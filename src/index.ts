@@ -19,6 +19,8 @@ interface AnalysisOptions {
   to: string;
   entryPattern?: string;
   exitPattern?: string;
+  ticker?: string;
+  timeframe?: string;
 }
 
 const program = new Command();
@@ -33,6 +35,8 @@ program
   .requiredOption('--to <date>', 'End date (YYYY-MM-DD)')
   .option('--entry-pattern <pattern>', 'Entry pattern to use (default: quick-rise)', 'quick-rise')
   .option('--exit-pattern <pattern>', 'Exit pattern to use (default: fixed-time)', 'fixed-time')
+  .option('--ticker <symbol>', 'Ticker to analyze (default: SPY)', 'SPY')
+  .option('--timeframe <period>', 'Data resolution (default: 1min)', '1min')
   .action(async (options: AnalysisOptions) => {
     try {
       // Get the appropriate patterns based on command line options
@@ -51,7 +55,7 @@ program
             column5::BIGINT as volume,
             strftime(column0, '%Y-%m-%d') as trade_date,
             strftime(column0, '%Y') as year
-          FROM read_csv_auto('tickers/SPY/SPY_full_1min_adjsplit.csv', header=false)
+          FROM read_csv_auto('tickers/${options.ticker}/${options.timeframe}.csv', header=false)
           WHERE column0 >= '${options.from} 00:00:00'
             AND column0 <= '${options.to} 23:59:59'
         ),

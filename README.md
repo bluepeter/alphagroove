@@ -81,6 +81,24 @@ pnpm start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise --exit-p
 | `--to <YYYY-MM-DD>`         | End date (inclusive)   | Required   |
 | `--entry-pattern <pattern>` | Entry pattern to use   | quick-rise |
 | `--exit-pattern <pattern>`  | Exit pattern to use    | fixed-time |
+| `--ticker <symbol>`         | Ticker to analyze      | SPY        |
+| `--timeframe <period>`      | Data resolution        | 1min       |
+
+### Available Timeframes
+
+The system supports any timeframe granularity using the format `<number><unit>`, where:
+
+- `<number>` is the duration (e.g., 1, 5, 15, 30)
+- `<unit>` is the time unit (min, hour, day)
+
+Common timeframes include:
+
+- `1min`: 1-minute bars
+- `5min`: 5-minute bars
+- `15min`: 15-minute bars
+- `30min`: 30-minute bars
+- `1hour`: 1-hour bars
+- `1day`: Daily bars
 
 ### Available Patterns
 
@@ -92,30 +110,18 @@ pnpm start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise --exit-p
 
 - `fixed-time`: Exits the trade 10 minutes after entry
 
-Example usage with different patterns:
+Example usage with different options:
 
 ```bash
-# Use default patterns
+# Use default patterns and SPY 1-minute data
 pnpm dev:start --from 2020-01-01 --to 2025-05-02
 
-# Specify different patterns
-pnpm dev:start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise --exit-pattern fixed-time
+# Specify different patterns and timeframe
+pnpm dev:start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise --exit-pattern fixed-time --timeframe 5min
+
+# Analyze a different ticker
+pnpm dev:start --from 2020-01-01 --to 2025-05-02 --ticker QQQ --timeframe 1hour
 ```
-
-## Available Commands
-
-### read-spy
-
-Reads and analyzes SPY data within a specified date range.
-
-```bash
-pnpm dev:start read-spy --from <YYYY-MM-DD> --to <YYYY-MM-DD>
-```
-
-Options:
-
-- `--from`: Start date (inclusive)
-- `--to`: End date (inclusive)
 
 ## Project Setup
 
@@ -136,7 +142,7 @@ alphagroove/
 │   ├── index.ts        # Main entry point
 │   └── index.test.ts   # Tests for index.ts
 ├── tickers/            # Market data organized by ticker and timeframe
-│   ├── SPY/            # SPY ticker data (25 years of historical data)
+│   ├── SPY/            # SPY ticker data
 │   │   ├── 1min.csv    # 1-minute timeframe data
 │   │   └── ...         # Other timeframes
 │   └── README.md       # Documentation for the data structure

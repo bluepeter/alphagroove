@@ -1,40 +1,79 @@
-# AlphaGroove Ticker Data
+# Market Data Structure
 
-This directory contains market data organized by ticker symbol and timeframe for pattern analysis in
-AlphaGroove.
+This directory contains historical market data organized by ticker symbol. Each ticker has its own
+subdirectory containing data files for different timeframes.
 
-## Data Organization
+## Directory Structure
 
 ```
 tickers/
-├── SPY/                 # SPY ticker data
-│   ├── 1min.csv         # 1-minute timeframe data
-│   ├── 5min.csv         # 5-minute timeframe data
-│   ├── 30min.csv        # 30-minute timeframe data
-│   ├── 1hour.csv        # 1-hour timeframe data
-│   └── 1day.csv         # Daily timeframe data
-└── README.md            # This file
+├── SPY/                # SPY ticker data
+│   ├── 1min.csv       # 1-minute timeframe data
+│   ├── 5min.csv       # 5-minute timeframe data
+│   ├── 15min.csv      # 15-minute timeframe data
+│   ├── 30min.csv      # 30-minute timeframe data
+│   ├── 1hour.csv      # 1-hour timeframe data
+│   └── 1day.csv       # Daily timeframe data
+└── TEST/              # Test data for development and testing
+    ├── 1min.csv       # Test data with known patterns
+    ├── 5min.csv       # Test data with known patterns
+    └── 1day.csv       # Test data with known patterns
 ```
 
-## Data Format
+## File Format
 
-All price data files follow the same CSV format:
+Each CSV file contains the following columns:
 
+1. Timestamp (YYYY-MM-DD HH:MM:SS)
+2. Open price
+3. High price
+4. Low price
+5. Close price
+6. Volume
+
+## Timeframe Naming Convention
+
+Files are named using a simple format: `<number><unit>.csv` where:
+
+- `<number>` is the duration (e.g., 1, 5, 15, 30)
+- `<unit>` is the time unit (min, hour, day)
+
+Examples:
+
+- `1min.csv`: 1-minute bars
+- `5min.csv`: 5-minute bars
+- `30min.csv`: 30-minute bars
+- `1hour.csv`: 1-hour bars
+- `1day.csv`: Daily bars
+
+The system supports any timeframe granularity that follows this naming convention.
+
+## Test Data
+
+The `TEST/` directory contains a small dataset designed for testing and development:
+
+- Covers a 1-week period
+- Includes various market conditions
+- Contains known patterns for testing
+- Includes edge cases and special scenarios
+
+## Usage
+
+When running the analysis tool, you can specify:
+
+- Which ticker to analyze (default: SPY)
+- Which timeframe to use (default: 1min)
+- Where to find the data (default: tickers/)
+
+Example:
+
+```bash
+# Analyze SPY 1-minute data
+pnpm dev:start --from 2020-01-01 --to 2025-05-02 --ticker SPY --timeframe 1min
+
+# Analyze test data
+pnpm dev:start --from 2024-01-01 --to 2024-01-07 --ticker TEST --timeframe 1min
 ```
-timestamp,open,high,low,close,volume
-2025-04-21 09:30:00,521.16,521.7,520.08,520.6,837232
-2025-04-21 09:35:00,520.58,520.68,519.0,519.9901,1023443
-...
-```
-
-### Field Descriptions
-
-- `timestamp`: Date and time in format 'YYYY-MM-DD HH:MM:SS' (Eastern Time)
-- `open`: Opening price for the period
-- `high`: Highest price during the period
-- `low`: Lowest price during the period
-- `close`: Closing price for the period
-- `volume`: Volume in number of shares traded
 
 ## Data Characteristics
 
@@ -43,14 +82,6 @@ timestamp,open,high,low,close,volume
 - **Zero Volume**: Periods with zero volume are omitted (gaps in timestamp sequence)
 - **Trading Hours**: Data may include pre-market (4:00 AM - 9:30 AM), regular market (9:30 AM - 4:00
   PM), and after-hours (4:00 PM - 8:00 PM) sessions
-
-## Available Timeframes
-
-- **1min**: 1-minute bars
-- **5min**: 5-minute bars
-- **30min**: 30-minute bars
-- **1hour**: 1-hour bars
-- **1day**: Daily bars
 
 ## Data Sources
 
