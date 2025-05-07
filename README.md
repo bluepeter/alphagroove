@@ -32,7 +32,7 @@ alphagroove/
 │   ├── index.ts        # Main entry point
 │   └── index.test.ts   # Tests for index.ts
 ├── tickers/            # Market data organized by ticker and timeframe
-│   ├── SPY/            # SPY ticker data
+│   ├── SPY/            # SPY ticker data (25 years of historical data)
 │   │   ├── 1min.csv    # 1-minute timeframe data
 │   │   └── ...         # Other timeframes
 │   └── README.md       # Documentation for the data structure
@@ -83,6 +83,101 @@ pnpm test
 - Review other repos that are one directory back from this one (`../`) to see how their coding
   standards and tech stack are used.
 
+## Proposed Pattern Architecture
+
+The project will implement a modular pattern system where each trading pattern consists of paired
+entry and exit conditions. This architecture will allow for flexible strategy development and
+testing.
+
+### Proposed Pattern Structure
+
+```
+src/patterns/
+├── types.ts           # Common interfaces and types
+├── entry/            # Entry pattern implementations
+│   ├── open-up-1pct.ts
+│   └── ...
+├── exit/             # Exit pattern implementations
+│   ├── fixed-time.ts
+│   ├── take-profit.ts
+│   └── ...
+└── backtest.ts       # Backtesting engine
+```
+
+### Proposed Pattern Interfaces
+
+```typescript
+interface EntryPattern {
+  id: string;
+  name: string;
+  description: string;
+  detect(data: MarketData): EntrySignal[];
+}
+
+interface ExitPattern {
+  id: string;
+  name: string;
+  description: string;
+  detect(data: MarketData, entry: EntrySignal): ExitSignal[];
+}
+```
+
+### Planned Exit Strategies
+
+The system will include several built-in exit strategies:
+
+1. **Fixed Time Exit**: Exit after a specified duration (e.g., 30 minutes)
+2. **Take Profit Exit**: Exit when price reaches a target profit level
+3. **Stop Loss Exit**: Exit when price hits a stop loss level
+4. **Trailing Stop Exit**: Exit when price retraces from its peak by a specified amount
+
+### Proposed Backtesting Logic
+
+The backtesting engine will follow this process:
+
+1. Load market data for the specified date range
+2. For each day:
+   - Run entry pattern detection
+   - For each entry signal:
+     - Run exit pattern detection
+     - Calculate returns and metrics
+3. Aggregate results across all days
+4. Generate performance statistics
+
+### Execution Modeling
+
+The backtesting engine will include realistic execution modeling to account for real-world trading
+conditions:
+
+1. **Slippage Model**:
+
+   - Entry slippage: Simulates the difference between signal price and actual execution
+   - Exit slippage: Accounts for market impact when closing positions
+   - Configurable slippage parameters based on:
+     - Time of day (higher during open/close)
+     - Volume conditions
+     - Position size
+
+2. **Execution Delays**:
+
+   - Signal processing delay
+   - Order routing delay
+   - Fill confirmation delay
+
+3. **Order Types**:
+
+   - Market orders (immediate execution with slippage)
+   - Limit orders (execution at specified price or better)
+   - Stop orders (execution at specified price or worse)
+
+4. **Position Sizing**:
+   - Fixed size per trade
+   - Percentage of account
+   - Risk-based sizing (e.g., fixed risk per trade)
+
+These execution models will help provide more realistic backtesting results and better estimate
+real-world performance.
+
 ## Future Implementation Plan
 
 ### 1. DuckDB Integration
@@ -116,27 +211,7 @@ await db.exec(`
 `);
 ```
 
-### 2. Pattern Architecture
-
-Patterns will follow a modular architecture:
-
-```
-src/patterns/
-├── base-pattern.ts     # Abstract base class with common functionality
-├── open-up-1pct/       # Individual pattern implementation
-│   ├── index.ts        # Pattern definition and logic
-│   ├── query.sql       # SQL query for pattern detection
-│   └── test.ts         # Pattern-specific tests
-└── ...
-```
-
-Each pattern module will implement a standard interface:
-
-- `analyze(options)`: Run the pattern detection algorithm
-- `getMetrics()`: Calculate statistics on the results
-- `describe()`: Return a human-readable description of the pattern
-
-### 3. Command Line Interface
+### 2. Command Line Interface
 
 The CLI will be implemented using Commander.js with:
 
@@ -145,7 +220,7 @@ The CLI will be implemented using Commander.js with:
 - Command validation
 - Support for chaining commands
 
-### 4. Visualization
+### 3. Visualization
 
 For the visualization option, AlphaGroove will generate interactive charts using:
 
