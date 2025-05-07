@@ -6,4 +6,6 @@ dist/
 .env
 .env.local
 .pnpm-debug.log
-tickers/*/*.csv
+tickers/*
+!tickers/TEST/
+!tickers/TEST/*.csv
