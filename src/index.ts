@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
 import { execSync } from 'child_process';
+
 import { Command } from 'commander';
+
 import { getEntryPattern, getExitPattern } from './patterns/pattern-factory.js';
 import {
   printHeader,
