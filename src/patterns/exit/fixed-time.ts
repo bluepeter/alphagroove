@@ -1,4 +1,5 @@
-import { Bar, Signal } from '../types.js';
+import { Bar, Signal } from '../types';
+import { PatternDefinition } from '../pattern-factory';
 
 export interface FixedTimeExitConfig {
   barsAfterEntry: number;
@@ -24,12 +25,6 @@ export function detectFixedTimeExit(
     price: bars[exitIndex].close,
     type: 'exit',
   };
-}
-
-export interface PatternDefinition {
-  name: string;
-  description: string;
-  sql: string;
 }
 
 export const fixedTimeExitPattern: PatternDefinition = {

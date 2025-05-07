@@ -19,7 +19,7 @@ export function detectQuickRiseEntry(
     const lookbackBars = bars.slice(i - (config.maxBars - 1), i + 1);
     const minOpen = Math.min(...lookbackBars.map(bar => bar.open));
     const currentHigh = bars[i].high;
-    const risePct = ((currentHigh - minOpen) / minOpen) * 100;
+    const risePct = Number((((currentHigh - minOpen) / minOpen) * 100).toFixed(2));
 
     if (risePct >= config.percentIncrease) {
       return {
