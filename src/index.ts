@@ -61,13 +61,25 @@ program
         trading_days: 0,
         total_matches: 0,
         total_return_sum: 0,
+        median_return: 0,
+        std_dev_return: 0,
+        win_rate: 0,
+        winning_trades: 0,
       };
 
       let currentYear = '';
       let yearStats = null;
       let seenYears = new Set();
+      let allReturns = [];
 
       for (const trade of trades) {
+        // Update total return sum and win count
+        totalStats.total_return_sum += trade.return_pct;
+        if (trade.return_pct >= 0) {
+          totalStats.winning_trades++;
+        }
+        allReturns.push(trade.return_pct);
+
         // If we're starting a new year, print the previous year's summary
         if (trade.year !== currentYear) {
           if (yearStats) {
@@ -84,6 +96,9 @@ program
             min_return: trade.min_return,
             max_return: trade.max_return,
             avg_return: trade.avg_return,
+            median_return: trade.median_return || 0,
+            std_dev_return: trade.std_dev_return || 0,
+            win_rate: trade.win_rate || 0,
           };
           printYearHeader(trade.year);
 
@@ -95,9 +110,6 @@ program
           }
         }
 
-        // Update total return sum
-        totalStats.total_return_sum += trade.return_pct;
-
         // Print trade details
         printTradeDetails(trade);
       }
@@ -106,6 +118,24 @@ program
       if (yearStats) {
         printYearSummary(yearStats);
       }
+
+      // Calculate final stats
+      totalStats.win_rate =
+        totalStats.total_matches > 0 ? totalStats.winning_trades / totalStats.total_matches : 0;
+      totalStats.median_return =
+        allReturns.length > 0
+          ? allReturns.sort((a, b) => a - b)[Math.floor(allReturns.length / 2)]
+          : 0;
+      totalStats.std_dev_return =
+        allReturns.length > 0
+          ? Math.sqrt(
+              allReturns.reduce(
+                (acc, val) =>
+                  acc + Math.pow(val - totalStats.total_return_sum / totalStats.total_matches, 2),
+                0
+              ) / allReturns.length
+            )
+          : 0;
 
       // Print overall summary
       printOverallSummary(totalStats);

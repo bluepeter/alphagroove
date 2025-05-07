@@ -96,6 +96,9 @@ export const printYearSummary = (stats: {
   min_return: number;
   max_return: number;
   avg_return: number;
+  median_return: number;
+  std_dev_return: number;
+  win_rate: number;
 }): void => {
   const returnColor = stats.avg_return >= 0 ? colors.fg.green : colors.fg.red;
   const returnEmoji = stats.avg_return >= 0 ? emojis.success : emojis.error;
@@ -104,22 +107,20 @@ export const printYearSummary = (stats: {
   console.log(
     `${colors.bright}${colors.fg.cyan}${emojis.chart} ${stats.year} Summary${colors.reset}`
   );
-  console.log(`${colors.dim}Trading Days: ${stats.trading_days}${colors.reset}`);
   console.log(
-    `${colors.dim}Trades: ${stats.match_count} (${(
+    `${colors.dim}Trading Days: ${stats.trading_days} | Trades: ${stats.match_count} (${(
       (stats.match_count / stats.trading_days) *
       100
     ).toFixed(1)}% of days)${colors.reset}`
   );
   console.log(
-    `${colors.dim}Rise Range: ${stats.min_rise_pct.toFixed(2)}% to ${stats.max_rise_pct.toFixed(2)}% (avg: ${stats.avg_rise_pct.toFixed(2)}%)${colors.reset}`
+    `${colors.dim}Move: ${stats.min_rise_pct.toFixed(2)}% to ${stats.max_rise_pct.toFixed(2)}% (avg: ${stats.avg_rise_pct.toFixed(2)}%) | Return: ${stats.min_return.toFixed(2)}% to ${stats.max_return.toFixed(2)}%${colors.reset}`
   );
+  console.log(`${returnColor}${returnEmoji} Performance Stats:${colors.reset}`);
   console.log(
-    `${colors.dim}Return Range: ${stats.min_return.toFixed(2)}% to ${stats.max_return.toFixed(2)}%${colors.reset}`
+    `${colors.dim}  Mean: ${stats.avg_return.toFixed(2)}% | Median: ${stats.median_return.toFixed(2)}% | StdDev: ${stats.std_dev_return.toFixed(2)}%${colors.reset}`
   );
-  console.log(
-    `${returnColor}${returnEmoji} Average Return: ${stats.avg_return.toFixed(2)}%${colors.reset}`
-  );
+  console.log(`${colors.dim}  Win Rate: ${(stats.win_rate * 100).toFixed(1)}%${colors.reset}`);
   console.log('-'.repeat(80) + '\n');
 };
 
@@ -127,6 +128,9 @@ export const printOverallSummary = (stats: {
   trading_days: number;
   total_matches: number;
   total_return_sum: number;
+  median_return: number;
+  std_dev_return: number;
+  win_rate: number;
 }): void => {
   const avgReturn = stats.total_matches > 0 ? stats.total_return_sum / stats.total_matches : 0;
   const returnColor = avgReturn >= 0 ? colors.fg.green : colors.fg.red;
@@ -134,16 +138,17 @@ export const printOverallSummary = (stats: {
 
   console.log('\n' + '='.repeat(80));
   console.log(`${colors.bright}${colors.fg.cyan}${emojis.chart} Overall Summary${colors.reset}`);
-  console.log(`${colors.dim}Total Trading Days: ${stats.trading_days}${colors.reset}`);
   console.log(
-    `${colors.dim}Total Trades: ${stats.total_matches} (${(
+    `${colors.dim}Trading Days: ${stats.trading_days} | Trades: ${stats.total_matches} (${(
       (stats.total_matches / stats.trading_days) *
       100
     ).toFixed(1)}% of days)${colors.reset}`
   );
+  console.log(`${returnColor}${returnEmoji} Performance Stats:${colors.reset}`);
   console.log(
-    `${returnColor}${returnEmoji} Average Return: ${avgReturn.toFixed(2)}%${colors.reset}`
+    `${colors.dim}  Mean: ${avgReturn.toFixed(2)}% | Median: ${stats.median_return.toFixed(2)}% | StdDev: ${stats.std_dev_return.toFixed(2)}%${colors.reset}`
   );
+  console.log(`${colors.dim}  Win Rate: ${(stats.win_rate * 100).toFixed(1)}%${colors.reset}`);
   console.log('='.repeat(80) + '\n');
 };
 

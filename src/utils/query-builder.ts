@@ -91,7 +91,10 @@ export const buildAnalysisQuery = (options: QueryOptions): string => {
         AVG(t.rise_pct) as avg_rise_pct,
         MIN(t.return_pct) as min_return,
         MAX(t.return_pct) as max_return,
-        AVG(t.return_pct) as avg_return
+        AVG(t.return_pct) as avg_return,
+        MEDIAN(t.return_pct) as median_return,
+        STDDEV(t.return_pct) as std_dev_return,
+        SUM(CASE WHEN t.return_pct >= 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT as win_rate
       FROM individual_trades t
       JOIN trading_days d ON t.year = d.year
       GROUP BY t.year, d.total_trading_days
@@ -105,7 +108,10 @@ export const buildAnalysisQuery = (options: QueryOptions): string => {
       y.avg_rise_pct,
       y.min_return,
       y.max_return,
-      y.avg_return
+      y.avg_return,
+      y.median_return,
+      y.std_dev_return,
+      y.win_rate
     FROM individual_trades t
     JOIN yearly_stats y ON t.year = y.year
     ORDER BY t.trade_date, t.entry_time;`;

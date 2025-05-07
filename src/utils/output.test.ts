@@ -98,6 +98,9 @@ describe('output utilities', () => {
         min_return: -0.32,
         max_return: 0.64,
         avg_return: 0.15,
+        median_return: 0.12,
+        std_dev_return: 0.25,
+        win_rate: 0.75,
       };
 
       printYearSummary(stats);
@@ -106,9 +109,12 @@ describe('output utilities', () => {
       expect(output).toContain('2025 Summary');
       expect(output).toContain('Trading Days: 2');
       expect(output).toContain('Trades: 12 (600.0% of days)');
-      expect(output).toContain('Rise Range: 0.30% to 0.45%');
-      expect(output).toContain('Return Range: -0.32% to 0.64%');
-      expect(output).toContain('Average Return: 0.15%');
+      expect(output).toContain('Move: 0.30% to 0.45% (avg: 0.35%)');
+      expect(output).toContain('Return: -0.32% to 0.64%');
+      expect(output).toContain('Mean: 0.15%');
+      expect(output).toContain('Median: 0.12%');
+      expect(output).toContain('StdDev: 0.25%');
+      expect(output).toContain('Win Rate: 75.0%');
       expect(output).toContain('✅'); // Success emoji for positive return
     });
   });
@@ -119,15 +125,21 @@ describe('output utilities', () => {
         trading_days: 2,
         total_matches: 12,
         total_return_sum: 1.8,
+        median_return: 0.12,
+        std_dev_return: 0.25,
+        win_rate: 0.75,
       };
 
       printOverallSummary(stats);
 
       const output = consoleLogSpy.mock.calls.map(call => call[0]).join('\n');
       expect(output).toContain('Overall Summary');
-      expect(output).toContain('Total Trading Days: 2');
-      expect(output).toContain('Total Trades: 12 (600.0% of days)');
-      expect(output).toContain('Average Return: 0.15%');
+      expect(output).toContain('Trading Days: 2');
+      expect(output).toContain('Trades: 12 (600.0% of days)');
+      expect(output).toContain('Mean: 0.15%');
+      expect(output).toContain('Median: 0.12%');
+      expect(output).toContain('StdDev: 0.25%');
+      expect(output).toContain('Win Rate: 75.0%');
       expect(output).toContain('✅'); // Success emoji for positive return
     });
 
@@ -136,13 +148,20 @@ describe('output utilities', () => {
         trading_days: 2,
         total_matches: 0,
         total_return_sum: 0,
+        median_return: 0,
+        std_dev_return: 0,
+        win_rate: 0,
       };
 
       printOverallSummary(stats);
 
       const output = consoleLogSpy.mock.calls.map(call => call[0]).join('\n');
-      expect(output).toContain('Total Trades: 0 (0.0% of days)');
-      expect(output).toContain('Average Return: 0.00%');
+      expect(output).toContain('Trading Days: 2');
+      expect(output).toContain('Trades: 0 (0.0% of days)');
+      expect(output).toContain('Mean: 0.00%');
+      expect(output).toContain('Median: 0.00%');
+      expect(output).toContain('StdDev: 0.00%');
+      expect(output).toContain('Win Rate: 0.0%');
     });
   });
 
