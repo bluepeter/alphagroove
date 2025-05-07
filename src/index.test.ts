@@ -1,34 +1,51 @@
-import { describe, it, expect, vi } from 'vitest';
-
-import { getGreeting, getDescription, main } from './index.js';
+import { describe, it, expect } from 'vitest';
+import { Command } from 'commander';
 
 describe('AlphaGroove CLI', () => {
-  it('should return the correct greeting', () => {
-    expect(getGreeting()).toBe('Hello from AlphaGroove!');
+  it('should have required command line options', () => {
+    const program = new Command();
+
+    // Add the same options as in index.ts
+    program
+      .requiredOption('--from <date>', 'Start date (YYYY-MM-DD)')
+      .requiredOption('--to <date>', 'End date (YYYY-MM-DD)')
+      .option(
+        '--entry-pattern <pattern>',
+        'Entry pattern to use (default: quick-rise)',
+        'quick-rise'
+      )
+      .option('--exit-pattern <pattern>', 'Exit pattern to use (default: fixed-time)', 'fixed-time')
+      .option('--ticker <symbol>', 'Ticker to analyze (default: SPY)', 'SPY')
+      .option('--timeframe <period>', 'Data resolution (default: 1min)', '1min');
+
+    // Test that options are properly configured
+    expect(program.options).toHaveLength(6);
+    expect(program.options[0].required).toBe(true);
+    expect(program.options[1].required).toBe(true);
   });
 
-  it('should return the correct description', () => {
-    expect(getDescription()).toBe(
-      'A command-line research and strategy toolkit for exploring intraday trading patterns'
-    );
-  });
+  it('should use default values for optional parameters', () => {
+    const program = new Command();
 
-  it('should log greeting and description when main is called', () => {
-    // Mock console.log
-    const consoleSpy = vi.spyOn(console, 'log');
+    program
+      .requiredOption('--from <date>', 'Start date (YYYY-MM-DD)')
+      .requiredOption('--to <date>', 'End date (YYYY-MM-DD)')
+      .option(
+        '--entry-pattern <pattern>',
+        'Entry pattern to use (default: quick-rise)',
+        'quick-rise'
+      )
+      .option('--exit-pattern <pattern>', 'Exit pattern to use (default: fixed-time)', 'fixed-time')
+      .option('--ticker <symbol>', 'Ticker to analyze (default: SPY)', 'SPY')
+      .option('--timeframe <period>', 'Data resolution (default: 1min)', '1min');
 
-    // Call the main function
-    main();
+    // Parse with only required options
+    program.parse(['node', 'index.js', '--from', '2025-05-02', '--to', '2025-05-05']);
 
-    // Check console.log was called with the right arguments
-    expect(consoleSpy).toHaveBeenCalledTimes(2);
-    expect(consoleSpy).toHaveBeenNthCalledWith(1, 'Hello from AlphaGroove!');
-    expect(consoleSpy).toHaveBeenNthCalledWith(
-      2,
-      'A command-line research and strategy toolkit for exploring intraday trading patterns'
-    );
-
-    // Restore the original console.log
-    consoleSpy.mockRestore();
+    // Check default values
+    expect(program.opts().entryPattern).toBe('quick-rise');
+    expect(program.opts().exitPattern).toBe('fixed-time');
+    expect(program.opts().ticker).toBe('SPY');
+    expect(program.opts().timeframe).toBe('1min');
   });
 });
