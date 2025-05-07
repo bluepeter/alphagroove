@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { detectFixedTimeExit, FixedTimeExitConfig } from './fixed-time.js';
+
 import { Bar, Signal } from '../types.js';
+
+import { detectFixedTimeExit, FixedTimeExitConfig } from './fixed-time.js';
 
 describe('Fixed Time Exit Pattern', () => {
   const createBar = (timestamp: string, close: number): Bar => ({
