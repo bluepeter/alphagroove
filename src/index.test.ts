@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
 import { Command } from 'commander';
+import { describe, it, expect } from 'vitest';
 
 describe('AlphaGroove CLI', () => {
   it('should have required command line options', () => {

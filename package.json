@@ -31,7 +31,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "format": "prettier --write \"src/**/*.ts\"",
-    "lint": "eslint . --ext .ts"
+    "lint": "eslint . --ext .ts && prettier --check \"src/**/*.ts\"",
+    "lint:fix": "pnpm lint --fix && pnpm format"
   },
   "dependencies": {
     "commander": "^13.1.0",

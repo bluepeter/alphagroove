@@ -1,5 +1,5 @@
-import { Bar, Signal } from '../types';
 import { PatternDefinition } from '../pattern-factory';
+import { Bar, Signal } from '../types';
 
 export interface FixedTimeExitConfig {
   barsAfterEntry: number;
