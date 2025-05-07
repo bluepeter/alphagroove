@@ -51,7 +51,7 @@ export const quickRisePattern: PatternDefinition = {
         e.exit_price,
         CASE 
           WHEN f.five_min_high >= f.market_open * 1.003 AND e.exit_price IS NOT NULL 
-          THEN ((e.exit_price - f.five_min_high) / f.five_min_high * 100)
+          THEN ((e.exit_price - f.five_min_high) / f.five_min_high * 100)  -- Calculate return from entry to exit
           ELSE NULL
         END as trade_return,
         ((f.five_min_high - f.market_open) / f.market_open * 100) as rise_pct

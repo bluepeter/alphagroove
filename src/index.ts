@@ -78,22 +78,20 @@ program
             MIN(low) as day_low,
             MAX(high) as day_high,
             SUM(volume) as day_volume,
-            ((MAX(high) - MIN(low)) / MIN(low) * 100) as day_range_pct,
             MIN(timestamp) as day_start,
             MAX(timestamp) as day_end
           FROM raw_data
+          WHERE strftime(timestamp, '%H:%M') BETWEEN '09:30' AND '16:00'  -- Only count regular market hours
           GROUP BY trade_date, year
         ),
         yearly_stats AS (
           SELECT 
             year,
-            COUNT(*) as total_bars,
+            SUM(bar_count) as total_bars,  -- Sum the daily bar counts
             COUNT(DISTINCT trade_date) as trading_days,
             MIN(day_low) as min_price,
             MAX(day_high) as max_price,
             SUM(day_volume) as total_volume,
-            AVG(day_range_pct) as avg_daily_range,
-            COUNT(CASE WHEN day_range_pct > 1.0 THEN 1 END) as significant_move_days,
             MIN(day_start) as first_bar,
             MAX(day_end) as last_bar
           FROM daily_stats
@@ -126,17 +124,39 @@ program
             f.market_open,
             f.five_min_high,
             f.entry_time,
-            LEAD(close, 10) OVER (
-              PARTITION BY f.trade_date 
-              ORDER BY r.timestamp
-            ) as exit_price,
-            LEAD(r.timestamp, 10) OVER (
-              PARTITION BY f.trade_date 
-              ORDER BY r.timestamp
-            ) as exit_time
+            r.close as exit_price,
+            r.timestamp as exit_time
           FROM five_min_prices f
           JOIN raw_data r ON f.trade_date = r.trade_date
-          WHERE r.timestamp >= f.entry_time
+          WHERE strftime(r.timestamp, '%H:%M') = '09:45'  -- Get exactly 9:45am bar
+        ),
+        entry_triggers AS (
+          SELECT 
+            trade_date,
+            year,
+            COUNT(*) as trigger_count
+          FROM (
+            SELECT 
+              trade_date,
+              year,
+              FIRST_VALUE(open) OVER (PARTITION BY trade_date ORDER BY timestamp) as market_open,
+              MAX(high) OVER (
+                PARTITION BY trade_date 
+                ORDER BY timestamp 
+                ROWS BETWEEN CURRENT ROW AND 4 FOLLOWING
+              ) as five_min_high
+            FROM raw_data
+            WHERE strftime(timestamp, '%H:%M') = '09:30'
+          ) t
+          WHERE (five_min_high - market_open) / market_open >= 0.003  -- 0.3% rise
+          GROUP BY trade_date, year
+        ),
+        trigger_stats AS (
+          SELECT 
+            year,
+            COUNT(*) as days_with_triggers
+          FROM entry_triggers
+          GROUP BY year
         ),
         pattern_matches AS (
           ${quickRisePattern.sql}
@@ -148,10 +168,9 @@ program
           y.min_price,
           y.max_price,
           y.total_volume,
-          y.avg_daily_range,
-          y.significant_move_days,
           y.first_bar,
           y.last_bar,
+          COALESCE(t.days_with_triggers, 0) as days_with_triggers,
           COALESCE(p.match_count, 0) as match_count,
           COALESCE(p.total_returns, 0) as total_returns,
           p.min_rise_pct,
@@ -165,6 +184,7 @@ program
           p.min_exit,
           p.max_exit
         FROM yearly_stats y
+        LEFT JOIN trigger_stats t ON y.year = t.year
         LEFT JOIN pattern_matches p ON y.year = p.year
         ORDER BY y.year;
       `;
@@ -192,10 +212,9 @@ program
         min_price: Infinity,
         max_price: -Infinity,
         total_volume: 0,
-        avg_daily_range: 0,
-        significant_move_days: 0,
         total_matches: 0,
         total_returns: 0,
+        total_return_sum: 0,
       };
 
       for (const stats of yearlyStats) {
@@ -205,26 +224,19 @@ program
         totalStats.min_price = Math.min(totalStats.min_price, stats.min_price);
         totalStats.max_price = Math.max(totalStats.max_price, stats.max_price);
         totalStats.total_volume += stats.total_volume;
-        totalStats.avg_daily_range += stats.avg_daily_range * stats.trading_days;
-        totalStats.significant_move_days += stats.significant_move_days;
         totalStats.total_matches += stats.match_count;
-        totalStats.total_returns += stats.total_returns;
+        if (stats.match_count > 0) {
+          totalStats.total_return_sum += stats.avg_return * stats.match_count;
+        }
 
         console.log(`\n${colors.bright}${emojis.calendar} ${stats.year} Summary:${colors.reset}`);
-        console.log(`${colors.dim}Total bars: ${stats.total_bars}${colors.reset}`);
         console.log(`${colors.dim}Trading days: ${stats.trading_days}${colors.reset}`);
-        console.log(
-          `${colors.dim}Price range: $${stats.min_price.toFixed(2)} - $${stats.max_price.toFixed(2)}${colors.reset}`
-        );
-        console.log(
-          `${colors.dim}Average daily range: ${stats.avg_daily_range.toFixed(2)}%${colors.reset}`
-        );
-        console.log(
-          `${colors.dim}Days with >1% range: ${stats.significant_move_days} (${((stats.significant_move_days / stats.trading_days) * 100).toFixed(1)}% of days)${colors.reset}`
-        );
 
         if (stats.match_count > 0) {
           console.log(`\n${colors.bright}${emojis.money} Pattern Statistics:${colors.reset}`);
+          console.log(
+            `${colors.cyan}Trades executed: ${stats.match_count} (${((stats.match_count / stats.trading_days) * 100).toFixed(1)}% of days)${colors.reset}`
+          );
           console.log(
             `${colors.green}Rise %: ${stats.min_rise_pct.toFixed(2)}% to ${stats.max_rise_pct.toFixed(2)}% (avg: ${stats.avg_rise_pct.toFixed(2)}%)${colors.reset}`
           );
@@ -236,41 +248,21 @@ program
           console.log(
             `${returnColor}${returnEmoji} Returns: ${stats.min_return.toFixed(2)}% to ${stats.max_return.toFixed(2)}% (avg: ${stats.avg_return.toFixed(2)}%)${colors.reset}`
           );
-          console.log(
-            `${colors.blue}Entry prices: $${stats.min_entry.toFixed(2)} to $${stats.max_entry.toFixed(2)}${colors.reset}`
-          );
-          console.log(
-            `${colors.blue}Exit prices: $${stats.min_exit.toFixed(2)} to $${stats.max_exit.toFixed(2)}${colors.reset}`
-          );
         } else {
-          console.log(
-            `\n${colors.yellow}${emojis.warning} No pattern matches found${colors.reset}`
-          );
+          console.log(`\n${colors.yellow}${emojis.warning} No trades executed${colors.reset}`);
         }
       }
 
       // Display overall statistics
       console.log(`\n${colors.bright}${emojis.chart} Overall Summary:${colors.reset}`);
-      console.log(`${colors.dim}Total bars: ${totalStats.total_bars}${colors.reset}`);
       console.log(`${colors.dim}Trading days: ${totalStats.trading_days}${colors.reset}`);
       console.log(
-        `${colors.dim}Price range: $${totalStats.min_price.toFixed(2)} - $${totalStats.max_price.toFixed(2)}${colors.reset}`
-      );
-      console.log(
-        `${colors.dim}Average daily range: ${(totalStats.avg_daily_range / totalStats.trading_days).toFixed(2)}%${colors.reset}`
-      );
-      console.log(
-        `${colors.dim}Days with >1% range: ${totalStats.significant_move_days} (${((totalStats.significant_move_days / totalStats.trading_days) * 100).toFixed(1)}% of days)${colors.reset}`
-      );
-
-      const overallAvgReturn = totalStats.total_returns / totalStats.total_matches;
-      const overallColor = overallAvgReturn >= 0 ? colors.green : colors.red;
-      const overallEmoji = overallAvgReturn >= 0 ? emojis.success : emojis.failure;
-
-      console.log(
-        `${colors.bright}Total pattern matches: ${totalStats.total_matches}${colors.reset}`
+        `${colors.bright}Total trades executed: ${totalStats.total_matches} (${((totalStats.total_matches / totalStats.trading_days) * 100).toFixed(1)}% of days)${colors.reset}`
       );
       if (totalStats.total_matches > 0) {
+        const overallAvgReturn = totalStats.total_return_sum / totalStats.total_matches;
+        const overallColor = overallAvgReturn >= 0 ? colors.green : colors.red;
+        const overallEmoji = overallAvgReturn >= 0 ? emojis.success : emojis.failure;
         console.log(
           `${overallColor}${overallEmoji} Overall average return: ${overallAvgReturn.toFixed(2)}%${colors.reset}`
         );
