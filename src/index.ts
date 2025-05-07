@@ -7,6 +7,32 @@ import { Command } from 'commander';
 import { quickRisePattern } from './patterns/entry/quick-rise.js';
 import { fixedTimeExitPattern } from './patterns/exit/fixed-time.js';
 
+// ANSI color codes
+const colors = {
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  dim: '\x1b[2m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  magenta: '\x1b[35m',
+  cyan: '\x1b[36m',
+  white: '\x1b[37m',
+};
+
+// Emojis
+const emojis = {
+  chart: '📊',
+  calendar: '📅',
+  money: '💰',
+  arrow: '➡️',
+  warning: '⚠️',
+  info: 'ℹ️',
+  success: '✅',
+  failure: '❌',
+};
+
 interface ReadSpyOptions {
   from: string;
   to: string;
@@ -73,26 +99,44 @@ program
           FROM daily_stats
           GROUP BY year
         ),
-        price_changes AS (
+        market_open_prices AS (
           SELECT 
-            timestamp,
-            open,
-            close,
             trade_date,
             year,
-            MIN(open) OVER (
-              ORDER BY timestamp ASC 
-              ROWS BETWEEN 4 PRECEDING AND CURRENT ROW
-            ) as min_open_5min,
-            LEAD(close, 10) OVER (
-              PARTITION BY trade_date 
-              ORDER BY timestamp
-            ) as exit_price,
-            LEAD(timestamp, 10) OVER (
-              PARTITION BY trade_date 
-              ORDER BY timestamp
-            ) as exit_time
+            open as market_open,
+            timestamp as market_open_time
           FROM raw_data
+          WHERE strftime(timestamp, '%H:%M') = '09:30'
+        ),
+        five_min_prices AS (
+          SELECT 
+            m.trade_date,
+            m.year,
+            m.market_open,
+            r.high as five_min_high,
+            r.timestamp as entry_time
+          FROM market_open_prices m
+          JOIN raw_data r ON m.trade_date = r.trade_date
+          WHERE strftime(r.timestamp, '%H:%M') = '09:35'
+        ),
+        exit_prices AS (
+          SELECT 
+            f.trade_date,
+            f.year,
+            f.market_open,
+            f.five_min_high,
+            f.entry_time,
+            LEAD(close, 10) OVER (
+              PARTITION BY f.trade_date 
+              ORDER BY r.timestamp
+            ) as exit_price,
+            LEAD(r.timestamp, 10) OVER (
+              PARTITION BY f.trade_date 
+              ORDER BY r.timestamp
+            ) as exit_time
+          FROM five_min_prices f
+          JOIN raw_data r ON f.trade_date = r.trade_date
+          WHERE r.timestamp >= f.entry_time
         ),
         pattern_matches AS (
           ${quickRisePattern.sql}
@@ -109,7 +153,17 @@ program
           y.first_bar,
           y.last_bar,
           COALESCE(p.match_count, 0) as match_count,
-          COALESCE(p.total_returns, 0) as total_returns
+          COALESCE(p.total_returns, 0) as total_returns,
+          p.min_rise_pct,
+          p.max_rise_pct,
+          p.avg_rise_pct,
+          p.min_return,
+          p.max_return,
+          p.avg_return,
+          p.min_entry,
+          p.max_entry,
+          p.min_exit,
+          p.max_exit
         FROM yearly_stats y
         LEFT JOIN pattern_matches p ON y.year = p.year
         ORDER BY y.year;
@@ -122,9 +176,15 @@ program
       const yearlyStats = JSON.parse(result);
 
       // Process and display results by year
-      console.log(`\nSPY Analysis (${options.from} to ${options.to}):`);
-      console.log(`Entry Pattern: ${quickRisePattern.name}`);
-      console.log(`Exit Pattern: ${fixedTimeExitPattern.name}`);
+      console.log(
+        `\n${colors.bright}${emojis.chart} SPY Analysis (${options.from} to ${options.to}):${colors.reset}`
+      );
+      console.log(
+        `${colors.cyan}${emojis.info} Entry Pattern: ${quickRisePattern.name}${colors.reset}`
+      );
+      console.log(
+        `${colors.cyan}${emojis.info} Exit Pattern: ${fixedTimeExitPattern.name}${colors.reset}`
+      );
 
       let totalStats = {
         total_bars: 0,
@@ -145,50 +205,83 @@ program
         totalStats.min_price = Math.min(totalStats.min_price, stats.min_price);
         totalStats.max_price = Math.max(totalStats.max_price, stats.max_price);
         totalStats.total_volume += stats.total_volume;
-        totalStats.avg_daily_range += stats.avg_daily_range * stats.trading_days; // Weighted average
+        totalStats.avg_daily_range += stats.avg_daily_range * stats.trading_days;
         totalStats.significant_move_days += stats.significant_move_days;
         totalStats.total_matches += stats.match_count;
         totalStats.total_returns += stats.total_returns;
 
-        console.log(`\n${stats.year} Summary:`);
-        console.log(`Total bars: ${stats.total_bars}`);
-        console.log(`Trading days: ${stats.trading_days}`);
-        console.log(`Price range: $${stats.min_price.toFixed(2)} - $${stats.max_price.toFixed(2)}`);
-        console.log(`Average daily range: ${stats.avg_daily_range.toFixed(2)}%`);
+        console.log(`\n${colors.bright}${emojis.calendar} ${stats.year} Summary:${colors.reset}`);
+        console.log(`${colors.dim}Total bars: ${stats.total_bars}${colors.reset}`);
+        console.log(`${colors.dim}Trading days: ${stats.trading_days}${colors.reset}`);
         console.log(
-          `Days with >1% range: ${stats.significant_move_days} (${((stats.significant_move_days / stats.trading_days) * 100).toFixed(1)}% of days)`
+          `${colors.dim}Price range: $${stats.min_price.toFixed(2)} - $${stats.max_price.toFixed(2)}${colors.reset}`
         );
-        console.log(`Pattern matches: ${stats.match_count}`);
+        console.log(
+          `${colors.dim}Average daily range: ${stats.avg_daily_range.toFixed(2)}%${colors.reset}`
+        );
+        console.log(
+          `${colors.dim}Days with >1% range: ${stats.significant_move_days} (${((stats.significant_move_days / stats.trading_days) * 100).toFixed(1)}% of days)${colors.reset}`
+        );
+
         if (stats.match_count > 0) {
-          const avgReturn = stats.total_returns / stats.match_count;
-          console.log(`Average pattern return: ${avgReturn.toFixed(2)}%`);
+          console.log(`\n${colors.bright}${emojis.money} Pattern Statistics:${colors.reset}`);
+          console.log(
+            `${colors.green}Rise %: ${stats.min_rise_pct.toFixed(2)}% to ${stats.max_rise_pct.toFixed(2)}% (avg: ${stats.avg_rise_pct.toFixed(2)}%)${colors.reset}`
+          );
+
+          const avgReturn = stats.avg_return;
+          const returnColor = avgReturn >= 0 ? colors.green : colors.red;
+          const returnEmoji = avgReturn >= 0 ? emojis.success : emojis.failure;
+
+          console.log(
+            `${returnColor}${returnEmoji} Returns: ${stats.min_return.toFixed(2)}% to ${stats.max_return.toFixed(2)}% (avg: ${stats.avg_return.toFixed(2)}%)${colors.reset}`
+          );
+          console.log(
+            `${colors.blue}Entry prices: $${stats.min_entry.toFixed(2)} to $${stats.max_entry.toFixed(2)}${colors.reset}`
+          );
+          console.log(
+            `${colors.blue}Exit prices: $${stats.min_exit.toFixed(2)} to $${stats.max_exit.toFixed(2)}${colors.reset}`
+          );
+        } else {
+          console.log(
+            `\n${colors.yellow}${emojis.warning} No pattern matches found${colors.reset}`
+          );
         }
       }
 
       // Display overall statistics
-      console.log('\nOverall Summary:');
-      console.log(`Total bars: ${totalStats.total_bars}`);
-      console.log(`Trading days: ${totalStats.trading_days}`);
+      console.log(`\n${colors.bright}${emojis.chart} Overall Summary:${colors.reset}`);
+      console.log(`${colors.dim}Total bars: ${totalStats.total_bars}${colors.reset}`);
+      console.log(`${colors.dim}Trading days: ${totalStats.trading_days}${colors.reset}`);
       console.log(
-        `Price range: $${totalStats.min_price.toFixed(2)} - $${totalStats.max_price.toFixed(2)}`
+        `${colors.dim}Price range: $${totalStats.min_price.toFixed(2)} - $${totalStats.max_price.toFixed(2)}${colors.reset}`
       );
       console.log(
-        `Average daily range: ${(totalStats.avg_daily_range / totalStats.trading_days).toFixed(2)}%`
+        `${colors.dim}Average daily range: ${(totalStats.avg_daily_range / totalStats.trading_days).toFixed(2)}%${colors.reset}`
       );
       console.log(
-        `Days with >1% range: ${totalStats.significant_move_days} (${((totalStats.significant_move_days / totalStats.trading_days) * 100).toFixed(1)}% of days)`
+        `${colors.dim}Days with >1% range: ${totalStats.significant_move_days} (${((totalStats.significant_move_days / totalStats.trading_days) * 100).toFixed(1)}% of days)${colors.reset}`
       );
-      console.log(`Total pattern matches: ${totalStats.total_matches}`);
+
+      const overallAvgReturn = totalStats.total_returns / totalStats.total_matches;
+      const overallColor = overallAvgReturn >= 0 ? colors.green : colors.red;
+      const overallEmoji = overallAvgReturn >= 0 ? emojis.success : emojis.failure;
+
+      console.log(
+        `${colors.bright}Total pattern matches: ${totalStats.total_matches}${colors.reset}`
+      );
       if (totalStats.total_matches > 0) {
         console.log(
-          `Overall average return: ${(totalStats.total_returns / totalStats.total_matches).toFixed(2)}%`
+          `${overallColor}${overallEmoji} Overall average return: ${overallAvgReturn.toFixed(2)}%${colors.reset}`
         );
       }
 
       // Note about detailed matches
-      console.log('\nNote: Run with a shorter date range to see detailed pattern matches.');
+      console.log(
+        `\n${colors.yellow}${emojis.info} Note: Run with a shorter date range to see detailed pattern matches.${colors.reset}`
+      );
     } catch (error) {
-      console.error('Error:', error);
+      console.error(`${colors.red}${emojis.failure} Error:${colors.reset}`, error);
       process.exit(1);
     }
   });

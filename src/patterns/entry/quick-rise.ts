@@ -7,7 +7,7 @@ export interface QuickRiseEntryConfig {
 
 export function detectQuickRiseEntry(
   bars: Bar[],
-  config: QuickRiseEntryConfig = { percentIncrease: 0.5, maxBars: 5 }
+  config: QuickRiseEntryConfig = { percentIncrease: 0.3, maxBars: 5 }
 ): Signal | null {
   if (bars.length < config.maxBars) {
     return null;
@@ -40,17 +40,42 @@ export interface PatternDefinition {
 
 export const quickRisePattern: PatternDefinition = {
   name: 'Quick Rise',
-  description: 'Detects when price rises 0.5% from the 5-minute low',
+  description: 'Detects when price rises 0.3% from 9:30am open to 9:35am high',
   sql: `
+    WITH daily_matches AS (
+      SELECT 
+        f.trade_date,
+        f.year,
+        f.market_open,
+        f.five_min_high as entry_price,
+        e.exit_price,
+        CASE 
+          WHEN f.five_min_high >= f.market_open * 1.003 AND e.exit_price IS NOT NULL 
+          THEN ((e.exit_price - f.five_min_high) / f.five_min_high * 100)
+          ELSE NULL
+        END as trade_return,
+        ((f.five_min_high - f.market_open) / f.market_open * 100) as rise_pct
+      FROM five_min_prices f
+      JOIN exit_prices e ON f.trade_date = e.trade_date
+      WHERE f.five_min_high >= f.market_open * 1.003  -- 0.3% rise
+        AND e.exit_price IS NOT NULL
+        AND e.exit_time IS NOT NULL
+    )
     SELECT 
       year,
-      COUNT(*) as match_count,
-      SUM(CASE WHEN open >= min_open_5min * 1.005 AND exit_price IS NOT NULL 
-        THEN ((exit_price - open) / open * 100) END) as total_returns
-    FROM price_changes
-    WHERE open >= min_open_5min * 1.005  -- 0.5% rise
-      AND exit_price IS NOT NULL
-      AND exit_time IS NOT NULL
+      COUNT(DISTINCT trade_date) as match_count,
+      SUM(trade_return) as total_returns,
+      MIN(rise_pct) as min_rise_pct,
+      MAX(rise_pct) as max_rise_pct,
+      AVG(rise_pct) as avg_rise_pct,
+      MIN(trade_return) as min_return,
+      MAX(trade_return) as max_return,
+      AVG(trade_return) as avg_return,
+      MIN(entry_price) as min_entry,
+      MAX(entry_price) as max_entry,
+      MIN(exit_price) as min_exit,
+      MAX(exit_price) as max_exit
+    FROM daily_matches
     GROUP BY year
   `,
 };

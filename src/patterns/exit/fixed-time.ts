@@ -34,7 +34,7 @@ export interface PatternDefinition {
 
 export const fixedTimeExitPattern: PatternDefinition = {
   name: 'Fixed Time Exit',
-  description: 'Exits after 10 minutes',
+  description: 'Exits exactly 10 minutes after entry (at 9:45am)',
   sql: `
     SELECT 
       year,
