@@ -13,6 +13,82 @@ batched analyses across date ranges, and output metrics like mean/median returns
 distribution buckets. AlphaGroove is intended for hands-on quant researchers who prefer scripting
 over spreadsheets, precision over black boxes, and clarity over curve-fitting.
 
+## Prerequisites
+
+### Required: DuckDB Installation
+
+AlphaGroove requires DuckDB to be installed on your system. This is a mandatory step before running
+the application.
+
+```bash
+# Install DuckDB using Homebrew
+brew install duckdb
+
+# Verify the installation
+duckdb --version
+```
+
+If you don't have Homebrew installed, you can install it from [brew.sh](https://brew.sh).
+
+### Node.js Setup
+
+The project requires Node.js 18 or later. We recommend using `pnpm` as the package manager.
+
+```bash
+# Install dependencies
+pnpm install
+```
+
+Note: The project uses a `pnpm-workspace.yaml` file to configure build behavior. This file tells
+pnpm to ignore build scripts for DuckDB since we're using the Homebrew-installed version instead of
+the Node.js package.
+
+## Quick Start
+
+1. First, ensure DuckDB is installed (see Prerequisites above)
+2. Install project dependencies:
+   ```bash
+   pnpm install
+   ```
+3. Run the application:
+
+   ```bash
+   # Run with specific date range
+   pnpm dev:start read-spy --from 2024-01-01 --to 2024-01-02
+
+   # Example output:
+   # SPY Data Summary (2024-01-01 to 2024-01-02):
+   # Total bars: 821
+   # First bar: 2024-01-02 04:00:00
+   # Last bar: 2024-01-02 19:59:00
+   # Price range: $470.49 - $476.36
+   ```
+
+For production use, build and run:
+
+```bash
+# Build the project
+pnpm build
+
+# Run the built version
+pnpm start read-spy --from 2024-01-01 --to 2024-01-02
+```
+
+## Available Commands
+
+### read-spy
+
+Reads and analyzes SPY data within a specified date range.
+
+```bash
+pnpm dev:start read-spy --from <YYYY-MM-DD> --to <YYYY-MM-DD>
+```
+
+Options:
+
+- `--from`: Start date (inclusive)
+- `--to`: End date (inclusive)
+
 ## Project Setup
 
 The project has been initialized with the following structure:
