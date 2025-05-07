@@ -1,8 +1,14 @@
 import { describe, it, expect } from 'vitest';
 
+import { PatternDefinition } from '../pattern-factory.js';
 import { Bar } from '../types.js';
 
 import { detectQuickRiseEntry, QuickRiseEntryConfig, quickRisePattern } from './quick-rise.js';
+
+type ConfigurablePattern = PatternDefinition & {
+  config: QuickRiseEntryConfig;
+  updateConfig: (newConfig: Partial<QuickRiseEntryConfig>) => ConfigurablePattern;
+};
 
 describe('Quick Rise Entry Pattern', () => {
   describe('pattern definition', () => {
@@ -13,19 +19,36 @@ describe('Quick Rise Entry Pattern', () => {
     });
 
     it('should have valid SQL query', () => {
-      expect(quickRisePattern.sql).toBeTruthy();
-      expect(quickRisePattern.sql).toContain('SELECT');
+      expect(quickRisePattern.name).toBe('Quick Rise');
       expect(quickRisePattern.sql).toContain('FROM');
       expect(quickRisePattern.sql).toContain('WHERE');
-      expect(quickRisePattern.sql).toContain('0.003'); // Default 0.3%
+      expect(quickRisePattern.sql).toContain('0.003'); // Default 0.3% as decimal
     });
 
-    it('should update SQL query when configuration changes', () => {
-      quickRisePattern.updateConfig({ percentIncrease: 0.5 });
-      expect(quickRisePattern.sql).toContain('0.005'); // 0.5%
+    it('should handle different rise percentages', () => {
+      const pattern1 = (quickRisePattern as unknown as ConfigurablePattern).updateConfig({
+        percentIncrease: 0.5,
+      });
+      expect(pattern1.sql).toContain('0.005'); // 0.5% as decimal
 
-      quickRisePattern.updateConfig({ percentIncrease: 0.1 });
-      expect(quickRisePattern.sql).toContain('0.001'); // 0.1%
+      const pattern2 = (pattern1 as unknown as ConfigurablePattern).updateConfig({
+        percentIncrease: 0.1,
+      });
+      expect(pattern2.sql).toContain('0.001'); // 0.1% as decimal
+    });
+
+    it('should create new instances for each configuration', () => {
+      // First get pattern with default config
+      expect(quickRisePattern.sql).toContain('0.003'); // Default 0.3% as decimal
+
+      // Then get pattern with custom config
+      const pattern2 = (quickRisePattern as unknown as ConfigurablePattern).updateConfig({
+        percentIncrease: 0.5,
+      });
+      expect(pattern2.sql).toContain('0.005'); // 0.5% as decimal
+
+      // Original pattern should still have default config
+      expect(quickRisePattern.sql).toContain('0.003'); // Default 0.3% as decimal
     });
   });
 

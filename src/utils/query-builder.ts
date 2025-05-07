@@ -1,14 +1,18 @@
-interface QueryOptions {
+export interface QueryOptions {
   ticker: string;
   timeframe: string;
   from: string;
   to: string;
   entryPattern?: string;
   exitPattern?: string;
+  risePct?: string;
 }
 
 export const buildAnalysisQuery = (options: QueryOptions): string => {
-  const { ticker, timeframe, from, to } = options;
+  const { ticker, timeframe, from, to, risePct } = options;
+
+  // Use the rise percentage directly, defaulting to 0.3 if not specified
+  const riseThreshold = (risePct ? parseFloat(risePct) : 0.3) / 100;
 
   return `
     WITH raw_data AS (
@@ -33,6 +37,10 @@ export const buildAnalysisQuery = (options: QueryOptions): string => {
       WHERE strftime(timestamp, '%H:%M') = '09:30'  -- Only count days with market open
         AND strftime(timestamp, '%w') NOT IN ('0', '6')  -- Exclude weekends
       GROUP BY year
+    ),
+    total_trading_days AS (
+      SELECT SUM(total_trading_days) as total_trading_days
+      FROM trading_days
     ),
     market_open_prices AS (
       SELECT 
@@ -76,32 +84,35 @@ export const buildAnalysisQuery = (options: QueryOptions): string => {
         exit_price,
         entry_time,
         exit_time,
-        ((five_min_high - market_open) / market_open * 100) as rise_pct,
-        ((exit_price - five_min_high) / five_min_high * 100) as return_pct
+        ((five_min_high - market_open) / market_open) as rise_pct,
+        ((exit_price - five_min_high) / five_min_high) as return_pct
       FROM exit_prices
-      WHERE (five_min_high - market_open) / market_open >= 0.003  -- 0.3% rise
+      WHERE ((five_min_high - market_open) / market_open) >= ${riseThreshold}
     ),
     yearly_stats AS (
       SELECT 
         t.year,
         d.total_trading_days,
+        ttd.total_trading_days as all_trading_days,
         COUNT(*) as match_count,
-        MIN(t.rise_pct) as min_rise_pct,
-        MAX(t.rise_pct) as max_rise_pct,
-        AVG(t.rise_pct) as avg_rise_pct,
-        MIN(t.return_pct) as min_return,
-        MAX(t.return_pct) as max_return,
-        AVG(t.return_pct) as avg_return,
-        MEDIAN(t.return_pct) as median_return,
-        STDDEV(t.return_pct) as std_dev_return,
+        MIN(t.rise_pct * 100) as min_rise_pct,
+        MAX(t.rise_pct * 100) as max_rise_pct,
+        AVG(t.rise_pct * 100) as avg_rise_pct,
+        MIN(t.return_pct * 100) as min_return,
+        MAX(t.return_pct * 100) as max_return,
+        AVG(t.return_pct * 100) as avg_return,
+        MEDIAN(t.return_pct * 100) as median_return,
+        CASE WHEN COUNT(*) > 1 THEN STDDEV(t.return_pct * 100) ELSE 0 END as std_dev_return,
         SUM(CASE WHEN t.return_pct >= 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT as win_rate
       FROM individual_trades t
       JOIN trading_days d ON t.year = d.year
-      GROUP BY t.year, d.total_trading_days
+      CROSS JOIN total_trading_days ttd
+      GROUP BY t.year, d.total_trading_days, ttd.total_trading_days
     )
     SELECT 
       t.*,
       y.total_trading_days,
+      y.all_trading_days,
       y.match_count,
       y.min_rise_pct,
       y.max_rise_pct,
@@ -114,5 +125,6 @@ export const buildAnalysisQuery = (options: QueryOptions): string => {
       y.win_rate
     FROM individual_trades t
     JOIN yearly_stats y ON t.year = y.year
-    ORDER BY t.trade_date, t.entry_time;`;
+    ORDER BY t.trade_date, t.entry_time;
+  `;
 };

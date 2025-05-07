@@ -2,10 +2,10 @@ import { PatternDefinition } from '../pattern-factory.js';
 import { Bar, Signal } from '../types.js';
 
 /**
- * Configuration options for the Quick Rise entry pattern.
+ * Configuration for the Quick Rise entry pattern.
  * @interface QuickRiseEntryConfig
- * @property {number} percentIncrease - The minimum percentage increase required to trigger the pattern (e.g., 0.3 for 0.3%)
- * @property {number} maxBars - The maximum number of bars to look back for the rise (default: 5 for 5-minute window)
+ * @property {number} percentIncrease - The minimum percentage increase required to trigger an entry (e.g., 0.3 for 0.3%)
+ * @property {number} maxBars - The maximum number of bars to look back for the rise
  */
 export interface QuickRiseEntryConfig {
   percentIncrease: number;
@@ -13,9 +13,11 @@ export interface QuickRiseEntryConfig {
 }
 
 /**
- * Default configuration for the Quick Rise pattern
+ * Default configuration for the Quick Rise pattern.
+ * - percentIncrease: 0.3 (0.3% minimum rise)
+ * - maxBars: 5 (look back up to 5 bars)
  */
-const DEFAULT_CONFIG: QuickRiseEntryConfig = {
+export const DEFAULT_CONFIG: QuickRiseEntryConfig = {
   percentIncrease: 0.3,
   maxBars: 5,
 };
@@ -106,14 +108,14 @@ const createSqlQuery = (config: QuickRiseEntryConfig = DEFAULT_CONFIG) => `
     SELECT 
       year,
       COUNT(*) as match_count,
-      MIN((five_min_high - market_open) / market_open * 100) as min_rise_pct,
-      MAX((five_min_high - market_open) / market_open * 100) as max_rise_pct,
-      AVG((five_min_high - market_open) / market_open * 100) as avg_rise_pct,
-      MIN((exit_price - five_min_high) / five_min_high * 100) as min_return,
-      MAX((exit_price - five_min_high) / five_min_high * 100) as max_return,
-      AVG((exit_price - five_min_high) / five_min_high * 100) as avg_return
+      MIN((five_min_high - market_open) / market_open) * 100 as min_rise_pct,
+      MAX((five_min_high - market_open) / market_open) * 100 as max_rise_pct,
+      AVG((five_min_high - market_open) / market_open) * 100 as avg_rise_pct,
+      MIN((exit_price - five_min_high) / five_min_high) * 100 as min_return,
+      MAX((exit_price - five_min_high) / five_min_high) * 100 as max_return,
+      AVG((exit_price - five_min_high) / five_min_high) * 100 as avg_return
     FROM exit_prices
-    WHERE (five_min_high - market_open) / market_open >= ${config.percentIncrease / 100}  -- Configurable rise percentage
+    WHERE ((five_min_high - market_open) / market_open) >= ${config.percentIncrease / 100}  -- Use decimal value
     GROUP BY year
   )
   SELECT * FROM pattern_matches
@@ -135,14 +137,18 @@ const createSqlQuery = (config: QuickRiseEntryConfig = DEFAULT_CONFIG) => `
  */
 export const quickRisePattern: PatternDefinition & {
   config: QuickRiseEntryConfig;
-  updateConfig: (newConfig: Partial<QuickRiseEntryConfig>) => void;
+  updateConfig: (newConfig: Partial<QuickRiseEntryConfig>) => PatternDefinition;
 } = {
   name: 'Quick Rise',
   description: 'Detects a configurable percentage rise in the first few minutes of trading',
   config: { ...DEFAULT_CONFIG },
   sql: createSqlQuery(DEFAULT_CONFIG),
   updateConfig(newConfig: Partial<QuickRiseEntryConfig>) {
-    this.config = { ...this.config, ...newConfig };
-    this.sql = createSqlQuery(this.config);
+    const updatedConfig = { ...this.config, ...newConfig };
+    return {
+      ...this,
+      config: updatedConfig,
+      sql: createSqlQuery(updatedConfig),
+    };
   },
 };

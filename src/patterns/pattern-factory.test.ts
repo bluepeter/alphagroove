@@ -39,6 +39,24 @@ describe('pattern factory', () => {
       });
       expect(pattern2.sql).toContain('0.01'); // 1.0%
     });
+
+    it('should create new instances for each configuration', () => {
+      // First get pattern with default config
+      const pattern1 = getEntryPattern('quick-rise');
+      expect(pattern1.sql).toContain('0.003'); // Default 0.3%
+
+      // Then get pattern with custom config
+      const pattern2 = getEntryPattern('quick-rise', {
+        'quick-rise': {
+          percentIncrease: 0.9,
+        },
+      });
+      expect(pattern2.sql).toContain('0.009'); // 0.9%
+
+      // Get another pattern with default config
+      const pattern3 = getEntryPattern('quick-rise');
+      expect(pattern3.sql).toContain('0.003'); // Should be back to default 0.3%
+    });
   });
 
   describe('getExitPattern', () => {

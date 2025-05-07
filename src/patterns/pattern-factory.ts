@@ -38,8 +38,10 @@ export const getEntryPattern = (name: string, options?: PatternOptions): Pattern
   // If it's quick-rise pattern and we have options, update the configuration
   if (name === 'quick-rise' && options?.['quick-rise']?.percentIncrease) {
     const quickRise = pattern as typeof quickRisePattern;
-    quickRise.updateConfig({ percentIncrease: options['quick-rise'].percentIncrease });
-    return quickRise;
+    return quickRise.updateConfig({
+      percentIncrease: options['quick-rise'].percentIncrease,
+      maxBars: 5, // Keep the default maxBars
+    });
   }
 
   return pattern;

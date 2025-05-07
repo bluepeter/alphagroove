@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 import { execSync } from 'child_process';
+import { writeFileSync, unlinkSync } from 'fs';
+import { join } from 'path';
 
 import { Command } from 'commander';
 
@@ -12,6 +14,7 @@ import {
   printYearSummary,
   printOverallSummary,
   printFooter,
+  Trade,
 } from './utils/output.js';
 import { buildAnalysisQuery } from './utils/query-builder.js';
 
@@ -23,6 +26,16 @@ interface AnalysisOptions {
   ticker: string;
   timeframe: string;
   risePct?: string;
+}
+
+interface TotalStats {
+  total_trading_days: number;
+  total_matches: number;
+  total_return_sum: number;
+  median_return: number;
+  std_dev_return: number;
+  win_rate: number;
+  winning_trades: number;
 }
 
 const program = new Command();
@@ -41,7 +54,7 @@ program
   .option('--timeframe <period>', 'Data resolution (default: 1min)', '1min')
   .option(
     '--rise-pct <number>',
-    'Minimum rise percentage for quick-rise pattern (default: 0.3)',
+    'Minimum rise percentage for quick-rise pattern (default: 0.3). Example: --rise-pct 0.5 for 0.5% rise',
     '0.3'
   )
   .action(async (options: AnalysisOptions) => {
@@ -56,19 +69,41 @@ program
 
       // Build and execute the query
       const query = buildAnalysisQuery(options);
-      const result = execSync(`duckdb -json -c "${query}"`, {
+
+      // Write query to a temporary file
+      const tempFile = join(process.cwd(), 'temp_query.sql');
+      writeFileSync(tempFile, query, 'utf-8');
+
+      // Execute the query and get CSV output
+      const result = execSync(`duckdb -csv -header < ${tempFile}`, {
         encoding: 'utf-8',
         maxBuffer: 100 * 1024 * 1024,
       });
 
-      const trades = JSON.parse(result);
+      // Clean up temporary file
+      unlinkSync(tempFile);
+
+      // Parse CSV output
+      const [header, ...lines] = result.trim().split('\n');
+      const columns = header.split(',');
+      const trades = lines.map(line => {
+        const values = line.split(',');
+        return columns.reduce(
+          (obj, col, i) => {
+            const value = values[i];
+            obj[col] = isNaN(Number(value)) ? value : Number(value);
+            return obj;
+          },
+          {} as Record<string, string | number>
+        );
+      });
 
       // Print header
-      printHeader(entryPattern.name, exitPattern.name, options.from, options.to);
+      printHeader(options.ticker, options.from, options.to, entryPattern.name, exitPattern.name);
 
       // Process and display trades by year
-      let totalStats = {
-        trading_days: 0,
+      let totalStats: TotalStats = {
+        total_trading_days: 0,
         total_matches: 0,
         total_return_sum: 0,
         median_return: 0,
@@ -78,76 +113,101 @@ program
       };
 
       let currentYear = '';
-      let yearStats = null;
+      let yearTrades: Trade[] = [];
       let seenYears = new Set();
-      let allReturns = [];
+      let allReturns: number[] = [];
+
+      // Get total trading days from first trade (all trades will have the same value)
+      if (trades.length > 0) {
+        totalStats.total_trading_days = trades[0].all_trading_days as number;
+      }
 
       for (const trade of trades) {
         // Update total return sum and win count
-        totalStats.total_return_sum += trade.return_pct;
-        if (trade.return_pct >= 0) {
+        totalStats.total_return_sum += trade.return_pct as number;
+        if ((trade.return_pct as number) >= 0) {
           totalStats.winning_trades++;
         }
-        allReturns.push(trade.return_pct);
+        allReturns.push(trade.return_pct as number);
 
         // If we're starting a new year, print the previous year's summary
         if (trade.year !== currentYear) {
-          if (yearStats) {
-            printYearSummary(yearStats);
+          if (yearTrades.length > 0) {
+            printYearSummary(Number(currentYear), yearTrades);
           }
-          currentYear = trade.year;
-          yearStats = {
-            year: trade.year,
-            trading_days: trade.total_trading_days,
-            match_count: trade.match_count,
-            min_rise_pct: trade.min_rise_pct,
-            max_rise_pct: trade.max_rise_pct,
-            avg_rise_pct: trade.avg_rise_pct,
-            min_return: trade.min_return,
-            max_return: trade.max_return,
-            avg_return: trade.avg_return,
-            median_return: trade.median_return || 0,
-            std_dev_return: trade.std_dev_return || 0,
-            win_rate: trade.win_rate || 0,
-          };
-          printYearHeader(trade.year);
+          currentYear = trade.year as string;
+          yearTrades = [];
+          printYearHeader(trade.year as string);
 
-          // Only add trading days and match count once per year
+          // Only add match count once per year
           if (!seenYears.has(trade.year)) {
             seenYears.add(trade.year);
-            totalStats.trading_days += trade.total_trading_days;
-            totalStats.total_matches += trade.match_count;
+            totalStats.total_matches += trade.match_count as number;
           }
         }
 
+        // Add trade to current year's trades
+        yearTrades.push({
+          trade_date: trade.trade_date as string,
+          entry_time: trade.entry_time as string,
+          exit_time: trade.exit_time as string,
+          market_open: trade.market_open as number,
+          entry_price: trade.entry_price as number,
+          exit_price: trade.exit_price as number,
+          rise_pct: trade.rise_pct as number,
+          return_pct: trade.return_pct as number,
+          year: parseInt(trade.year as string),
+          total_trading_days: trade.total_trading_days as number,
+          median_return: trade.median_return as number,
+          std_dev_return: trade.std_dev_return as number,
+          win_rate: trade.win_rate as number,
+        });
+
         // Print trade details
-        printTradeDetails(trade);
+        printTradeDetails({
+          trade_date: trade.trade_date as string,
+          entry_time: trade.entry_time as string,
+          exit_time: trade.exit_time as string,
+          market_open: trade.market_open as number,
+          entry_price: trade.entry_price as number,
+          exit_price: trade.exit_price as number,
+          rise_pct: trade.rise_pct as number,
+          return_pct: trade.return_pct as number,
+        });
       }
 
       // Print the last year's summary
-      if (yearStats) {
-        printYearSummary(yearStats);
+      if (yearTrades.length > 0) {
+        printYearSummary(Number(currentYear), yearTrades);
       }
 
       // Calculate final stats
       totalStats.win_rate =
         totalStats.total_matches > 0 ? totalStats.winning_trades / totalStats.total_matches : 0;
+
+      // Calculate mean return
+      const meanReturn =
+        allReturns.length > 0 ? allReturns.reduce((a, b) => a + b, 0) / allReturns.length : 0;
+
+      // Calculate median return
+      const sortedReturns = [...allReturns].sort((a, b) => a - b);
       totalStats.median_return =
-        allReturns.length > 0
-          ? allReturns.sort((a, b) => a - b)[Math.floor(allReturns.length / 2)]
-          : 0;
+        sortedReturns.length > 0 ? sortedReturns[Math.floor(sortedReturns.length / 2)] : 0;
+
+      // Calculate standard deviation
       totalStats.std_dev_return =
         allReturns.length > 0
           ? Math.sqrt(
-              allReturns.reduce(
-                (sum, ret) => sum + Math.pow(ret - totalStats.median_return, 2),
-                0
-              ) / allReturns.length
+              allReturns.reduce((sum, ret) => sum + Math.pow(ret - meanReturn, 2), 0) /
+                (allReturns.length - 1) // Use n-1 for sample standard deviation
             )
           : 0;
 
       // Print overall summary
-      printOverallSummary(totalStats);
+      printOverallSummary({
+        ...totalStats,
+        total_return_sum: meanReturn * totalStats.total_matches, // Update total return sum to match mean
+      });
 
       // Print footer
       printFooter();

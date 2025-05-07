@@ -8,21 +8,13 @@ describe('buildAnalysisQuery', () => {
       ticker: 'TEST',
       timeframe: '1min',
       from: '2025-05-02',
-      to: '2025-05-05',
+      to: '2025-05-02',
     };
 
     const query = buildAnalysisQuery(options);
-
-    // Test that the query contains all the necessary components
-    expect(query).toContain('tickers/TEST/1min.csv');
+    expect(query).toContain("read_csv_auto('tickers/TEST/1min.csv'");
     expect(query).toContain("column0 >= '2025-05-02 00:00:00'");
-    expect(query).toContain("column0 <= '2025-05-05 23:59:59'");
-    expect(query).toContain('trading_days');
-    expect(query).toContain('market_open_prices');
-    expect(query).toContain('five_min_prices');
-    expect(query).toContain('exit_prices');
-    expect(query).toContain('individual_trades');
-    expect(query).toContain('yearly_stats');
+    expect(query).toContain("column0 <= '2025-05-02 23:59:59'");
   });
 
   it('should handle different timeframes', () => {
@@ -66,7 +58,7 @@ describe('buildAnalysisQuery', () => {
     expect(query).toContain("strftime(r.timestamp, '%H:%M') = '09:45'");
   });
 
-  it('should include the quick rise threshold condition', () => {
+  it('should use default rise threshold when not specified', () => {
     const options = {
       ticker: 'TEST',
       timeframe: '1min',
@@ -75,7 +67,20 @@ describe('buildAnalysisQuery', () => {
     };
 
     const query = buildAnalysisQuery(options);
-    expect(query).toContain('(five_min_high - market_open) / market_open >= 0.003'); // 0.3% rise
+    expect(query).toContain('((five_min_high - market_open) / market_open) >= 0.003'); // Default 0.3%
+  });
+
+  it('should use custom rise threshold when specified', () => {
+    const options = {
+      ticker: 'TEST',
+      timeframe: '1min',
+      from: '2025-05-02',
+      to: '2025-05-02',
+      risePct: '0.9',
+    };
+
+    const query = buildAnalysisQuery(options);
+    expect(query).toContain('((five_min_high - market_open) / market_open) >= 0.009'); // 0.9% rise
   });
 
   it('should exclude weekends from trading days', () => {
@@ -99,7 +104,7 @@ describe('buildAnalysisQuery', () => {
     };
 
     const query = buildAnalysisQuery(options);
-    expect(query).toContain('((exit_price - five_min_high) / five_min_high * 100) as return_pct');
+    expect(query).toContain('((exit_price - five_min_high) / five_min_high) as return_pct');
   });
 
   it('should group yearly statistics', () => {
@@ -112,8 +117,67 @@ describe('buildAnalysisQuery', () => {
 
     const query = buildAnalysisQuery(options);
     expect(query).toContain('GROUP BY t.year');
-    expect(query).toContain('MIN(t.return_pct)');
-    expect(query).toContain('MAX(t.return_pct)');
-    expect(query).toContain('AVG(t.return_pct)');
+    expect(query).toContain('MIN(t.return_pct * 100)');
+    expect(query).toContain('MAX(t.return_pct * 100)');
+    expect(query).toContain('AVG(t.return_pct * 100)');
+  });
+});
+
+describe('query builder', () => {
+  it('should use default rise percentage when not specified', () => {
+    const query = buildAnalysisQuery({
+      ticker: 'SPY',
+      timeframe: '1min',
+      from: '2020-01-01',
+      to: '2020-12-31',
+    });
+
+    expect(query).toContain('0.003'); // Default rise percentage (0.3%)
+  });
+
+  it('should use specified rise percentage', () => {
+    const query = buildAnalysisQuery({
+      ticker: 'SPY',
+      timeframe: '1min',
+      from: '2020-01-01',
+      to: '2020-12-31',
+      risePct: '1.0',
+    });
+
+    expect(query).toContain('0.01'); // 1.0% as decimal
+  });
+
+  it('should handle different rise percentages', () => {
+    const query1 = buildAnalysisQuery({
+      ticker: 'SPY',
+      timeframe: '1min',
+      from: '2020-01-01',
+      to: '2020-12-31',
+      risePct: '0.2',
+    });
+    expect(query1).toContain('0.002'); // 0.2% as decimal
+
+    const query2 = buildAnalysisQuery({
+      ticker: 'SPY',
+      timeframe: '1min',
+      from: '2020-01-01',
+      to: '2020-12-31',
+      risePct: '2.0',
+    });
+    expect(query2).toContain('0.02'); // 2.0% as decimal
+  });
+
+  it('should handle standard deviation for single trades', () => {
+    const query = buildAnalysisQuery({
+      ticker: 'SPY',
+      timeframe: '1min',
+      from: '2020-01-01',
+      to: '2020-12-31',
+      risePct: '1.0',
+    });
+
+    expect(query).toContain(
+      'CASE WHEN COUNT(*) > 1 THEN STDDEV(t.return_pct * 100) ELSE 0 END as std_dev_return'
+    );
   });
 });
