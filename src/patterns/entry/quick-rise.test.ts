@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { detectQuickRiseEntry, QuickRiseEntryConfig } from './quick-rise.js';
+
 import { Bar } from '../types.js';
+
+import { detectQuickRiseEntry, QuickRiseEntryConfig } from './quick-rise.js';
 
 describe('Quick Rise Entry Pattern', () => {
   const createBar = (timestamp: string, open: number, high: number): Bar => ({
