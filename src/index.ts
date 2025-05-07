@@ -7,7 +7,9 @@ import { Command } from 'commander';
 import { getEntryPattern, getExitPattern } from './patterns/pattern-factory.js';
 import {
   printHeader,
-  printYearlySummary,
+  printYearHeader,
+  printTradeDetails,
+  printYearSummary,
   printOverallSummary,
   printFooter,
 } from './utils/output.js';
@@ -53,77 +55,150 @@ program
           WHERE column0 >= '${options.from} 00:00:00'
             AND column0 <= '${options.to} 23:59:59'
         ),
-        daily_stats AS (
+        trading_days AS (
+          SELECT 
+            year,
+            COUNT(DISTINCT trade_date) as total_trading_days
+          FROM raw_data
+          WHERE strftime(timestamp, '%H:%M') = '09:30'  -- Only count days with market open
+            AND strftime(timestamp, '%w') NOT IN ('0', '6')  -- Exclude weekends
+          GROUP BY year
+        ),
+        market_open_prices AS (
           SELECT 
             trade_date,
             year,
-            COUNT(*) as bar_count,
-            MIN(low) as day_low,
-            MAX(high) as day_high,
-            SUM(volume) as day_volume,
-            MIN(timestamp) as day_start,
-            MAX(timestamp) as day_end
+            open as market_open,
+            timestamp as market_open_time
           FROM raw_data
-          WHERE strftime(timestamp, '%H:%M') BETWEEN '09:30' AND '16:00'  -- Only count regular market hours
-          GROUP BY trade_date, year
+          WHERE strftime(timestamp, '%H:%M') = '09:30'
+        ),
+        five_min_prices AS (
+          SELECT 
+            m.trade_date,
+            m.year,
+            m.market_open,
+            r.high as five_min_high,
+            r.timestamp as entry_time
+          FROM market_open_prices m
+          JOIN raw_data r ON m.trade_date = r.trade_date
+          WHERE strftime(r.timestamp, '%H:%M') = '09:35'
+        ),
+        exit_prices AS (
+          SELECT 
+            f.trade_date,
+            f.year,
+            f.market_open,
+            f.five_min_high,
+            f.entry_time,
+            r.close as exit_price,
+            r.timestamp as exit_time
+          FROM five_min_prices f
+          JOIN raw_data r ON f.trade_date = r.trade_date
+          WHERE strftime(r.timestamp, '%H:%M') = '09:45'  -- Get exactly 9:45am bar
+        ),
+        individual_trades AS (
+          SELECT 
+            trade_date,
+            year,
+            market_open,
+            five_min_high as entry_price,
+            exit_price,
+            entry_time,
+            exit_time,
+            ((five_min_high - market_open) / market_open * 100) as rise_pct,
+            ((exit_price - five_min_high) / five_min_high * 100) as return_pct
+          FROM exit_prices
+          WHERE (five_min_high - market_open) / market_open >= 0.003  -- 0.3% rise
         ),
         yearly_stats AS (
           SELECT 
-            year,
-            SUM(bar_count) as total_bars,  -- Sum the daily bar counts
-            COUNT(DISTINCT trade_date) as trading_days,
-            MIN(day_low) as min_price,
-            MAX(day_high) as max_price,
-            SUM(day_volume) as total_volume,
-            MIN(day_start) as first_bar,
-            MAX(day_end) as last_bar
-          FROM daily_stats
-          GROUP BY year
-        ),
-        pattern_matches AS (
-          ${entryPattern.sql}
+            t.year,
+            d.total_trading_days,
+            COUNT(*) as match_count,
+            MIN(t.rise_pct) as min_rise_pct,
+            MAX(t.rise_pct) as max_rise_pct,
+            AVG(t.rise_pct) as avg_rise_pct,
+            MIN(t.return_pct) as min_return,
+            MAX(t.return_pct) as max_return,
+            AVG(t.return_pct) as avg_return
+          FROM individual_trades t
+          JOIN trading_days d ON t.year = d.year
+          GROUP BY t.year, d.total_trading_days
         )
         SELECT 
-          y.year,
-          y.trading_days,
-          COALESCE(p.match_count, 0) as match_count,
-          p.min_rise_pct,
-          p.max_rise_pct,
-          p.avg_rise_pct,
-          p.min_return,
-          p.max_return,
-          p.avg_return
-        FROM yearly_stats y
-        LEFT JOIN pattern_matches p ON y.year = p.year
-        ORDER BY y.year;`;
+          t.*,
+          y.total_trading_days,
+          y.match_count,
+          y.min_rise_pct,
+          y.max_rise_pct,
+          y.avg_rise_pct,
+          y.min_return,
+          y.max_return,
+          y.avg_return
+        FROM individual_trades t
+        JOIN yearly_stats y ON t.year = y.year
+        ORDER BY t.trade_date, t.entry_time;`;
 
       const result = execSync(`duckdb -json -c "${query}"`, {
         encoding: 'utf-8',
         maxBuffer: 100 * 1024 * 1024,
       });
 
-      const yearlyStats = JSON.parse(result);
+      const trades = JSON.parse(result);
 
       // Print header
       printHeader(entryPattern.name, exitPattern.name, options.from, options.to);
 
-      // Process and display results by year
+      // Process and display trades by year
       let totalStats = {
         trading_days: 0,
         total_matches: 0,
         total_return_sum: 0,
       };
 
-      for (const stats of yearlyStats) {
-        // Update total statistics
-        totalStats.trading_days += stats.trading_days;
-        totalStats.total_matches += stats.match_count;
-        if (stats.match_count > 0) {
-          totalStats.total_return_sum += stats.avg_return * stats.match_count;
+      let currentYear = '';
+      let yearStats = null;
+      let seenYears = new Set();
+
+      for (const trade of trades) {
+        // If we're starting a new year, print the previous year's summary
+        if (trade.year !== currentYear) {
+          if (yearStats) {
+            printYearSummary(yearStats);
+          }
+          currentYear = trade.year;
+          yearStats = {
+            year: trade.year,
+            trading_days: trade.total_trading_days,
+            match_count: trade.match_count,
+            min_rise_pct: trade.min_rise_pct,
+            max_rise_pct: trade.max_rise_pct,
+            avg_rise_pct: trade.avg_rise_pct,
+            min_return: trade.min_return,
+            max_return: trade.max_return,
+            avg_return: trade.avg_return,
+          };
+          printYearHeader(trade.year);
+
+          // Only add trading days and match count once per year
+          if (!seenYears.has(trade.year)) {
+            seenYears.add(trade.year);
+            totalStats.trading_days += trade.total_trading_days;
+            totalStats.total_matches += trade.match_count;
+          }
         }
 
-        // Print yearly summary
-        printYearlySummary(stats);
+        // Update total return sum
+        totalStats.total_return_sum += trade.return_pct;
+
+        // Print trade details
+        printTradeDetails(trade);
+      }
+
+      // Print the last year's summary
+      if (yearStats) {
+        printYearSummary(yearStats);
       }
 
       // Print overall summary

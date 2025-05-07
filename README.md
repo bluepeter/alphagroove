@@ -53,15 +53,14 @@ the Node.js package.
 3. Run the application:
 
    ```bash
-   # Run with specific date range
-   pnpm dev:start read-spy --from 2024-01-01 --to 2024-01-02
+   # Run with specific date range and patterns
+   pnpm dev:start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise --exit-pattern fixed-time
 
    # Example output:
-   # SPY Data Summary (2024-01-01 to 2024-01-02):
-   # Total bars: 821
-   # First bar: 2024-01-02 04:00:00
-   # Last bar: 2024-01-02 19:59:00
-   # Price range: $470.49 - $476.36
+   # SPY Analysis (2020-01-01 to 2025-05-02):
+   # Entry Pattern: Quick Rise
+   # Exit Pattern: Fixed Time Exit
+   # ...
    ```
 
 For production use, build and run:
@@ -71,7 +70,36 @@ For production use, build and run:
 pnpm build
 
 # Run the built version
-pnpm start read-spy --from 2024-01-01 --to 2024-01-02
+pnpm start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise --exit-pattern fixed-time
+```
+
+## Available Options
+
+| Option                      | Description            | Default    |
+| --------------------------- | ---------------------- | ---------- |
+| `--from <YYYY-MM-DD>`       | Start date (inclusive) | Required   |
+| `--to <YYYY-MM-DD>`         | End date (inclusive)   | Required   |
+| `--entry-pattern <pattern>` | Entry pattern to use   | quick-rise |
+| `--exit-pattern <pattern>`  | Exit pattern to use    | fixed-time |
+
+### Available Patterns
+
+#### Entry Patterns
+
+- `quick-rise`: Detects a 0.3% rise in the first 5 minutes of trading
+
+#### Exit Patterns
+
+- `fixed-time`: Exits the trade 10 minutes after entry
+
+Example usage with different patterns:
+
+```bash
+# Use default patterns
+pnpm dev:start --from 2020-01-01 --to 2025-05-02
+
+# Specify different patterns
+pnpm dev:start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise --exit-pattern fixed-time
 ```
 
 ## Available Commands
