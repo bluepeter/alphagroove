@@ -1,3 +1,4 @@
+import { PatternDefinition } from '../pattern-factory.js';
 import { Bar, Signal } from '../types.js';
 
 export interface QuickRiseEntryConfig {
@@ -32,50 +33,57 @@ export function detectQuickRiseEntry(
   return null;
 }
 
-export interface PatternDefinition {
-  name: string;
-  description: string;
-  sql: string;
-}
-
 export const quickRisePattern: PatternDefinition = {
   name: 'Quick Rise',
-  description: 'Detects when price rises 0.3% from 9:30am open to 9:35am high',
+  description: 'Detects a 0.3% rise in the first 5 minutes of trading',
   sql: `
-    WITH daily_matches AS (
+    WITH market_open_prices AS (
+      SELECT 
+        trade_date,
+        year,
+        open as market_open,
+        timestamp as market_open_time
+      FROM raw_data
+      WHERE strftime(timestamp, '%H:%M') = '09:30'
+    ),
+    five_min_prices AS (
+      SELECT 
+        m.trade_date,
+        m.year,
+        m.market_open,
+        r.high as five_min_high,
+        r.timestamp as entry_time
+      FROM market_open_prices m
+      JOIN raw_data r ON m.trade_date = r.trade_date
+      WHERE strftime(r.timestamp, '%H:%M') = '09:35'
+    ),
+    exit_prices AS (
       SELECT 
         f.trade_date,
         f.year,
         f.market_open,
-        f.five_min_high as entry_price,
-        e.exit_price,
-        CASE 
-          WHEN f.five_min_high >= f.market_open * 1.003 AND e.exit_price IS NOT NULL 
-          THEN ((e.exit_price - f.five_min_high) / f.five_min_high * 100)  -- Calculate return from entry to exit
-          ELSE NULL
-        END as trade_return,
-        ((f.five_min_high - f.market_open) / f.market_open * 100) as rise_pct
+        f.five_min_high,
+        f.entry_time,
+        r.close as exit_price,
+        r.timestamp as exit_time
       FROM five_min_prices f
-      JOIN exit_prices e ON f.trade_date = e.trade_date
-      WHERE f.five_min_high >= f.market_open * 1.003  -- 0.3% rise
-        AND e.exit_price IS NOT NULL
-        AND e.exit_time IS NOT NULL
+      JOIN raw_data r ON f.trade_date = r.trade_date
+      WHERE strftime(r.timestamp, '%H:%M') = '09:45'  -- Get exactly 9:45am bar
+    ),
+    pattern_matches AS (
+      SELECT 
+        year,
+        COUNT(*) as match_count,
+        MIN((five_min_high - market_open) / market_open * 100) as min_rise_pct,
+        MAX((five_min_high - market_open) / market_open * 100) as max_rise_pct,
+        AVG((five_min_high - market_open) / market_open * 100) as avg_rise_pct,
+        MIN((exit_price - five_min_high) / five_min_high * 100) as min_return,
+        MAX((exit_price - five_min_high) / five_min_high * 100) as max_return,
+        AVG((exit_price - five_min_high) / five_min_high * 100) as avg_return
+      FROM exit_prices
+      WHERE (five_min_high - market_open) / market_open >= 0.003  -- 0.3% rise
+      GROUP BY year
     )
-    SELECT 
-      year,
-      COUNT(DISTINCT trade_date) as match_count,
-      SUM(trade_return) as total_returns,
-      MIN(rise_pct) as min_rise_pct,
-      MAX(rise_pct) as max_rise_pct,
-      AVG(rise_pct) as avg_rise_pct,
-      MIN(trade_return) as min_return,
-      MAX(trade_return) as max_return,
-      AVG(trade_return) as avg_return,
-      MIN(entry_price) as min_entry,
-      MAX(entry_price) as max_entry,
-      MIN(exit_price) as min_exit,
-      MAX(exit_price) as max_exit
-    FROM daily_matches
-    GROUP BY year
+    SELECT * FROM pattern_matches
   `,
 };
