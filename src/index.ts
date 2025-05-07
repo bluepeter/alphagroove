@@ -22,6 +22,7 @@ interface AnalysisOptions {
   exitPattern?: string;
   ticker: string;
   timeframe: string;
+  risePct?: string;
 }
 
 const program = new Command();
@@ -38,10 +39,19 @@ program
   .option('--exit-pattern <pattern>', 'Exit pattern to use (default: fixed-time)', 'fixed-time')
   .option('--ticker <symbol>', 'Ticker to analyze (default: SPY)', 'SPY')
   .option('--timeframe <period>', 'Data resolution (default: 1min)', '1min')
+  .option(
+    '--rise-pct <number>',
+    'Minimum rise percentage for quick-rise pattern (default: 0.3)',
+    '0.3'
+  )
   .action(async (options: AnalysisOptions) => {
     try {
       // Get the appropriate patterns based on command line options
-      const entryPattern = getEntryPattern(options.entryPattern || 'quick-rise');
+      const entryPattern = getEntryPattern(options.entryPattern || 'quick-rise', {
+        'quick-rise': {
+          percentIncrease: parseFloat(options.risePct || '0.3'),
+        },
+      });
       const exitPattern = getExitPattern(options.exitPattern || 'fixed-time');
 
       // Build and execute the query
@@ -130,8 +140,7 @@ program
         allReturns.length > 0
           ? Math.sqrt(
               allReturns.reduce(
-                (acc, val) =>
-                  acc + Math.pow(val - totalStats.total_return_sum / totalStats.total_matches, 2),
+                (sum, ret) => sum + Math.pow(ret - totalStats.median_return, 2),
                 0
               ) / allReturns.length
             )
@@ -143,11 +152,7 @@ program
       // Print footer
       printFooter();
     } catch (error) {
-      console.error('Error during analysis:', error);
-      if (error instanceof Error) {
-        console.error('Error details:', error.message);
-        console.error('Stack trace:', error.stack);
-      }
+      console.error('Error:', error);
       process.exit(1);
     }
   });

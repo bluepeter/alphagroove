@@ -7,6 +7,13 @@ export interface PatternDefinition {
   sql: string;
 }
 
+// Each pattern can define its own options
+export type PatternOptions = {
+  'quick-rise'?: {
+    percentIncrease: number;
+  };
+};
+
 type PatternMap = {
   [key: string]: PatternDefinition;
 };
@@ -20,13 +27,21 @@ const exitPatterns: PatternMap = {
   'fixed-time': fixedTimeExitPattern,
 };
 
-export const getEntryPattern = (name: string): PatternDefinition => {
+export const getEntryPattern = (name: string, options?: PatternOptions): PatternDefinition => {
   const pattern = entryPatterns[name];
   if (!pattern) {
     throw new Error(
       `Entry pattern '${name}' not found. Available patterns: ${Object.keys(entryPatterns).join(', ')}`
     );
   }
+
+  // If it's quick-rise pattern and we have options, update the configuration
+  if (name === 'quick-rise' && options?.['quick-rise']?.percentIncrease) {
+    const quickRise = pattern as typeof quickRisePattern;
+    quickRise.updateConfig({ percentIncrease: options['quick-rise'].percentIncrease });
+    return quickRise;
+  }
+
   return pattern;
 };
 

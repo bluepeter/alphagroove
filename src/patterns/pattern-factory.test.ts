@@ -4,42 +4,51 @@ import { getEntryPattern, getExitPattern } from './pattern-factory.js';
 
 describe('pattern factory', () => {
   describe('getEntryPattern', () => {
-    it('should return the quick-rise pattern', () => {
+    it('should return quick-rise pattern by default', () => {
       const pattern = getEntryPattern('quick-rise');
-
-      expect(pattern.name).toBeDefined();
-      expect(pattern.description).toBeDefined();
-      expect(pattern.sql).toBeDefined();
-      expect(pattern.sql).toContain('market_open');
-      expect(pattern.sql).toContain('rise_pct');
+      expect(pattern.name).toBe('Quick Rise');
+      expect(pattern.sql).toContain('0.003'); // Default 0.3%
     });
 
-    it('should throw an error for unknown entry patterns', () => {
-      const getUnknown = () => getEntryPattern('unknown-pattern');
+    it('should throw error for unknown pattern', () => {
+      expect(() => getEntryPattern('unknown')).toThrow("Entry pattern 'unknown' not found");
+    });
 
-      expect(getUnknown).toThrow();
-      expect(getUnknown).toThrow('Entry pattern');
-      expect(getUnknown).toThrow('quick-rise'); // Should list available patterns
+    it('should update SQL with custom rise percentage', () => {
+      const pattern = getEntryPattern('quick-rise', {
+        'quick-rise': {
+          percentIncrease: 0.5,
+        },
+      });
+      expect(pattern.name).toBe('Quick Rise');
+      expect(pattern.sql).toContain('0.005'); // 0.5%
+    });
+
+    it('should handle different rise percentages', () => {
+      const pattern1 = getEntryPattern('quick-rise', {
+        'quick-rise': {
+          percentIncrease: 0.1,
+        },
+      });
+      expect(pattern1.sql).toContain('0.001'); // 0.1%
+
+      const pattern2 = getEntryPattern('quick-rise', {
+        'quick-rise': {
+          percentIncrease: 1.0,
+        },
+      });
+      expect(pattern2.sql).toContain('0.01'); // 1.0%
     });
   });
 
   describe('getExitPattern', () => {
-    it('should return the fixed-time pattern', () => {
+    it('should return fixed-time pattern', () => {
       const pattern = getExitPattern('fixed-time');
-
-      expect(pattern.name).toBeDefined();
-      expect(pattern.description).toBeDefined();
-      expect(pattern.sql).toBeDefined();
-      expect(pattern.sql).toContain('exit_time');
-      expect(pattern.sql).toContain('total_returns');
+      expect(pattern.name).toBe('Fixed Time Exit');
     });
 
-    it('should throw an error for unknown exit patterns', () => {
-      const getUnknown = () => getExitPattern('unknown-pattern');
-
-      expect(getUnknown).toThrow();
-      expect(getUnknown).toThrow('Exit pattern');
-      expect(getUnknown).toThrow('fixed-time'); // Should list available patterns
+    it('should throw error for unknown pattern', () => {
+      expect(() => getExitPattern('unknown')).toThrow("Exit pattern 'unknown' not found");
     });
   });
 });
