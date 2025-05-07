@@ -29,20 +29,23 @@ The project has been initialized with the following structure:
 - **Build System**: Simple build process using TypeScript compiler
 - **Basic CLI**: Hello world script that demonstrates the project structure
 - **Direct TypeScript Execution**: Using ts-node for rapid development without build steps
+- **Testing Framework**: Vitest for unit and integration testing
 
 ### Directory Structure
 
 ```
 alphagroove/
-├── src/              # Source code
-│   └── index.ts      # Main entry point
-├── dist/             # Compiled output (generated)
-├── package.json      # Project metadata and dependencies
-├── tsconfig.json     # TypeScript configuration
-├── eslint.config.mjs  # ESLint configuration
-├── .prettierrc       # Prettier configuration
-├── .gitignore        # Git ignore patterns
-└── README.md         # Project documentation
+├── src/                # Source code
+│   ├── index.ts        # Main entry point
+│   └── index.test.ts   # Tests for index.ts
+├── dist/               # Compiled output (generated)
+├── package.json        # Project metadata and dependencies
+├── tsconfig.json       # TypeScript configuration
+├── eslint.config.mjs   # ESLint configuration
+├── vitest.config.ts    # Vitest configuration
+├── .prettierrc         # Prettier configuration
+├── .gitignore          # Git ignore patterns
+└── README.md           # Project documentation
 ```
 
 ### Getting Started
@@ -57,14 +60,28 @@ pnpm dev:start
 # Or build and run (for production)
 pnpm build
 pnpm start
+
+# Run tests
+pnpm test
 ```
 
 ### Development Workflow
 
 - `pnpm dev:start` - Run directly with ts-node (no build step)
 - `pnpm dev` - Watch for changes and rebuild
+- `pnpm test` - Run tests once
+- `pnpm test:watch` - Run tests in watch mode
+- `pnpm test:coverage` - Run tests with coverage report
 - `pnpm lint` - Run ESLint
 - `pnpm format` - Format code with Prettier
+
+### Coding Standards
+
+- Use TypeScript for all code
+- Use arrow functions over regular functions
+- Follow ES6+ patterns and idioms
+- Write tests for all new functionality
+- Maintain high test coverage
 
 ### Next Steps
 

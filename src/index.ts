@@ -4,11 +4,23 @@
  * AlphaGroove - A simple CLI hello world
  */
 
-const main = () => {
-  console.log('Hello from AlphaGroove!');
-  console.log(
-    'A command-line research and strategy toolkit for exploring intraday trading patterns'
-  );
+// Function that returns the greeting message
+export const getGreeting = (): string => {
+  return 'Hello from AlphaGroove!';
 };
 
-main();
+// Function that returns the description
+export const getDescription = (): string => {
+  return 'A command-line research and strategy toolkit for exploring intraday trading patterns';
+};
+
+// Main function that prints messages to the console
+export const main = (): void => {
+  console.log(getGreeting());
+  console.log(getDescription());
+};
+
+// Execute main function if this file is run directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main();
+}
