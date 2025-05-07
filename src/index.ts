@@ -32,8 +32,8 @@ program
     'A command-line research and strategy toolkit for exploring intraday trading patterns'
   )
   .version('0.1.0')
-  .requiredOption('--from <date>', 'Start date (YYYY-MM-DD)')
-  .requiredOption('--to <date>', 'End date (YYYY-MM-DD)')
+  .option('--from <date>', 'Start date (YYYY-MM-DD)', '2010-01-01')
+  .option('--to <date>', 'End date (YYYY-MM-DD)', '2025-12-31')
   .option('--entry-pattern <pattern>', 'Entry pattern to use (default: quick-rise)', 'quick-rise')
   .option('--exit-pattern <pattern>', 'Exit pattern to use (default: fixed-time)', 'fixed-time')
   .option('--ticker <symbol>', 'Ticker to analyze (default: SPY)', 'SPY')
