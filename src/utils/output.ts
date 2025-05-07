@@ -41,12 +41,12 @@ const emojis = {
   clock: '⏰',
 };
 
-export function printHeader(
+export const printHeader = (
   entryPattern: string,
   exitPattern: string,
   fromDate: string,
   toDate: string
-): void {
+): void => {
   console.log('\n' + '='.repeat(80));
   console.log(
     `${colors.bright}${colors.fg.cyan}${emojis.chart} SPY Analysis (${fromDate} to ${toDate})${colors.reset}`
@@ -54,15 +54,15 @@ export function printHeader(
   console.log(`${colors.dim}Entry Pattern: ${entryPattern}${colors.reset}`);
   console.log(`${colors.dim}Exit Pattern: ${exitPattern}${colors.reset}`);
   console.log('='.repeat(80) + '\n');
-}
+};
 
-export function printYearHeader(year: string): void {
+export const printYearHeader = (year: string): void => {
   console.log('\n' + '-'.repeat(80));
   console.log(`${colors.bright}${colors.fg.cyan}${emojis.calendar} ${year}${colors.reset}`);
   console.log('-'.repeat(80) + '\n');
-}
+};
 
-export function printTradeDetails(trade: {
+export const printTradeDetails = (trade: {
   trade_date: string;
   entry_time: string;
   exit_time: string;
@@ -71,7 +71,7 @@ export function printTradeDetails(trade: {
   exit_price: number;
   rise_pct: number;
   return_pct: number;
-}): void {
+}): void => {
   const returnColor = trade.return_pct >= 0 ? colors.fg.green : colors.fg.red;
   const returnEmoji = trade.return_pct >= 0 ? emojis.success : emojis.error;
 
@@ -84,9 +84,9 @@ export function printTradeDetails(trade: {
       `${colors.dim}Rise: ${trade.rise_pct.toFixed(2)}%${colors.reset} ` +
       `${returnColor}${returnEmoji} Return: ${trade.return_pct.toFixed(2)}%${colors.reset}`
   );
-}
+};
 
-export function printYearSummary(stats: {
+export const printYearSummary = (stats: {
   year: string;
   trading_days: number;
   match_count: number;
@@ -96,7 +96,7 @@ export function printYearSummary(stats: {
   min_return: number;
   max_return: number;
   avg_return: number;
-}): void {
+}): void => {
   const returnColor = stats.avg_return >= 0 ? colors.fg.green : colors.fg.red;
   const returnEmoji = stats.avg_return >= 0 ? emojis.success : emojis.error;
 
@@ -121,13 +121,13 @@ export function printYearSummary(stats: {
     `${returnColor}${returnEmoji} Average Return: ${stats.avg_return.toFixed(2)}%${colors.reset}`
   );
   console.log('-'.repeat(80) + '\n');
-}
+};
 
-export function printOverallSummary(stats: {
+export const printOverallSummary = (stats: {
   trading_days: number;
   total_matches: number;
   total_return_sum: number;
-}): void {
+}): void => {
   const avgReturn = stats.total_matches > 0 ? stats.total_return_sum / stats.total_matches : 0;
   const returnColor = avgReturn >= 0 ? colors.fg.green : colors.fg.red;
   const returnEmoji = avgReturn >= 0 ? emojis.success : emojis.error;
@@ -145,8 +145,8 @@ export function printOverallSummary(stats: {
     `${returnColor}${returnEmoji} Average Return: ${avgReturn.toFixed(2)}%${colors.reset}`
   );
   console.log('='.repeat(80) + '\n');
-}
+};
 
-export function printFooter(): void {
+export const printFooter = (): void => {
   console.log(`${colors.dim}${emojis.info} Analysis complete.${colors.reset}\n`);
-}
+};
