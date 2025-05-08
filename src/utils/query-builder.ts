@@ -9,11 +9,24 @@ export interface QueryOptions {
   direction?: 'long' | 'short';
 }
 
-export const buildAnalysisQuery = (options: QueryOptions): string => {
-  const { ticker, timeframe, from, to, risePct, direction } = options;
+// Config format used by the new configuration system
+export type MergedConfig = Record<string, any>;
 
-  // Use the rise percentage directly, defaulting to 0.3 if not specified
-  const riseThreshold = (risePct ? parseFloat(risePct) : 0.3) / 100;
+export const buildAnalysisQuery = (options: QueryOptions | MergedConfig): string => {
+  const { ticker, timeframe, from, to, direction } = options;
+
+  // Determine rise percentage - first check if options has the new format,
+  // then check old format, finally use default
+  let riseThreshold = 0.3; // default value
+  if ('quick-rise' in options && options['quick-rise'] && 'rise-pct' in options['quick-rise']) {
+    riseThreshold = options['quick-rise']['rise-pct'];
+  } else if ('risePct' in options && options.risePct !== undefined) {
+    riseThreshold = parseFloat(options.risePct as string);
+  }
+
+  // Convert to decimal representation
+  riseThreshold = riseThreshold / 100;
+
   const isShort = direction === 'short';
 
   // For both directions, we look for the same pattern - a quick rise

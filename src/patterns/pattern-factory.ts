@@ -6,15 +6,11 @@ export interface PatternDefinition {
   description: string;
   sql: string;
   direction?: 'long' | 'short';
+  updateConfig?: (config: any) => PatternDefinition;
 }
 
-// Each pattern can define its own options
-export type PatternOptions = {
-  'quick-rise'?: {
-    percentIncrease: number;
-    direction?: 'long' | 'short';
-  };
-};
+// Define pattern options based on merged configuration
+export type PatternOptions = Record<string, any>;
 
 type PatternMap = {
   [key: string]: PatternDefinition;
@@ -29,7 +25,7 @@ const exitPatterns: PatternMap = {
   'fixed-time': fixedTimeExitPattern,
 };
 
-export const getEntryPattern = (name: string, options?: PatternOptions): PatternDefinition => {
+export const getEntryPattern = (name: string, mergedConfig: PatternOptions): PatternDefinition => {
   const pattern = entryPatterns[name];
   if (!pattern) {
     throw new Error(
@@ -38,24 +34,56 @@ export const getEntryPattern = (name: string, options?: PatternOptions): Pattern
   }
 
   // If it's quick-rise pattern and we have options, update the configuration
-  if (name === 'quick-rise' && options?.['quick-rise']) {
+  if (name === 'quick-rise' && mergedConfig['quick-rise']) {
+    const quickRiseOptions = mergedConfig['quick-rise'];
     const quickRise = pattern as typeof quickRisePattern;
+
     return quickRise.updateConfig({
-      percentIncrease: options['quick-rise'].percentIncrease ?? quickRise.config.percentIncrease,
-      maxBars: quickRise.config.maxBars,
-      direction: options['quick-rise'].direction ?? 'long',
+      // Use new property names from config but map to internal format
+      percentIncrease: quickRiseOptions['rise-pct'] ?? quickRise.config.percentIncrease,
+      maxBars: quickRiseOptions['within-minutes'] ?? quickRise.config.maxBars,
+      direction: mergedConfig.direction ?? 'long',
     });
   }
 
   return pattern;
 };
 
-export const getExitPattern = (name: string): PatternDefinition => {
+export const getExitPattern = (name: string, mergedConfig: PatternOptions): PatternDefinition => {
   const pattern = exitPatterns[name];
   if (!pattern) {
     throw new Error(
       `Exit pattern '${name}' not found. Available patterns: ${Object.keys(exitPatterns).join(', ')}`
     );
   }
+
+  // For fixed-time pattern, update the configuration if we have options
+  if (name === 'fixed-time' && mergedConfig['fixed-time'] && pattern.updateConfig) {
+    const fixedTimeOptions = mergedConfig['fixed-time'];
+    return pattern.updateConfig({
+      barsAfterEntry: fixedTimeOptions['hold-minutes'] ?? 10,
+    });
+  }
+
   return pattern;
+};
+
+// Register a new entry pattern
+export const registerEntryPattern = (id: string, pattern: PatternDefinition): void => {
+  entryPatterns[id] = pattern;
+};
+
+// Register a new exit pattern
+export const registerExitPattern = (id: string, pattern: PatternDefinition): void => {
+  exitPatterns[id] = pattern;
+};
+
+// Get all available entry patterns
+export const getAvailableEntryPatterns = (): string[] => {
+  return Object.keys(entryPatterns);
+};
+
+// Get all available exit patterns
+export const getAvailableExitPatterns = (): string[] => {
+  return Object.keys(exitPatterns);
 };

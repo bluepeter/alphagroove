@@ -75,18 +75,81 @@ pnpm build
 pnpm start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise --exit-pattern fixed-time
 ```
 
+## Configuration
+
+AlphaGroove supports a flexible configuration system with defaults in a YAML file that can be
+overridden via command-line options.
+
+### Configuration File
+
+Create a file named `alphagroove.config.yaml` in the project root:
+
+```yaml
+default:
+  date:
+    from: '2023-01-01'
+    to: '2025-05-02'
+  ticker: 'SPY'
+  timeframe: '1min'
+  direction: 'long'
+
+patterns:
+  quick-rise:
+    rise-pct: 0.3
+    within-minutes: 5
+
+  fixed-time:
+    hold-minutes: 10
+```
+
+You can generate a default config file by running:
+
+```bash
+pnpm dev:start init
+```
+
+### Pattern-Specific Options
+
+Each pattern can have its own set of configuration options. You can specify these in the config file
+or using the CLI with dot notation:
+
+```bash
+# Using dot notation for pattern-specific options
+pnpm dev:start --quick-rise.rise-pct=0.5 --fixed-time.hold-minutes=15
+
+# Combining standard and pattern-specific options
+pnpm dev:start --from 2023-01-01 --to 2023-12-31 --direction short --quick-rise.rise-pct=0.7
+```
+
 ## Available Options
 
-| Option                      | Description                                          | Default    |
-| --------------------------- | ---------------------------------------------------- | ---------- |
-| `--from <YYYY-MM-DD>`       | Start date (inclusive)                               | Required   |
-| `--to <YYYY-MM-DD>`         | End date (inclusive)                                 | Required   |
-| `--entry-pattern <pattern>` | Entry pattern to use                                 | quick-rise |
-| `--exit-pattern <pattern>`  | Exit pattern to use                                  | fixed-time |
-| `--ticker <symbol>`         | Ticker to analyze                                    | SPY        |
-| `--timeframe <period>`      | Data resolution                                      | 1min       |
-| `--rise-pct <number>`       | Minimum percentage for pattern detection (e.g., 0.5) | 0.3        |
-| `--direction <direction>`   | Trading direction for position (long or short)       | long       |
+CLI options override values from the configuration file.
+
+| Option                      | Description                                    | Default                   |
+| --------------------------- | ---------------------------------------------- | ------------------------- |
+| `--from <YYYY-MM-DD>`       | Start date (inclusive)                         | From config               |
+| `--to <YYYY-MM-DD>`         | End date (inclusive)                           | From config               |
+| `--entry-pattern <pattern>` | Entry pattern to use                           | quick-rise                |
+| `--exit-pattern <pattern>`  | Exit pattern to use                            | fixed-time                |
+| `--ticker <symbol>`         | Ticker to analyze                              | SPY                       |
+| `--timeframe <period>`      | Data resolution                                | 1min                      |
+| `--direction <direction>`   | Trading direction for position (long or short) | long                      |
+| `--config <path>`           | Path to custom configuration file              | ./alphagroove.config.yaml |
+
+### Pattern-Specific Options
+
+#### Quick Rise Pattern Options
+
+| Option                        | Description                                | Default |
+| ----------------------------- | ------------------------------------------ | ------- |
+| `--quick-rise.rise-pct`       | Minimum percentage rise to trigger pattern | 0.3     |
+| `--quick-rise.within-minutes` | Number of minutes to look for the rise     | 5       |
+
+#### Fixed Time Pattern Options
+
+| Option                      | Description                                    | Default |
+| --------------------------- | ---------------------------------------------- | ------- |
+| `--fixed-time.hold-minutes` | Number of minutes to hold position before exit | 10      |
 
 ### Available Timeframes
 
@@ -133,24 +196,30 @@ interpreted:
 
 This approach lets you analyze the same market conditions but test both long and short strategies.
 
-Example usage with different options:
+### Command Examples
 
 ```bash
-# Use default patterns and SPY 1-minute data
+# Use values from config file
+pnpm dev:start
+
+# Override date range
 pnpm dev:start --from 2020-01-01 --to 2025-05-02
 
-# Specify different patterns and timeframe
-pnpm dev:start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise --exit-pattern fixed-time --timeframe 5min
+# Specify pattern options
+pnpm dev:start --quick-rise.rise-pct=0.5 --fixed-time.hold-minutes=15
 
-# Analyze a different ticker
-pnpm dev:start --from 2020-01-01 --to 2025-05-02 --ticker QQQ --timeframe 1hour
+# Analyze a different ticker with specific timeframe
+pnpm dev:start --ticker QQQ --timeframe 5min
 
-# Compare both long and short strategies using the same pattern
-pnpm dev:start --from 2020-01-01 --to 2025-01-31 --direction long --rise-pct 0.4
-pnpm dev:start --from 2020-01-01 --to 2025-01-31 --direction short --rise-pct 0.4
+# Compare both long and short strategies
+pnpm dev:start --direction long
+pnpm dev:start --direction short
 
-# Analyze a specific time period with higher threshold for pattern detection
-pnpm dev:start --from 2023-01-01 --to 2025-12-31 --direction short --rise-pct 0.5
+# List available patterns
+pnpm dev:start list-patterns
+
+# Use a custom config file
+pnpm dev:start --config custom-config.yaml
 ```
 
 ## Project Setup
@@ -160,7 +229,7 @@ The project has been initialized with the following structure:
 - **TypeScript Configuration**: Set up with modern ES modules and strict type checking
 - **ESLint & Prettier**: Code quality tools with recommended rules for TypeScript
 - **Build System**: Simple build process using TypeScript compiler
-- **Basic CLI**: Hello world script that demonstrates the project structure
+- **Flexible Configuration**: YAML-based config with CLI overrides
 - **Direct TypeScript Execution**: Using ts-node for rapid development without build steps
 - **Testing Framework**: Vitest for unit and integration testing
 
@@ -179,10 +248,11 @@ alphagroove/
 ├── dist/               # Compiled output (generated)
 ├── package.json        # Project metadata and dependencies
 ├── tsconfig.json       # TypeScript configuration
-├── eslint.config.mjs   # ESLint configuration
+├── eslint.config.ts    # ESLint configuration
 ├── vitest.config.ts    # Vitest configuration
 ├── .prettierrc         # Prettier configuration
 ├── .gitignore          # Git ignore patterns
+├── alphagroove.config.yaml # Default configuration
 └── README.md           # Project documentation
 ```
 
@@ -198,30 +268,7 @@ pnpm dev:start
 # Or build and run (for production)
 pnpm build
 pnpm start
-
-# Run tests
-pnpm test
 ```
-
-### Development Workflow
-
-- `pnpm dev:start` - Run directly with ts-node (no build step)
-- `pnpm dev` - Watch for changes and rebuild
-- `pnpm test` - Run tests once
-- `pnpm test:watch` - Run tests in watch mode
-- `pnpm test:coverage` - Run tests with coverage report
-- `pnpm lint` - Run ESLint
-- `pnpm format` - Format code with Prettier
-
-### Coding Standards
-
-- Use TypeScript for all code
-- Use arrow functions over regular functions
-- Follow ES6+ patterns and idioms
-- Write tests for all new functionality
-- Maintain high test coverage
-- Review other repos that are one directory back from this one (`../`) to see how their coding
-  standards and tech stack are used.
 
 ## Proposed Pattern Architecture
 
@@ -399,36 +446,3 @@ The backtesting engine will be enhanced with realistic execution modeling:
    - Fixed size per trade
    - Percentage of account
    - Risk-based sizing
-
-## Future CLI Ideas
-
-The planned command-line interface will provide a flexible way to analyze trading patterns:
-
-### CLI Options
-
-| Flag                   | Meaning                                   | Default      |
-| ---------------------- | ----------------------------------------- | ------------ |
-| `--from <YYYY-MM-DD>`  | Start date (inclusive)                    | required     |
-| `--to <YYYY-MM-DD>`    | End date (inclusive)                      | required     |
-| `--pattern <id>`       | Pattern module to run                     | open-up-1pct |
-| `--timeframe <period>` | Data resolution (1min, 5min, etc.)        | 1min         |
-| `--session <type>`     | Time filter ("regular"/"premarket"/"all") | regular      |
-| `--direction <type>`   | Trading direction ("long"/"short")        | long         |
-| `--plot`               | Render chart(s) in browser                | false        |
-| `--export <format>`    | Dump raw matches (csv/json)               | none         |
-
-### Example Usage
-
-```bash
-# Run the default "open-up-1pct" pattern on SPY data for one week
-alphagroove --from 2025-04-21 --to 2025-04-25
-
-# Analyze pre-market behavior with 5-minute bars and export results
-alphagroove --from 2025-04-01 --to 2025-04-30 --pattern gap-and-go --timeframe 5min --session premarket --export csv
-
-# Plot a specific pattern's matches for visual analysis
-alphagroove --from 2025-04-01 --to 2025-04-30 --pattern reversal-30min --plot
-
-# Look for downward price movements instead of upward ones
-alphagroove --from 2025-04-01 --to 2025-04-30 --pattern quick-rise --direction short
-```

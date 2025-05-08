@@ -36,9 +36,12 @@
   },
   "dependencies": {
     "commander": "^13.1.0",
-    "duckdb": "1.2.1"
+    "duckdb": "1.2.1",
+    "js-yaml": "4.1.0",
+    "zod": "3.24.4"
   },
   "devDependencies": {
+    "@types/js-yaml": "4.0.9",
     "@types/node": "^22.15.17",
     "@typescript-eslint/eslint-plugin": "^8.32.0",
     "@typescript-eslint/parser": "^8.32.0",

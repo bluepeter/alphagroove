@@ -1,0 +1,15 @@
+default:
+  date:
+    from: '2015-01-01'
+    to: '2025-05-02'
+  ticker: 'SPY'
+  timeframe: '1min'
+  direction: 'long'
+
+patterns:
+  quick-rise:
+    rise-pct: 0.1
+    within-minutes: 5
+
+  fixed-time:
+    hold-minutes: 10
