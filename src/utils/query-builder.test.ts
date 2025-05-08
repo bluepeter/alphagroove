@@ -121,6 +121,26 @@ describe('buildAnalysisQuery', () => {
     expect(query).toContain('MAX(t.return_pct * 100)');
     expect(query).toContain('AVG(t.return_pct * 100)');
   });
+
+  it('should handle rise percentages from command line arguments correctly', () => {
+    const query1 = buildAnalysisQuery({
+      ticker: 'SPY',
+      timeframe: '1min',
+      from: '2020-01-01',
+      to: '2020-12-31',
+      risePct: '3', // 3% from command line
+    });
+    expect(query1).toContain('0.03'); // 3% as decimal
+
+    const query2 = buildAnalysisQuery({
+      ticker: 'SPY',
+      timeframe: '1min',
+      from: '2020-01-01',
+      to: '2020-12-31',
+      risePct: '0.03', // 0.03% from command line (probably not what user intended)
+    });
+    expect(query2).toContain('0.0003'); // 0.03% as decimal
+  });
 });
 
 describe('query builder', () => {
