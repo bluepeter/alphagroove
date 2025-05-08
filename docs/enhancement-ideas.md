@@ -2,27 +2,6 @@
 
 This document captures ideas for future enhancements to the AlphaGroove project.
 
-## Quick-Fall Pattern and Direction Support
-
-### 1. New Entry Pattern Options for Quick-Fall Pattern
-
-We have two approaches:
-
-**Option 1: Create a Unified "Quick-Change" Pattern**
-
-- Rename "quick-rise" to "quick-change" with a direction parameter
-- Advantages: Unified codebase, single pattern with configurable direction
-- Disadvantages: More complex configuration, might make SQL queries less readable
-
-**Option 2: Create a Separate "Quick-Fall" Pattern**
-
-- Keep "quick-rise" as is and add a new "quick-fall" pattern
-- Advantages: Cleaner separation, simpler implementation, more explicit
-- Disadvantages: Duplicated code, separate maintenance paths
-
-Recommendation: Option 2 initially, with a carefully designed interface that shares code between the
-implementations where appropriate. This provides clearer separation while we work out the details.
-
 ## Pattern Screening/Filtering
 
 This concept adds an additional layer of intelligence to the pattern detection process:
