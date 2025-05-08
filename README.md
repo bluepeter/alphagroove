@@ -146,11 +146,11 @@ pnpm dev:start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise --ex
 pnpm dev:start --from 2020-01-01 --to 2025-05-02 --ticker QQQ --timeframe 1hour
 
 # Compare both long and short strategies using the same pattern
-pnpm dev:start --from 2020-01-01 --to 2020-01-31 --direction long --rise-pct 0.4
-pnpm dev:start --from 2020-01-01 --to 2020-01-31 --direction short --rise-pct 0.4
+pnpm dev:start --from 2020-01-01 --to 2025-01-31 --direction long --rise-pct 0.4
+pnpm dev:start --from 2020-01-01 --to 2025-01-31 --direction short --rise-pct 0.4
 
 # Analyze a specific time period with higher threshold for pattern detection
-pnpm dev:start --from 2023-01-01 --to 2023-12-31 --direction short --rise-pct 0.5
+pnpm dev:start --from 2023-01-01 --to 2025-12-31 --direction short --rise-pct 0.5
 ```
 
 ## Project Setup

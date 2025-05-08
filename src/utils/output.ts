@@ -130,9 +130,9 @@ export const printYearSummary = (year: number, trades: Trade[]) => {
     `Trading Days: ${tradingDays} | Trades: ${totalTrades} (${tradePercentage}% of days)`
   );
   console.log(
-    `Rise: ${minRise.toFixed(2)}% to ${maxRise.toFixed(2)}% (avg: ${avgRise.toFixed(2)}%) | Return: ${minReturn.toFixed(
-      2
-    )}% to ${maxReturn.toFixed(2)}%`
+    `Rise: ${(minRise * 100).toFixed(2)}% to ${(maxRise * 100).toFixed(2)}% (avg: ${(avgRise * 100).toFixed(2)}%) | Return: ${(
+      minReturn * 100
+    ).toFixed(2)}% to ${(maxReturn * 100).toFixed(2)}%`
   );
   console.log('✅ Performance Stats:');
   console.log(

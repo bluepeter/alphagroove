@@ -142,7 +142,7 @@ describe('output utilities', () => {
 
       const logs = consoleLogSpy.mock.calls.map(call => call[0]);
       expect(logs[2]).toContain('Trading Days: 252 | Trades: 1 (0.4% of days)');
-      expect(logs[3]).toMatch(/Rise:.+\| Return:.+/);
+      expect(logs[3]).toContain('Rise: 0.04% to 0.04% (avg: 0.04%) | Return: 0.01% to 0.01%');
       expect(logs[4]).toContain('✅ Performance Stats:');
       expect(logs[5]).toContain('  Mean: 0.1200% | Median: 0.1200% | StdDev: 0.2500%');
       expect(logs[6]).toContain('Win Rate: 100.0%');
@@ -153,27 +153,28 @@ describe('output utilities', () => {
     it('should handle multiple trades correctly', () => {
       const consoleLogSpy = vi.spyOn(console, 'log');
 
-      const trades: Trade[] = Array(10).fill({
+      // Create 10 distinct trade objects with varying values
+      const trades: Trade[] = Array.from({ length: 10 }, (_, i) => ({
         trade_date: '2025-05-02',
         entry_time: '2025-05-02 16:54:00',
         exit_time: '2025-05-02 16:55:00',
         market_open: 566.81,
         entry_price: 566.83,
-        exit_price: 567.19,
-        rise_pct: 0.0036,
-        return_pct: 0.0005,
+        exit_price: 567.19 + i * 0.5, // Slightly different exit prices
+        rise_pct: 0.0036 + i * 0.0005, // Range from 0.36% to 0.81%
+        return_pct: 0.0005 + i * 0.0008, // Range from 0.05% to 0.77%
         year: 2025,
         total_trading_days: 252,
         median_return: 0.04,
         std_dev_return: 0.34,
         win_rate: 0.6,
-      });
+      }));
 
       printYearSummary(2025, trades);
 
       const logs = consoleLogSpy.mock.calls.map(call => call[0]);
       expect(logs[2]).toContain('Trading Days: 252 | Trades: 10 (4.0% of days)');
-      expect(logs[3]).toContain('Rise: 0.00% to 0.00% (avg: 0.00%) | Return: 0.00% to 0.00%');
+      expect(logs[3]).toContain('Rise: 0.36% to 0.81% (avg: 0.59%) | Return: 0.05% to 0.77%');
       expect(logs[4]).toContain('✅ Performance Stats:');
       expect(logs[5]).toContain('  Mean: 0.0400% | Median: 0.0400% | StdDev: 0.3400%');
       expect(logs[6]).toContain('Win Rate: 100.0%');
@@ -206,7 +207,7 @@ describe('output utilities', () => {
 
       const logs = consoleLogSpy.mock.calls.map(call => call[0]);
       expect(logs[2]).toContain('Trading Days: 252 | Trades: 1 (0.4% of days)');
-      expect(logs[3]).toContain('Rise: 0.00% to 0.00% (avg: 0.00%) | Return: 0.00% to 0.00%');
+      expect(logs[3]).toContain('Rise: 0.35% to 0.35% (avg: 0.35%) | Return: 0.05% to 0.05%');
       expect(logs[4]).toContain('✅ Performance Stats:');
       expect(logs[5]).toContain('  Mean: 0.0500% | Median: 0.0500% | StdDev: 0.0000%');
       expect(logs[6]).toContain('Win Rate: 100.0%');
