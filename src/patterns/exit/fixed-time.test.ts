@@ -4,6 +4,15 @@ import { Bar, Signal } from '../types.js';
 
 import { detectFixedTimeExit, FixedTimeExitConfig, fixedTimeExitPattern } from './fixed-time.js';
 
+// Type with configuration support specifically for the fixed time exit pattern
+interface FixedTimePatternWithConfig {
+  name: string;
+  description: string;
+  sql: string;
+  config: FixedTimeExitConfig;
+  updateConfig: (newConfig: Partial<FixedTimeExitConfig>) => FixedTimePatternWithConfig;
+}
+
 describe('Fixed Time Exit Pattern', () => {
   describe('pattern definition', () => {
     it('should have correct name and description', () => {
@@ -12,24 +21,32 @@ describe('Fixed Time Exit Pattern', () => {
       expect(fixedTimeExitPattern.description.length).toBeGreaterThan(0);
     });
 
-    it('should have valid SQL query', () => {
+    it('should initially have empty SQL query', () => {
       expect(fixedTimeExitPattern.sql).toBeDefined();
-      expect(fixedTimeExitPattern.sql).toContain('exit_time');
-      expect(fixedTimeExitPattern.sql).toContain('total_returns');
-      expect(fixedTimeExitPattern.sql).toContain('match_count');
-      expect(fixedTimeExitPattern.sql).toContain('GROUP BY year');
+      // Initially empty query until configured
+      const initializedPattern = (fixedTimeExitPattern as FixedTimePatternWithConfig).updateConfig({
+        barsAfterEntry: 10,
+      });
+      expect(initializedPattern.sql).toContain('exit_time');
+      expect(initializedPattern.sql).toContain('total_returns');
+      expect(initializedPattern.sql).toContain('match_count');
+      expect(initializedPattern.sql).toContain('GROUP BY year');
     });
 
     it('should update description when configuration is changed', () => {
-      const originalPattern = fixedTimeExitPattern;
+      const originalPattern = (fixedTimeExitPattern as FixedTimePatternWithConfig).updateConfig({
+        barsAfterEntry: 10,
+      });
       const updatedPattern = originalPattern.updateConfig({ barsAfterEntry: 15 });
 
       expect(updatedPattern.description).toBe('Exits exactly 15 minutes after entry');
-      expect(originalPattern.description).toBe('Exits exactly 10 minutes after entry (at 9:45am)');
+      expect(originalPattern.description).toBe('Exits exactly 10 minutes after entry');
     });
 
     it('should keep the original pattern unchanged when creating updated version', () => {
-      const originalPattern = fixedTimeExitPattern;
+      const originalPattern = (fixedTimeExitPattern as FixedTimePatternWithConfig).updateConfig({
+        barsAfterEntry: 10,
+      });
       const originalConfig = { ...originalPattern.config };
 
       // Create updated pattern
@@ -40,20 +57,20 @@ describe('Fixed Time Exit Pattern', () => {
       expect(originalPattern.config.barsAfterEntry).toBe(10);
 
       // New pattern should have the updated config
-      // Type assertion to access config property
-      expect((updatedPattern as any).config.barsAfterEntry).toBe(20);
+      expect(updatedPattern.config.barsAfterEntry).toBe(20);
     });
 
     it('should apply multiple configuration updates', () => {
       // Type assertions to properly chain the updateConfig calls
-      const pattern1 = fixedTimeExitPattern.updateConfig({ barsAfterEntry: 5 });
-      const pattern2 = (pattern1 as typeof fixedTimeExitPattern).updateConfig({
+      const pattern1 = (fixedTimeExitPattern as FixedTimePatternWithConfig).updateConfig({
+        barsAfterEntry: 5,
+      });
+      const pattern2 = pattern1.updateConfig({
         barsAfterEntry: 15,
       });
 
-      // Type assertions to access config property
-      expect((pattern1 as any).config.barsAfterEntry).toBe(5);
-      expect((pattern2 as any).config.barsAfterEntry).toBe(15);
+      expect(pattern1.config.barsAfterEntry).toBe(5);
+      expect(pattern2.config.barsAfterEntry).toBe(15);
       expect(pattern2.description).toBe('Exits exactly 15 minutes after entry');
     });
   });
@@ -127,14 +144,15 @@ describe('Fixed Time Exit Pattern', () => {
       expect(result).toBeNull();
     });
 
-    it('should use default configuration when none provided', () => {
+    it('should always require explicit configuration', () => {
       const bars: Bar[] = Array(11)
         .fill(null)
         .map((_, i) => createBar(`2025-05-02 09:${35 + i}:00`, 567.12 - i * 0.02));
 
       const entry = createEntrySignal('2025-05-02 09:35:00', 567.12);
+      const config: FixedTimeExitConfig = { barsAfterEntry: 10 };
 
-      const result = detectFixedTimeExit(bars, entry);
+      const result = detectFixedTimeExit(bars, entry, config);
       expect(result).not.toBeNull();
       expect(result?.type).toBe('exit');
       expect(result?.timestamp).toBe('2025-05-02 09:45:00');

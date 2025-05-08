@@ -6,14 +6,14 @@ import { detectQuickFallEntry, QuickFallEntryConfig, quickFallPattern } from './
 
 describe('Quick Fall Pattern', () => {
   describe('pattern configuration', () => {
-    it('should have default values', () => {
+    it('should initialize with empty values', () => {
       // Cast quickFallPattern to unknown first to avoid TypeScript error
       const pattern = quickFallPattern as unknown as {
         config: QuickFallEntryConfig;
         direction?: 'long' | 'short';
       };
-      expect(pattern.config.percentDecrease).toBe(0.3);
-      expect(pattern.config.maxBars).toBe(5);
+      expect(pattern.config.percentDecrease).toBe(0);
+      expect(pattern.config.maxBars).toBe(0);
       expect(pattern.config.direction).toBe('short');
     });
 
@@ -38,10 +38,12 @@ describe('Quick Fall Pattern', () => {
     it('should update SQL query when configuration is changed', () => {
       const shortPattern = quickFallPattern.updateConfig({
         percentDecrease: 0.5,
+        maxBars: 5,
         direction: 'short',
       });
       const longPattern = quickFallPattern.updateConfig({
         percentDecrease: 0.5,
+        maxBars: 5,
         direction: 'long',
       });
 
@@ -70,7 +72,13 @@ describe('Quick Fall Pattern', () => {
         createBar('2025-05-02 09:35:00', 99.7, 99.6), // 0.4% fall from 100.0
       ];
 
-      const result = detectQuickFallEntry(bars);
+      const config: QuickFallEntryConfig = {
+        percentDecrease: 0.3,
+        maxBars: 5,
+        direction: 'short',
+      };
+
+      const result = detectQuickFallEntry(bars, config);
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2025-05-02 09:35:00');
       expect(result?.price).toBe(99.6);
@@ -87,7 +95,13 @@ describe('Quick Fall Pattern', () => {
         createBar('2025-05-02 09:35:00', 99.8, 99.75), // 0.25% fall from 100.0
       ];
 
-      const result = detectQuickFallEntry(bars);
+      const config: QuickFallEntryConfig = {
+        percentDecrease: 0.3,
+        maxBars: 5,
+        direction: 'short',
+      };
+
+      const result = detectQuickFallEntry(bars, config);
       expect(result).toBeNull();
     });
   });

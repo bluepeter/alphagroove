@@ -77,8 +77,9 @@ pnpm start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise --exit-p
 
 ## Configuration
 
-AlphaGroove supports a flexible configuration system with defaults in a YAML file that can be
-overridden via command-line options.
+AlphaGroove uses a centralized configuration system with all settings defined in the
+`alphagroove.config.yaml` file. This is the single source of truth for all configuration values in
+the application.
 
 ### Configuration File
 
@@ -115,6 +116,13 @@ This configuration structure allows you to:
 1. Define default entry and exit patterns to use when none are specified via CLI
 2. Organize patterns by type (entry vs exit)
 3. Configure parameters for each pattern
+
+All pattern configuration lives in this file - there are no hardcoded defaults in the code. The
+system follows a clear hierarchy for configuration:
+
+1. Command-line arguments (highest priority)
+2. Values from `alphagroove.config.yaml`
+3. System fallback defaults (used only if a config file doesn't exist)
 
 You can generate a default config file by running:
 
@@ -154,23 +162,23 @@ CLI options override values from the configuration file.
 
 #### Quick Rise Pattern Options
 
-| Option                        | Description                                | Default |
-| ----------------------------- | ------------------------------------------ | ------- |
-| `--quick-rise.rise-pct`       | Minimum percentage rise to trigger pattern | 0.3     |
-| `--quick-rise.within-minutes` | Number of minutes to look for the rise     | 5       |
+| Option                        | Description                                | Default from Config |
+| ----------------------------- | ------------------------------------------ | ------------------- |
+| `--quick-rise.rise-pct`       | Minimum percentage rise to trigger pattern | 0.3                 |
+| `--quick-rise.within-minutes` | Number of minutes to look for the rise     | 5                   |
 
 #### Quick Fall Pattern Options
 
-| Option                        | Description                                | Default |
-| ----------------------------- | ------------------------------------------ | ------- |
-| `--quick-fall.fall-pct`       | Minimum percentage fall to trigger pattern | 0.3     |
-| `--quick-fall.within-minutes` | Number of minutes to look for the fall     | 5       |
+| Option                        | Description                                | Default from Config |
+| ----------------------------- | ------------------------------------------ | ------------------- |
+| `--quick-fall.fall-pct`       | Minimum percentage fall to trigger pattern | 0.3                 |
+| `--quick-fall.within-minutes` | Number of minutes to look for the fall     | 5                   |
 
 #### Fixed Time Pattern Options
 
-| Option                      | Description                                    | Default |
-| --------------------------- | ---------------------------------------------- | ------- |
-| `--fixed-time.hold-minutes` | Number of minutes to hold position before exit | 10      |
+| Option                      | Description                                    | Default from Config |
+| --------------------------- | ---------------------------------------------- | ------------------- |
+| `--fixed-time.hold-minutes` | Number of minutes to hold position before exit | 10                  |
 
 ### Available Timeframes
 
@@ -192,14 +200,14 @@ Common timeframes include:
 
 #### Entry Patterns
 
-- `quick-rise`: Detects a percentage rise in the first 5 minutes of trading (default: 0.3%)
+- `quick-rise`: Detects a percentage rise in the first 5 minutes of trading (configurable)
 
   - Can be combined with the `--direction` parameter to interpret the pattern for long or short
     positions
   - For `--direction long`: Takes a long position at the peak of the rise (default)
   - For `--direction short`: Takes a short position at the peak of the rise
 
-- `quick-fall`: Detects a percentage fall in the first 5 minutes of trading (default: 0.3%)
+- `quick-fall`: Detects a percentage fall in the first 5 minutes of trading (configurable)
   - Can be combined with the `--direction` parameter to interpret the pattern for long or short
     positions
   - For `--direction short`: Takes a short position at the bottom of the fall (default)
@@ -207,7 +215,7 @@ Common timeframes include:
 
 #### Exit Patterns
 
-- `fixed-time`: Exits the trade 10 minutes after entry
+- `fixed-time`: Exits the trade after a configurable number of minutes from entry (default: 10)
 
 ### Trading Direction
 
@@ -430,6 +438,7 @@ The pattern system has been implemented with:
 - SQL-based pattern definitions
 - Support for multiple timeframes
 - Long/short direction support with smart trade success determination
+- Centralized configuration through `alphagroove.config.yaml`
 
 ### 4. Remaining Tasks
 

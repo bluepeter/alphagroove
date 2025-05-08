@@ -35,28 +35,28 @@ export const getEntryPattern = (name: string, mergedConfig: PatternOptions): Pat
     );
   }
 
-  // If it's quick-rise pattern and we have options, update the configuration
-  if (name === 'quick-rise' && mergedConfig['quick-rise']) {
-    const quickRiseOptions = mergedConfig['quick-rise'];
+  // If it's quick-rise pattern, always update the configuration from merged config
+  if (name === 'quick-rise') {
+    const quickRiseOptions = mergedConfig['quick-rise'] ?? {};
     const quickRise = pattern as typeof quickRisePattern;
 
     return quickRise.updateConfig({
       // Use new property names from config but map to internal format
-      percentIncrease: quickRiseOptions['rise-pct'] ?? quickRise.config.percentIncrease,
-      maxBars: quickRiseOptions['within-minutes'] ?? quickRise.config.maxBars,
+      percentIncrease: quickRiseOptions['rise-pct'] ?? 0.3,
+      maxBars: quickRiseOptions['within-minutes'] ?? 5,
       direction: mergedConfig.direction ?? 'long',
     });
   }
 
-  // If it's quick-fall pattern and we have options, update the configuration
-  if (name === 'quick-fall' && mergedConfig['quick-fall']) {
-    const quickFallOptions = mergedConfig['quick-fall'];
+  // If it's quick-fall pattern, always update the configuration from merged config
+  if (name === 'quick-fall') {
+    const quickFallOptions = mergedConfig['quick-fall'] ?? {};
     const quickFall = pattern as typeof quickFallPattern;
 
     return quickFall.updateConfig({
       // Use new property names from config but map to internal format
-      percentDecrease: quickFallOptions['fall-pct'] ?? quickFall.config.percentDecrease,
-      maxBars: quickFallOptions['within-minutes'] ?? quickFall.config.maxBars,
+      percentDecrease: quickFallOptions['fall-pct'] ?? 0.3,
+      maxBars: quickFallOptions['within-minutes'] ?? 5,
       direction: mergedConfig.direction ?? 'short',
     });
   }
@@ -72,9 +72,9 @@ export const getExitPattern = (name: string, mergedConfig: PatternOptions): Patt
     );
   }
 
-  // For fixed-time pattern, update the configuration if we have options
-  if (name === 'fixed-time' && mergedConfig['fixed-time'] && pattern.updateConfig) {
-    const fixedTimeOptions = mergedConfig['fixed-time'];
+  // For fixed-time pattern, always update configuration from merged config
+  if (name === 'fixed-time' && pattern.updateConfig) {
+    const fixedTimeOptions = mergedConfig['fixed-time'] ?? {};
     return pattern.updateConfig({
       barsAfterEntry: fixedTimeOptions['hold-minutes'] ?? 10,
     });

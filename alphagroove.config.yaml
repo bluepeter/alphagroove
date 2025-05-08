@@ -6,7 +6,7 @@ default:
   timeframe: '1min'
   direction: 'short'
   patterns:
-    entry: 'quick-fall'
+    entry: 'quick-rise'
     exit: 'fixed-time'
 
 patterns:

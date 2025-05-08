@@ -15,15 +15,6 @@ export interface QuickFallEntryConfig {
 }
 
 /**
- * Default configuration values for the quick fall pattern
- */
-export const DEFAULT_CONFIG: QuickFallEntryConfig = {
-  percentDecrease: 0.3, // 0.3% fall
-  maxBars: 5, // Look at first 5 bars
-  direction: 'short', // Default to short direction
-};
-
-/**
  * Detects a quick fall in price over a specified number of bars.
  *
  * @param bars - Array of price bars to analyze
@@ -38,10 +29,7 @@ export const DEFAULT_CONFIG: QuickFallEntryConfig = {
  * }
  * ```
  */
-export function detectQuickFallEntry(
-  bars: Bar[],
-  config: QuickFallEntryConfig = DEFAULT_CONFIG
-): Signal | null {
+export function detectQuickFallEntry(bars: Bar[], config: QuickFallEntryConfig): Signal | null {
   if (bars.length < config.maxBars) {
     return null;
   }
@@ -137,8 +125,8 @@ export function createSqlQuery(config: QuickFallEntryConfig): string {
  *
  * This pattern looks for a rapid price decrease within the first few minutes of trading,
  * depending on the direction setting.
- * By default, it detects a 0.3% fall in the first 5 minutes for short positions, or a 0.3% fall for
- * long positions (buying the dip), but these parameters can be configured.
+ * It detects a configurable percentage fall in the first few minutes for short positions, or a fall for
+ * long positions (buying the dip).
  *
  * @example
  * ```typescript
@@ -153,9 +141,14 @@ export const quickFallPattern: PatternDefinition & {
 } = {
   name: 'Quick Fall',
   description: 'Detects a configurable percentage fall in the first few minutes of trading',
-  config: { ...DEFAULT_CONFIG },
-  direction: DEFAULT_CONFIG.direction,
-  sql: createSqlQuery(DEFAULT_CONFIG),
+  // Will be set from config system
+  config: {
+    percentDecrease: 0,
+    maxBars: 0,
+    direction: 'short',
+  },
+  direction: 'short',
+  sql: '',
   updateConfig(newConfig: Partial<QuickFallEntryConfig>) {
     const updatedConfig = { ...this.config, ...newConfig };
     return {

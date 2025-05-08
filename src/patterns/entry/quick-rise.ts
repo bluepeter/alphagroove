@@ -15,15 +15,6 @@ export interface QuickRiseEntryConfig {
 }
 
 /**
- * Default configuration values for the quick rise pattern
- */
-export const DEFAULT_CONFIG: QuickRiseEntryConfig = {
-  percentIncrease: 0.3, // 0.3% rise
-  maxBars: 5, // Look at first 5 bars
-  direction: 'long', // Default to long direction
-};
-
-/**
  * Detects a quick rise in price over a specified number of bars.
  *
  * @param bars - Array of price bars to analyze
@@ -38,10 +29,7 @@ export const DEFAULT_CONFIG: QuickRiseEntryConfig = {
  * }
  * ```
  */
-export function detectQuickRiseEntry(
-  bars: Bar[],
-  config: QuickRiseEntryConfig = DEFAULT_CONFIG
-): Signal | null {
+export function detectQuickRiseEntry(bars: Bar[], config: QuickRiseEntryConfig): Signal | null {
   if (bars.length < config.maxBars) {
     return null;
   }
@@ -137,8 +125,8 @@ export function createSqlQuery(config: QuickRiseEntryConfig): string {
  *
  * This pattern looks for a rapid price increase or decrease within the first few minutes of trading,
  * depending on the direction setting.
- * By default, it detects a 0.3% rise in the first 5 minutes for long positions, or a 0.3% fall for
- * short positions, but these parameters can be configured.
+ * It detects a configurable percentage rise in the first few minutes for long positions, or a rise
+ * for short positions (shorting at the peak).
  *
  * @example
  * ```typescript
@@ -153,9 +141,14 @@ export const quickRisePattern: PatternDefinition & {
 } = {
   name: 'Quick Rise',
   description: 'Detects a configurable percentage rise in the first few minutes of trading',
-  config: { ...DEFAULT_CONFIG },
-  direction: DEFAULT_CONFIG.direction,
-  sql: createSqlQuery(DEFAULT_CONFIG),
+  // Will be set from config system
+  config: {
+    percentIncrease: 0,
+    maxBars: 0,
+    direction: 'long',
+  },
+  direction: 'long',
+  sql: '',
   updateConfig(newConfig: Partial<QuickRiseEntryConfig>) {
     const updatedConfig = { ...this.config, ...newConfig };
     return {

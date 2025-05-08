@@ -6,14 +6,14 @@ import { detectQuickRiseEntry, QuickRiseEntryConfig, quickRisePattern } from './
 
 describe('Quick Rise Pattern', () => {
   describe('pattern configuration', () => {
-    it('should have default values', () => {
+    it('should initialize with empty values', () => {
       // Cast quickRisePattern to unknown first to avoid TypeScript error
       const pattern = quickRisePattern as unknown as {
         config: QuickRiseEntryConfig;
         direction?: 'long' | 'short';
       };
-      expect(pattern.config.percentIncrease).toBe(0.3);
-      expect(pattern.config.maxBars).toBe(5);
+      expect(pattern.config.percentIncrease).toBe(0);
+      expect(pattern.config.maxBars).toBe(0);
       expect(pattern.config.direction).toBe('long');
     });
 
@@ -38,10 +38,12 @@ describe('Quick Rise Pattern', () => {
     it('should update SQL query when configuration is changed', () => {
       const longPattern = quickRisePattern.updateConfig({
         percentIncrease: 0.5,
+        maxBars: 5,
         direction: 'long',
       });
       const shortPattern = quickRisePattern.updateConfig({
         percentIncrease: 0.5,
+        maxBars: 5,
         direction: 'short',
       });
 
@@ -70,7 +72,14 @@ describe('Quick Rise Pattern', () => {
         createBar('2025-05-02 09:35:00', 100.29, 100.4), // 0.4% rise from 100.0
       ];
 
-      const result = detectQuickRiseEntry(bars);
+      // Create explicit config for testing
+      const config: QuickRiseEntryConfig = {
+        percentIncrease: 0.3,
+        maxBars: 5,
+        direction: 'long',
+      };
+
+      const result = detectQuickRiseEntry(bars, config);
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2025-05-02 09:35:00');
       expect(result?.price).toBe(100.4);
@@ -87,7 +96,14 @@ describe('Quick Rise Pattern', () => {
         createBar('2025-05-02 09:35:00', 100.2, 100.25), // 0.25% rise from 100.0
       ];
 
-      const result = detectQuickRiseEntry(bars);
+      // Create explicit config for testing
+      const config: QuickRiseEntryConfig = {
+        percentIncrease: 0.3,
+        maxBars: 5,
+        direction: 'long',
+      };
+
+      const result = detectQuickRiseEntry(bars, config);
       expect(result).toBeNull();
     });
 
