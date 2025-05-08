@@ -3,7 +3,8 @@ import tsparser from '@typescript-eslint/parser';
 import prettier from 'eslint-config-prettier';
 import importPlugin from 'eslint-plugin-import';
 
-export default [
+// Define the configuration as a plain array without explicit typing
+const config = [
   // Global ignores
   {
     ignores: ['dist/**', 'node_modules/**', 'output/**'],
@@ -66,3 +67,5 @@ export default [
 
   prettier,
 ];
+
+export default config;
