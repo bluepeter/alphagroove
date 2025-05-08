@@ -8,6 +8,11 @@ import { Command } from 'commander';
 
 import { getEntryPattern, getExitPattern } from './patterns/pattern-factory.js';
 import {
+  calculateMeanReturn,
+  calculateMedianReturn,
+  calculateStdDevReturn,
+} from './utils/calculations.js';
+import {
   printHeader,
   printTradeDetails,
   printYearSummary,
@@ -205,27 +210,18 @@ program
         totalStats.total_matches > 0 ? totalStats.winning_trades / totalStats.total_matches : 0;
 
       // Calculate mean return
-      const meanReturn =
-        allReturns.length > 0 ? allReturns.reduce((a, b) => a + b, 0) / allReturns.length : 0;
+      const meanReturn = calculateMeanReturn(allReturns);
 
       // Calculate median return
-      const sortedReturns = [...allReturns].sort((a, b) => a - b);
-      totalStats.median_return =
-        sortedReturns.length > 0 ? sortedReturns[Math.floor(sortedReturns.length / 2)] : 0;
+      totalStats.median_return = calculateMedianReturn(allReturns);
 
       // Calculate standard deviation
-      totalStats.std_dev_return =
-        allReturns.length > 0
-          ? Math.sqrt(
-              allReturns.reduce((sum, ret) => sum + Math.pow(ret - meanReturn, 2), 0) /
-                (allReturns.length - 1) // Use n-1 for sample standard deviation
-            )
-          : 0;
+      totalStats.std_dev_return = calculateStdDevReturn(allReturns, meanReturn);
 
       // Print overall summary
       printOverallSummary({
         ...totalStats,
-        total_return_sum: meanReturn * totalStats.total_matches, // Update total return sum to match mean
+        total_return_sum: meanReturn,
         direction: entryPattern.direction,
       });
 

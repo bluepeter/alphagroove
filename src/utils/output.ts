@@ -1,4 +1,17 @@
 import chalk from 'chalk';
+
+import {
+  formatDate,
+  formatTime,
+  formatDollar,
+  formatPercent,
+  calculateTradePercentage,
+  calculateAvgRise,
+  calculateWinningTrades,
+  calculateWinRate,
+  isWinningTrade,
+} from './calculations';
+
 // We could use date-fns for more advanced date formatting in the future
 // import { format } from 'date-fns';
 
@@ -31,23 +44,6 @@ export interface TotalStats {
   win_rate: number;
   winning_trades: number;
 }
-
-// Helper formatting functions
-const formatDate = (dateString: string): string => {
-  return dateString;
-};
-
-const formatTime = (timeString: string): string => {
-  return timeString.split(' ')[1];
-};
-
-const formatDollar = (value: number): string => {
-  return `$${value.toFixed(2)}`;
-};
-
-const formatPercent = (value: number): string => {
-  return `${(value * 100).toFixed(2)}%`;
-};
 
 export const printHeader = (
   ticker: string,
@@ -89,34 +85,32 @@ export const printTradeDetails = (trade: Trade, direction: 'long' | 'short' = 'l
 
   // Return is calculated differently based on direction
   const returnPct = formatPercent(trade.return_pct);
-  const isWin = isShort ? trade.return_pct > 0 : trade.return_pct >= 0;
+  const isWin = isWinningTrade(trade.return_pct, isShort);
   const returnColor = isWin ? chalk.green : chalk.red;
   const returnEmoji = isWin ? '✅' : '❌';
 
   // Print the formatted output
   console.log(
-    `${emoji} 📅 ${date} ⏰ ${entryTime} → ${exitTime} Open: ${open} Entry: ${entry} Exit: ${exit} Rise: ${riseText} ${returnEmoji} Return: ${returnColor(returnPct)}`
+    `${emoji} ${date} ⏰ ${entryTime} → ${exitTime} Open: ${open} Entry: ${entry} Exit: ${exit} Rise: ${riseText} ${returnEmoji} Return: ${returnColor(returnPct)}`
   );
 };
 
 export const printYearSummary = (year: number, trades: Trade[]) => {
   const totalTrades = trades.length;
   const tradingDays = trades[0]?.total_trading_days || 252;
-  const tradePercentage = ((totalTrades / tradingDays) * 100).toFixed(1);
+  const tradePercentage = calculateTradePercentage(totalTrades, tradingDays);
 
   const rises = trades.map(t => t.rise_pct);
-  const avgRise = rises.reduce((a, b) => a + b, 0) / rises.length;
+  const avgRise = calculateAvgRise(rises);
 
   const returns = trades.map(t => t.return_pct);
-  const minReturn = Math.min(...returns);
-  const maxReturn = Math.max(...returns);
+  const minReturn = returns.length > 0 ? Math.min(...returns) : 0;
+  const maxReturn = returns.length > 0 ? Math.max(...returns) : 0;
 
   // For short positions, we invert the success criteria
   const isShort = trades[0]?.direction === 'short';
-  const winningTrades = isShort
-    ? trades.filter(t => t.return_pct > 0).length
-    : trades.filter(t => t.return_pct >= 0).length;
-  const winRate = (winningTrades / totalTrades) * 100;
+  const winningTrades = calculateWinningTrades(trades, isShort);
+  const winRate = calculateWinRate(winningTrades, totalTrades);
 
   const meanReturn = trades[0]?.median_return || 0;
   const stdDevReturn = trades[0]?.std_dev_return || 0;
@@ -167,7 +161,7 @@ export const printOverallSummary = (stats: {
   console.log(
     chalk.bold(
       `📈 Overall: ${total_matches} trades (${avgMatches.toFixed(1)}% of days) | ` +
-        `Avg Return: ${avgReturnColor(`${total_return_sum.toFixed(4)}%`)} | Median: ${medianReturnColor(`${median_return.toFixed(4)}%`)} | ` +
+        `Avg Return: ${avgReturnColor(`${(total_return_sum * 100).toFixed(4)}%`)} | Median: ${medianReturnColor(`${median_return.toFixed(4)}%`)} | ` +
         `StdDev: ${std_dev_return.toFixed(4)}% | Win Rate: ${winRateColor(`${(win_rate * 100).toFixed(1)}%`)} | ` +
         `Direction: ${isShort ? 'Short ↘️' : 'Long ↗️'}`
     )
