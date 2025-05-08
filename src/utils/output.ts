@@ -105,8 +105,6 @@ export const printYearSummary = (year: number, trades: Trade[]) => {
   const tradePercentage = ((totalTrades / tradingDays) * 100).toFixed(1);
 
   const rises = trades.map(t => t.rise_pct);
-  const minRise = Math.min(...rises);
-  const maxRise = Math.max(...rises);
   const avgRise = rises.reduce((a, b) => a + b, 0) / rises.length;
 
   const returns = trades.map(t => t.return_pct);
@@ -121,25 +119,22 @@ export const printYearSummary = (year: number, trades: Trade[]) => {
   const winRate = (winningTrades / totalTrades) * 100;
 
   const meanReturn = trades[0]?.median_return || 0;
-  const medianReturn = trades[0]?.median_return || 0;
   const stdDevReturn = trades[0]?.std_dev_return || 0;
 
-  console.log('\n--------------------------------------------------------------------------------');
-  console.log(`📊 ${year} Summary`);
+  // Format values with color
+  const meanColor = meanReturn >= 0 ? chalk.green : chalk.red;
+  const winRateColor = winRate >= 50 ? chalk.green : chalk.red;
+  const returnRangeColor = maxReturn >= 0 ? (minReturn >= 0 ? chalk.green : chalk.gray) : chalk.red;
+
+  console.log('');
   console.log(
-    `Trading Days: ${tradingDays} | Trades: ${totalTrades} (${tradePercentage}% of days)`
+    chalk.cyan(
+      `📊 ${year} Summary: ${totalTrades} trades (${tradePercentage}% of days) | ` +
+        `Avg Rise: ${(avgRise * 100).toFixed(2)}% | Return Range: ${returnRangeColor(`${(minReturn * 100).toFixed(2)}% to ${(maxReturn * 100).toFixed(2)}%`)} | ` +
+        `Mean: ${meanColor(`${meanReturn.toFixed(4)}%`)} | StdDev: ${stdDevReturn.toFixed(4)}% | Win Rate: ${winRateColor(`${winRate.toFixed(1)}%`)}`
+    )
   );
-  console.log(
-    `Rise: ${(minRise * 100).toFixed(2)}% to ${(maxRise * 100).toFixed(2)}% (avg: ${(avgRise * 100).toFixed(2)}%) | Return: ${(
-      minReturn * 100
-    ).toFixed(2)}% to ${(maxReturn * 100).toFixed(2)}%`
-  );
-  console.log('✅ Performance Stats:');
-  console.log(
-    `  Mean: ${meanReturn.toFixed(4)}% | Median: ${medianReturn.toFixed(4)}% | StdDev: ${stdDevReturn.toFixed(4)}%`
-  );
-  console.log(`  Win Rate: ${winRate.toFixed(1)}%`);
-  console.log('--------------------------------------------------------------------------------');
+  console.log('');
 };
 
 export const printOverallSummary = (stats: {
@@ -163,19 +158,21 @@ export const printOverallSummary = (stats: {
   const avgMatches = (total_matches / total_trading_days) * 100;
   const isShort = direction === 'short';
 
-  console.log('\n');
-  console.log(chalk.bold(`📈 Overall Statistics (${isShort ? 'Short ↘️' : 'Long ↗️'}):`));
+  // Format values with color
+  const avgReturnColor = total_return_sum >= 0 ? chalk.green : chalk.red;
+  const medianReturnColor = median_return >= 0 ? chalk.green : chalk.red;
+  const winRateColor = win_rate >= 0.5 ? chalk.green : chalk.red;
+
+  console.log('');
   console.log(
-    `Total Trading Days: ${total_trading_days} | Total Trades: ${total_matches} (${avgMatches.toFixed(
-      1
-    )}% of days)`
+    chalk.bold(
+      `📈 Overall: ${total_matches} trades (${avgMatches.toFixed(1)}% of days) | ` +
+        `Avg Return: ${avgReturnColor(`${total_return_sum.toFixed(4)}%`)} | Median: ${medianReturnColor(`${median_return.toFixed(4)}%`)} | ` +
+        `StdDev: ${std_dev_return.toFixed(4)}% | Win Rate: ${winRateColor(`${(win_rate * 100).toFixed(1)}%`)} | ` +
+        `Direction: ${isShort ? 'Short ↘️' : 'Long ↗️'}`
+    )
   );
-  console.log(
-    `Average Return: ${total_return_sum.toFixed(4)}% | Median Return: ${median_return.toFixed(
-      4
-    )}% | StdDev: ${std_dev_return.toFixed(4)}%`
-  );
-  console.log(`Win Rate: ${(win_rate * 100).toFixed(1)}%`);
+  console.log('');
 };
 
 export const printFooter = () => {

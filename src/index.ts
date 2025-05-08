@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execSync } from 'child_process';
-import { writeFileSync, unlinkSync } from 'fs';
+import { writeFileSync, unlinkSync, existsSync } from 'fs';
 import { join } from 'path';
 
 import { Command } from 'commander';
@@ -9,7 +9,6 @@ import { Command } from 'commander';
 import { getEntryPattern, getExitPattern } from './patterns/pattern-factory.js';
 import {
   printHeader,
-  printYearHeader,
   printTradeDetails,
   printYearSummary,
   printOverallSummary,
@@ -88,7 +87,9 @@ program
       });
 
       // Clean up temporary file
-      unlinkSync(tempFile);
+      if (existsSync(tempFile)) {
+        unlinkSync(tempFile);
+      }
 
       // Parse CSV output
       const [header, ...lines] = result.trim().split('\n');
@@ -151,7 +152,6 @@ program
           }
           currentYear = trade.year as string;
           yearTrades = [];
-          printYearHeader(trade.year as string);
 
           // Only add match count once per year
           if (!seenYears.has(trade.year)) {
