@@ -14,7 +14,15 @@ export interface QueryOptions {
 export type MergedConfig = Record<string, any>;
 
 export const buildAnalysisQuery = (options: QueryOptions | MergedConfig): string => {
-  const { ticker, timeframe, from, to, direction, entryPattern } = options;
+  const {
+    ticker,
+    timeframe,
+    from,
+    to,
+    direction,
+    entryPattern,
+    exitPattern: _exitPattern,
+  } = options;
   const isQuickFall = entryPattern === 'quick-fall';
   const isShort = direction === 'short';
 
@@ -40,6 +48,12 @@ export const buildAnalysisQuery = (options: QueryOptions | MergedConfig): string
   // Convert to decimal representation
   threshold = threshold / 100;
 
+  // Determine hold minutes for exit
+  let holdMinutes = 10; // default value
+  if ('fixed-time' in options && options['fixed-time'] && 'hold-minutes' in options['fixed-time']) {
+    holdMinutes = options['fixed-time']['hold-minutes'];
+  }
+
   // Define pattern condition based on pattern type
   let patternCondition, patternPctCalc, entryPriceField;
 
@@ -54,6 +68,21 @@ export const buildAnalysisQuery = (options: QueryOptions | MergedConfig): string
     patternPctCalc = `((five_min_high - market_open) / market_open) as rise_pct`;
     entryPriceField = 'five_min_high'; // For quick-rise, we enter at the high price
   }
+
+  // Calculate exit time based on entry time (09:35) + hold minutes
+  const entryHour = 9;
+  const entryMinute = 35;
+  let exitHour = entryHour;
+  let exitMinute = entryMinute + parseInt(String(holdMinutes), 10);
+
+  // Handle minute overflow
+  if (exitMinute >= 60) {
+    exitHour += Math.floor(exitMinute / 60);
+    exitMinute = exitMinute % 60;
+  }
+
+  // Format the time as HH:MM
+  const exitTimeString = `${exitHour.toString().padStart(2, '0')}:${exitMinute.toString().padStart(2, '0')}`;
 
   // Return calculation differs by direction
   const returnPctCalc = isShort
@@ -121,7 +150,7 @@ export const buildAnalysisQuery = (options: QueryOptions | MergedConfig): string
         r.timestamp as exit_time
       FROM five_min_prices f
       JOIN raw_data r ON f.trade_date = r.trade_date
-      WHERE strftime(r.timestamp, '%H:%M') = '09:45'  -- Get exactly 9:45am bar
+      WHERE strftime(r.timestamp, '%H:%M') = '${exitTimeString}'  -- Exit based on hold-minutes
     ),
     individual_trades AS (
       SELECT 

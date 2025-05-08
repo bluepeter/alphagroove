@@ -19,6 +19,43 @@ describe('Fixed Time Exit Pattern', () => {
       expect(fixedTimeExitPattern.sql).toContain('match_count');
       expect(fixedTimeExitPattern.sql).toContain('GROUP BY year');
     });
+
+    it('should update description when configuration is changed', () => {
+      const originalPattern = fixedTimeExitPattern;
+      const updatedPattern = originalPattern.updateConfig({ barsAfterEntry: 15 });
+
+      expect(updatedPattern.description).toBe('Exits exactly 15 minutes after entry');
+      expect(originalPattern.description).toBe('Exits exactly 10 minutes after entry (at 9:45am)');
+    });
+
+    it('should keep the original pattern unchanged when creating updated version', () => {
+      const originalPattern = fixedTimeExitPattern;
+      const originalConfig = { ...originalPattern.config };
+
+      // Create updated pattern
+      const updatedPattern = originalPattern.updateConfig({ barsAfterEntry: 20 });
+
+      // Original pattern should remain unchanged
+      expect(originalPattern.config).toEqual(originalConfig);
+      expect(originalPattern.config.barsAfterEntry).toBe(10);
+
+      // New pattern should have the updated config
+      // Type assertion to access config property
+      expect((updatedPattern as any).config.barsAfterEntry).toBe(20);
+    });
+
+    it('should apply multiple configuration updates', () => {
+      // Type assertions to properly chain the updateConfig calls
+      const pattern1 = fixedTimeExitPattern.updateConfig({ barsAfterEntry: 5 });
+      const pattern2 = (pattern1 as typeof fixedTimeExitPattern).updateConfig({
+        barsAfterEntry: 15,
+      });
+
+      // Type assertions to access config property
+      expect((pattern1 as any).config.barsAfterEntry).toBe(5);
+      expect((pattern2 as any).config.barsAfterEntry).toBe(15);
+      expect(pattern2.description).toBe('Exits exactly 15 minutes after entry');
+    });
   });
 
   describe('pattern detection', () => {

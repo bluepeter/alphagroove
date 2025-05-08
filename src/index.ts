@@ -50,6 +50,11 @@ const runAnalysis = async (cliOptions: Record<string, any>): Promise<void> => {
     // Build and execute the query
     const query = buildAnalysisQuery(mergedConfig);
 
+    // Debug: Print the query
+    if (cliOptions.debug || cliOptions.dryRun) {
+      console.log('\nDEBUG - SQL Query:\n' + query);
+    }
+
     // Write query to a temporary file
     const tempFile = join(process.cwd(), 'temp_query.sql');
     writeFileSync(tempFile, query, 'utf-8');

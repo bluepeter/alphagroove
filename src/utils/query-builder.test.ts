@@ -58,8 +58,10 @@ describe('buildAnalysisQuery', () => {
     expect(query).toContain("strftime(timestamp, '%H:%M') = '09:30'");
     // Entry time check in five_min_prices
     expect(query).toContain("strftime(r.timestamp, '%H:%M') = '09:35'");
-    // Exit time check in exit_prices
-    expect(query).toContain("strftime(r.timestamp, '%H:%M') = '09:45'");
+    // Exit time check in exit_prices - now uses dynamic format based on hold-minutes
+    expect(query).toContain("strftime(r.timestamp, '%H:%M') = '");
+    // The default hold-minutes is 10, so exit time should be 9:45
+    expect(query).toContain('09:45');
   });
 
   it('should use default rise threshold when not specified for quick-rise', () => {
@@ -261,6 +263,71 @@ describe('buildAnalysisQuery', () => {
 
     const query = buildAnalysisQuery(options);
     expect(query).toContain('((market_open - five_min_low) / market_open) >= 0.015'); // 1.5% as decimal
+  });
+
+  it('should use default hold-minutes (10) when not specified', () => {
+    const options = {
+      ticker: 'SPY',
+      timeframe: '1min',
+      from: '2023-01-01',
+      to: '2023-01-31',
+      entryPattern: 'quick-rise',
+      exitPattern: 'fixed-time',
+    };
+
+    const query = buildAnalysisQuery(options);
+    expect(query).toContain("strftime(r.timestamp, '%H:%M') = '09:45'"); // 9:35 + 10 minutes
+  });
+
+  it('should apply custom hold-minutes value of 5', () => {
+    const options = {
+      ticker: 'SPY',
+      timeframe: '1min',
+      from: '2023-01-01',
+      to: '2023-01-31',
+      entryPattern: 'quick-rise',
+      exitPattern: 'fixed-time',
+      'fixed-time': {
+        'hold-minutes': 5,
+      },
+    };
+
+    const query = buildAnalysisQuery(options);
+    expect(query).toContain("strftime(r.timestamp, '%H:%M') = '09:40'"); // 9:35 + 5 minutes
+  });
+
+  it('should apply custom hold-minutes value of 15', () => {
+    const options = {
+      ticker: 'SPY',
+      timeframe: '1min',
+      from: '2023-01-01',
+      to: '2023-01-31',
+      entryPattern: 'quick-rise',
+      exitPattern: 'fixed-time',
+      'fixed-time': {
+        'hold-minutes': 15,
+      },
+    };
+
+    const query = buildAnalysisQuery(options);
+    expect(query).toContain("strftime(r.timestamp, '%H:%M') = '09:50'"); // 9:35 + 15 minutes
+  });
+
+  it('should handle hour rollover for large hold-minutes values', () => {
+    const options = {
+      ticker: 'SPY',
+      timeframe: '1min',
+      from: '2023-01-01',
+      to: '2023-01-31',
+      entryPattern: 'quick-rise',
+      exitPattern: 'fixed-time',
+      'fixed-time': {
+        'hold-minutes': 30,
+      },
+    };
+
+    const query = buildAnalysisQuery(options);
+    expect(query).toContain("strftime(r.timestamp, '%H:%M') = '10:05'"); // 9:35 + 30 minutes
   });
 });
 
