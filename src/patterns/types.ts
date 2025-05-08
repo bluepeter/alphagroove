@@ -11,6 +11,7 @@ export interface Signal {
   timestamp: string;
   price: number;
   type: 'entry' | 'exit';
+  direction?: 'long' | 'short';
 }
 
 export interface PatternResult {

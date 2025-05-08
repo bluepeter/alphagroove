@@ -77,14 +77,16 @@ pnpm start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise --exit-p
 
 ## Available Options
 
-| Option                      | Description            | Default    |
-| --------------------------- | ---------------------- | ---------- |
-| `--from <YYYY-MM-DD>`       | Start date (inclusive) | Required   |
-| `--to <YYYY-MM-DD>`         | End date (inclusive)   | Required   |
-| `--entry-pattern <pattern>` | Entry pattern to use   | quick-rise |
-| `--exit-pattern <pattern>`  | Exit pattern to use    | fixed-time |
-| `--ticker <symbol>`         | Ticker to analyze      | SPY        |
-| `--timeframe <period>`      | Data resolution        | 1min       |
+| Option                      | Description                                          | Default    |
+| --------------------------- | ---------------------------------------------------- | ---------- |
+| `--from <YYYY-MM-DD>`       | Start date (inclusive)                               | Required   |
+| `--to <YYYY-MM-DD>`         | End date (inclusive)                                 | Required   |
+| `--entry-pattern <pattern>` | Entry pattern to use                                 | quick-rise |
+| `--exit-pattern <pattern>`  | Exit pattern to use                                  | fixed-time |
+| `--ticker <symbol>`         | Ticker to analyze                                    | SPY        |
+| `--timeframe <period>`      | Data resolution                                      | 1min       |
+| `--rise-pct <number>`       | Minimum percentage for pattern detection (e.g., 0.5) | 0.3        |
+| `--direction <direction>`   | Trading direction for position (long or short)       | long       |
 
 ### Available Timeframes
 
@@ -106,11 +108,30 @@ Common timeframes include:
 
 #### Entry Patterns
 
-- `quick-rise`: Detects a 0.3% rise in the first 5 minutes of trading
+- `quick-rise`: Detects a percentage rise in the first 5 minutes of trading (default: 0.3%)
+  - Can be combined with the `--direction` parameter to interpret the pattern for long or short
+    positions
+  - For `--direction long`: Takes a long position at the peak of the rise (default)
+  - For `--direction short`: Takes a short position at the peak of the rise
 
 #### Exit Patterns
 
 - `fixed-time`: Exits the trade 10 minutes after entry
+
+### Trading Direction
+
+The `--direction` parameter doesn't change what patterns are detected, but rather how they are
+interpreted:
+
+- Both directions identify the same market setups (like a quick rise in price)
+- The difference is how positions are taken:
+  - `--direction long`: Takes buy positions, profiting from price increases
+  - `--direction short`: Takes sell positions, profiting from price decreases
+- Return calculations change based on direction:
+  - For long positions, price increases are profitable
+  - For short positions, price decreases are profitable
+
+This approach lets you analyze the same market conditions but test both long and short strategies.
 
 Example usage with different options:
 
@@ -123,6 +144,13 @@ pnpm dev:start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise --ex
 
 # Analyze a different ticker
 pnpm dev:start --from 2020-01-01 --to 2025-05-02 --ticker QQQ --timeframe 1hour
+
+# Compare both long and short strategies using the same pattern
+pnpm dev:start --from 2020-01-01 --to 2020-01-31 --direction long --rise-pct 0.4
+pnpm dev:start --from 2020-01-01 --to 2020-01-31 --direction short --rise-pct 0.4
+
+# Analyze a specific time period with higher threshold for pattern detection
+pnpm dev:start --from 2023-01-01 --to 2023-12-31 --direction short --rise-pct 0.5
 ```
 
 ## Project Setup
@@ -323,6 +351,7 @@ The pattern system has been implemented with:
 - Pattern factory for easy pattern registration
 - SQL-based pattern definitions
 - Support for multiple timeframes
+- Long/short direction support with smart trade success determination
 
 ### 4. Remaining Tasks
 
@@ -384,6 +413,7 @@ The planned command-line interface will provide a flexible way to analyze tradin
 | `--pattern <id>`       | Pattern module to run                     | open-up-1pct |
 | `--timeframe <period>` | Data resolution (1min, 5min, etc.)        | 1min         |
 | `--session <type>`     | Time filter ("regular"/"premarket"/"all") | regular      |
+| `--direction <type>`   | Trading direction ("long"/"short")        | long         |
 | `--plot`               | Render chart(s) in browser                | false        |
 | `--export <format>`    | Dump raw matches (csv/json)               | none         |
 
@@ -398,4 +428,7 @@ alphagroove --from 2025-04-01 --to 2025-04-30 --pattern gap-and-go --timeframe 5
 
 # Plot a specific pattern's matches for visual analysis
 alphagroove --from 2025-04-01 --to 2025-04-30 --pattern reversal-30min --plot
+
+# Look for downward price movements instead of upward ones
+alphagroove --from 2025-04-01 --to 2025-04-30 --pattern quick-rise --direction short
 ```

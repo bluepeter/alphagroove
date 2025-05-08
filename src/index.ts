@@ -26,6 +26,7 @@ interface AnalysisOptions {
   ticker: string;
   timeframe: string;
   risePct?: string;
+  direction?: 'long' | 'short';
 }
 
 interface TotalStats {
@@ -57,12 +58,18 @@ program
     'Minimum rise percentage for quick-rise pattern (default: 0.3). Example: --rise-pct 0.5 for 0.5% rise',
     '0.3'
   )
+  .option(
+    '--direction <direction>',
+    'Trading direction - long for price rises, short for price falls (default: long)',
+    'long'
+  )
   .action(async (options: AnalysisOptions) => {
     try {
       // Get the appropriate patterns based on command line options
       const entryPattern = getEntryPattern(options.entryPattern || 'quick-rise', {
         'quick-rise': {
           percentIncrease: parseFloat(options.risePct || '0.3'),
+          direction: options.direction as 'long' | 'short',
         },
       });
       const exitPattern = getExitPattern(options.exitPattern || 'fixed-time');
@@ -99,7 +106,14 @@ program
       });
 
       // Print header
-      printHeader(options.ticker, options.from, options.to, entryPattern.name, exitPattern.name);
+      printHeader(
+        options.ticker,
+        options.from,
+        options.to,
+        entryPattern.name,
+        exitPattern.name,
+        entryPattern.direction
+      );
 
       // Process and display trades by year
       let totalStats: TotalStats = {
@@ -161,19 +175,24 @@ program
           median_return: trade.median_return as number,
           std_dev_return: trade.std_dev_return as number,
           win_rate: trade.win_rate as number,
+          direction: entryPattern.direction,
         });
 
         // Print trade details
-        printTradeDetails({
-          trade_date: trade.trade_date as string,
-          entry_time: trade.entry_time as string,
-          exit_time: trade.exit_time as string,
-          market_open: trade.market_open as number,
-          entry_price: trade.entry_price as number,
-          exit_price: trade.exit_price as number,
-          rise_pct: trade.rise_pct as number,
-          return_pct: trade.return_pct as number,
-        });
+        printTradeDetails(
+          {
+            trade_date: trade.trade_date as string,
+            entry_time: trade.entry_time as string,
+            exit_time: trade.exit_time as string,
+            market_open: trade.market_open as number,
+            entry_price: trade.entry_price as number,
+            exit_price: trade.exit_price as number,
+            rise_pct: trade.rise_pct as number,
+            return_pct: trade.return_pct as number,
+            direction: entryPattern.direction,
+          },
+          entryPattern.direction
+        );
       }
 
       // Print the last year's summary
@@ -207,6 +226,7 @@ program
       printOverallSummary({
         ...totalStats,
         total_return_sum: meanReturn * totalStats.total_matches, // Update total return sum to match mean
+        direction: entryPattern.direction,
       });
 
       // Print footer
@@ -217,4 +237,4 @@ program
     }
   });
 
-program.parse();
+program.parse(process.argv);

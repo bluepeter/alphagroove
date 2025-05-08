@@ -104,7 +104,7 @@ describe('buildAnalysisQuery', () => {
     };
 
     const query = buildAnalysisQuery(options);
-    expect(query).toContain('((exit_price - five_min_high) / five_min_high) as return_pct');
+    expect(query).toContain('((exit_price - entry_price) / entry_price) as return_pct');
   });
 
   it('should group yearly statistics', () => {

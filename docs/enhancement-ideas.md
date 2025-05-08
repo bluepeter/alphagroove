@@ -4,9 +4,7 @@ This document captures ideas for future enhancements to the AlphaGroove project.
 
 ## Quick-Fall Pattern and Direction Support
 
-### 1. New Entry Pattern Options
-
-#### (a) Quick-Fall Pattern
+### 1. New Entry Pattern Options for Quick-Fall Pattern
 
 We have two approaches:
 
@@ -24,22 +22,6 @@ We have two approaches:
 
 Recommendation: Option 2 initially, with a carefully designed interface that shares code between the
 implementations where appropriate. This provides clearer separation while we work out the details.
-
-#### (b) Long/Short Direction Support
-
-We need to:
-
-1. Add a "direction" parameter to patterns
-2. Update the pattern factory to handle direction
-3. Modify the SQL queries and detection logic
-
-Implementation approach:
-
-- Enhance `PatternDefinition` interface with an optional `direction` property
-- Add direction parameter to CLI (e.g., `--direction long|short`)
-- Update output formatting to show direction
-- Calculate returns appropriately based on direction (short positions would invert the return
-  calculation)
 
 ## Pattern Screening/Filtering
 

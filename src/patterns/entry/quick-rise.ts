@@ -6,20 +6,21 @@ import { Bar, Signal } from '../types.js';
  * @interface QuickRiseEntryConfig
  * @property {number} percentIncrease - The minimum percentage increase required to trigger an entry (e.g., 0.3 for 0.3%)
  * @property {number} maxBars - The maximum number of bars to look back for the rise
+ * @property {string} direction - Trading direction ('long' or 'short')
  */
 export interface QuickRiseEntryConfig {
   percentIncrease: number;
   maxBars: number;
+  direction: 'long' | 'short';
 }
 
 /**
- * Default configuration for the Quick Rise pattern.
- * - percentIncrease: 0.3 (0.3% minimum rise)
- * - maxBars: 5 (look back up to 5 bars)
+ * Default configuration values for the quick rise pattern
  */
 export const DEFAULT_CONFIG: QuickRiseEntryConfig = {
-  percentIncrease: 0.3,
-  maxBars: 5,
+  percentIncrease: 0.3, // 0.3% rise
+  maxBars: 5, // Look at first 5 bars
+  direction: 'long', // Default to long direction
 };
 
 /**
@@ -31,7 +32,7 @@ export const DEFAULT_CONFIG: QuickRiseEntryConfig = {
  *
  * @example
  * ```typescript
- * const result = detectQuickRiseEntry(bars, { percentIncrease: 0.5, maxBars: 5 });
+ * const result = detectQuickRiseEntry(bars, { percentIncrease: 0.5, maxBars: 5, direction: 'long' });
  * if (result) {
  *   console.log(`Entry signal at ${result.timestamp} with price ${result.price}`);
  * }
@@ -52,11 +53,15 @@ export function detectQuickRiseEntry(
     const currentHigh = bars[i].high;
     const risePct = Number((((currentHigh - minOpen) / minOpen) * 100).toFixed(2));
 
+    // For both long and short, we look for the same price rise pattern
     if (risePct >= config.percentIncrease) {
+      // Found a rise that exceeds our threshold - return appropriate signal
       return {
         timestamp: bars[i].timestamp,
+        // For long we enter at the high, for short we also enter at the high (shorting at the peak)
         price: currentHigh,
         type: 'entry',
+        direction: config.direction,
       };
     }
   }
@@ -65,74 +70,81 @@ export function detectQuickRiseEntry(
 }
 
 /**
- * Creates an SQL query for the Quick Rise pattern with the specified configuration.
- *
- * @param config - Configuration options for the pattern
- * @returns string - The SQL query with the configured rise percentage
+ * Creates the SQL query for the quick rise pattern based on the given configuration
  */
-const createSqlQuery = (config: QuickRiseEntryConfig = DEFAULT_CONFIG) => `
-  WITH market_open_prices AS (
-    SELECT 
-      trade_date,
-      year,
-      open as market_open,
-      timestamp as market_open_time
-    FROM raw_data
-    WHERE strftime(timestamp, '%H:%M') = '09:30'
-  ),
-  five_min_prices AS (
-    SELECT 
-      m.trade_date,
-      m.year,
-      m.market_open,
-      r.high as five_min_high,
-      r.timestamp as entry_time
-    FROM market_open_prices m
-    JOIN raw_data r ON m.trade_date = r.trade_date
-    WHERE strftime(r.timestamp, '%H:%M') = '09:35'
-  ),
-  exit_prices AS (
-    SELECT 
-      f.trade_date,
-      f.year,
-      f.market_open,
-      f.five_min_high,
-      f.entry_time,
-      r.close as exit_price,
-      r.timestamp as exit_time
-    FROM five_min_prices f
-    JOIN raw_data r ON f.trade_date = r.trade_date
-    WHERE strftime(r.timestamp, '%H:%M') = '09:45'  -- Get exactly 9:45am bar
-  ),
-  pattern_matches AS (
-    SELECT 
-      year,
-      COUNT(*) as match_count,
-      MIN((five_min_high - market_open) / market_open) * 100 as min_rise_pct,
-      MAX((five_min_high - market_open) / market_open) * 100 as max_rise_pct,
-      AVG((five_min_high - market_open) / market_open) * 100 as avg_rise_pct,
-      MIN((exit_price - five_min_high) / five_min_high) * 100 as min_return,
-      MAX((exit_price - five_min_high) / five_min_high) * 100 as max_return,
-      AVG((exit_price - five_min_high) / five_min_high) * 100 as avg_return
-    FROM exit_prices
-    WHERE ((five_min_high - market_open) / market_open) >= ${config.percentIncrease / 100}  -- Use decimal value
-    GROUP BY year
-  )
-  SELECT * FROM pattern_matches
-`;
+export function createSqlQuery(config: QuickRiseEntryConfig): string {
+  // Calculate the rise percentage threshold - same for both directions
+  const riseThreshold = config.percentIncrease / 100;
+
+  // We always check for the same rise/fall metrics in both directions,
+  // but the entry prices and trade direction change
+  return `
+    WITH raw_data AS (
+      SELECT 
+        column0::TIMESTAMP as timestamp,
+        column1::DOUBLE as open,
+        column2::DOUBLE as high,
+        column3::DOUBLE as low,
+        column4::DOUBLE as close,
+        column5::BIGINT as volume,
+        strftime(column0, '%Y-%m-%d') as trade_date,
+        strftime(column0, '%Y') as year
+      FROM read_csv_auto('tickers/{ticker}/{timeframe}.csv', header=false)
+      WHERE column0 >= '{from} 00:00:00'
+        AND column0 <= '{to} 23:59:59'
+    ),
+    trading_days AS (
+      SELECT 
+        year,
+        COUNT(DISTINCT trade_date) as total_trading_days
+      FROM raw_data
+      WHERE strftime(timestamp, '%H:%M') = '09:30'  -- Only count days with market open
+        AND strftime(timestamp, '%w') NOT IN ('0', '6')  -- Exclude weekends
+      GROUP BY year
+    ),
+    total_trading_days AS (
+      SELECT SUM(total_trading_days) as total_trading_days
+      FROM trading_days
+    ),
+    market_open_prices AS (
+      SELECT 
+        trade_date,
+        year,
+        open as market_open,
+        timestamp as market_open_time
+      FROM raw_data
+      WHERE strftime(timestamp, '%H:%M') = '09:30'
+    ),
+    five_min_prices AS (
+      SELECT 
+        m.trade_date,
+        m.year,
+        m.market_open,
+        r.high as five_min_high,
+        r.low as five_min_low,
+        r.timestamp as entry_time
+      FROM market_open_prices m
+      JOIN raw_data r ON m.trade_date = r.trade_date
+      WHERE strftime(r.timestamp, '%H:%M') = '09:35'
+    )
+    -- Always look for a quick rise, but based on direction we select the appropriate entry price
+    WHERE ((five_min_high - market_open) / market_open) >= ${riseThreshold}
+  `;
+}
 
 /**
  * Quick Rise Pattern Definition
  *
- * This pattern looks for a rapid price increase within the first few minutes of trading.
- * By default, it detects a 0.3% rise in the first 5 minutes, but these parameters
- * can be configured.
+ * This pattern looks for a rapid price increase or decrease within the first few minutes of trading,
+ * depending on the direction setting.
+ * By default, it detects a 0.3% rise in the first 5 minutes for long positions, or a 0.3% fall for
+ * short positions, but these parameters can be configured.
  *
  * @example
  * ```typescript
  * // Get pattern with custom configuration
  * const pattern = quickRisePattern;
- * pattern.updateConfig({ percentIncrease: 0.5, maxBars: 3 });
+ * pattern.updateConfig({ percentIncrease: 0.5, maxBars: 3, direction: 'short' });
  * ```
  */
 export const quickRisePattern: PatternDefinition & {
@@ -142,12 +154,14 @@ export const quickRisePattern: PatternDefinition & {
   name: 'Quick Rise',
   description: 'Detects a configurable percentage rise in the first few minutes of trading',
   config: { ...DEFAULT_CONFIG },
+  direction: DEFAULT_CONFIG.direction,
   sql: createSqlQuery(DEFAULT_CONFIG),
   updateConfig(newConfig: Partial<QuickRiseEntryConfig>) {
     const updatedConfig = { ...this.config, ...newConfig };
     return {
       ...this,
       config: updatedConfig,
+      direction: updatedConfig.direction,
       sql: createSqlQuery(updatedConfig),
     };
   },

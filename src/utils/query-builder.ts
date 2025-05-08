@@ -6,13 +6,30 @@ export interface QueryOptions {
   entryPattern?: string;
   exitPattern?: string;
   risePct?: string;
+  direction?: 'long' | 'short';
 }
 
 export const buildAnalysisQuery = (options: QueryOptions): string => {
-  const { ticker, timeframe, from, to, risePct } = options;
+  const { ticker, timeframe, from, to, risePct, direction } = options;
 
   // Use the rise percentage directly, defaulting to 0.3 if not specified
   const riseThreshold = (risePct ? parseFloat(risePct) : 0.3) / 100;
+  const isShort = direction === 'short';
+
+  // For both directions, we look for the same pattern - a quick rise
+  // But for short, we enter at a different price
+  const riseCondition = `((five_min_high - market_open) / market_open) >= ${riseThreshold}`;
+
+  // For both directions, calculate the rise percentage the same way
+  const risePctCalc = `((five_min_high - market_open) / market_open) as rise_pct`;
+
+  // Entry price is different based on direction
+  const entryPriceField = 'five_min_high'; // Both long and short use the same price point
+
+  // Return calculation differs by direction
+  const returnPctCalc = isShort
+    ? `((entry_price - exit_price) / entry_price) as return_pct` // For shorts, price decrease = profit
+    : `((exit_price - entry_price) / entry_price) as return_pct`; // For longs, price increase = profit
 
   return `
     WITH raw_data AS (
@@ -57,6 +74,7 @@ export const buildAnalysisQuery = (options: QueryOptions): string => {
         m.year,
         m.market_open,
         r.high as five_min_high,
+        r.low as five_min_low,
         r.timestamp as entry_time
       FROM market_open_prices m
       JOIN raw_data r ON m.trade_date = r.trade_date
@@ -68,6 +86,7 @@ export const buildAnalysisQuery = (options: QueryOptions): string => {
         f.year,
         f.market_open,
         f.five_min_high,
+        f.five_min_low,
         f.entry_time,
         r.close as exit_price,
         r.timestamp as exit_time
@@ -80,14 +99,14 @@ export const buildAnalysisQuery = (options: QueryOptions): string => {
         trade_date,
         year,
         market_open,
-        five_min_high as entry_price,
+        ${entryPriceField} as entry_price,
         exit_price,
         entry_time,
         exit_time,
-        ((five_min_high - market_open) / market_open) as rise_pct,
-        ((exit_price - five_min_high) / five_min_high) as return_pct
+        ${risePctCalc},
+        ${returnPctCalc}
       FROM exit_prices
-      WHERE ((five_min_high - market_open) / market_open) >= ${riseThreshold}
+      WHERE ${riseCondition}
     ),
     yearly_stats AS (
       SELECT 
@@ -103,7 +122,11 @@ export const buildAnalysisQuery = (options: QueryOptions): string => {
         AVG(t.return_pct * 100) as avg_return,
         MEDIAN(t.return_pct * 100) as median_return,
         CASE WHEN COUNT(*) > 1 THEN STDDEV(t.return_pct * 100) ELSE 0 END as std_dev_return,
-        SUM(CASE WHEN t.return_pct >= 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT as win_rate
+        ${
+          isShort
+            ? 'SUM(CASE WHEN t.return_pct < 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT as win_rate'
+            : 'SUM(CASE WHEN t.return_pct >= 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT as win_rate'
+        }
       FROM individual_trades t
       JOIN trading_days d ON t.year = d.year
       CROSS JOIN total_trading_days ttd

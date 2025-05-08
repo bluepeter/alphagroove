@@ -1,4 +1,6 @@
 import chalk from 'chalk';
+// We could use date-fns for more advanced date formatting in the future
+// import { format } from 'date-fns';
 
 export interface Trade {
   trade_date: string;
@@ -17,48 +19,83 @@ export interface Trade {
   win_rate?: number;
   total_matches?: number;
   match_count?: number;
+  direction?: 'long' | 'short';
 }
+
+export interface TotalStats {
+  total_trading_days: number;
+  total_matches: number;
+  total_return_sum: number;
+  median_return: number;
+  std_dev_return: number;
+  win_rate: number;
+  winning_trades: number;
+}
+
+// Helper formatting functions
+const formatDate = (dateString: string): string => {
+  return dateString;
+};
+
+const formatTime = (timeString: string): string => {
+  return timeString.split(' ')[1];
+};
+
+const formatDollar = (value: number): string => {
+  return `$${value.toFixed(2)}`;
+};
+
+const formatPercent = (value: number): string => {
+  return `${(value * 100).toFixed(2)}%`;
+};
 
 export const printHeader = (
   ticker: string,
-  from: string,
-  to: string,
-  entryPattern: string,
-  exitPattern: string
+  fromDate: string,
+  toDate: string,
+  entryPatternName: string,
+  exitPatternName: string,
+  direction: 'long' | 'short' = 'long'
 ) => {
+  console.log(chalk.bold(`\n${ticker} Analysis (${fromDate} to ${toDate}):`));
+  console.log(chalk.bold(`Entry Pattern: ${entryPatternName}`));
+  console.log(chalk.bold(`Exit Pattern: ${exitPatternName}`));
+  console.log(chalk.bold(`Direction: ${direction === 'long' ? 'Long ↗️' : 'Short ↘️'}`));
+  console.log('');
   console.log(
-    `
-================================================================================
-📊 ${ticker} Analysis (${from} to ${to})
-Entry Pattern: ${entryPattern}
-Exit Pattern: ${exitPattern}
-================================================================================
-`
+    chalk.gray('═══════════════════════════════════════════════════════════════════════')
   );
+  console.log('');
 };
 
 export const printYearHeader = (year: string) => {
-  console.log(
-    `
---------------------------------------------------------------------------------
-📅 ${year}
---------------------------------------------------------------------------------
-`
-  );
+  console.log(chalk.cyan(`\n${year} Trades:`));
 };
 
-export const printTradeDetails = (trade: Trade) => {
-  const returnPct = trade.return_pct * 100;
-  const risePct = trade.rise_pct * 100;
-  const emoji = returnPct >= 0 ? '✅' : '❌';
-  const returnColor = returnPct >= 0 ? chalk.green : chalk.red;
+export const printTradeDetails = (trade: Trade, direction: 'long' | 'short' = 'long') => {
+  const isShort = direction === 'short';
+  const emoji = isShort ? '↘️' : '↗️';
 
+  // Get the base trade info
+  const date = formatDate(trade.trade_date);
+  const entryTime = formatTime(trade.entry_time);
+  const exitTime = formatTime(trade.exit_time);
+  const open = formatDollar(trade.market_open);
+  const entry = formatDollar(trade.entry_price);
+  const exit = formatDollar(trade.exit_price);
+
+  // For both directions, we're detecting a rise pattern
+  const riseText = formatPercent(trade.rise_pct);
+
+  // Return is calculated differently based on direction
+  const returnPct = formatPercent(trade.return_pct);
+  const isWin = isShort ? trade.return_pct > 0 : trade.return_pct >= 0;
+  const returnColor = isWin ? chalk.green : chalk.red;
+  const returnEmoji = isWin ? '✅' : '❌';
+
+  // Print the formatted output
   console.log(
-    `📅 ${trade.trade_date} ⏰ ${trade.entry_time.split(' ')[1]} → ${
-      trade.exit_time.split(' ')[1]
-    } Open: $${trade.market_open.toFixed(2)} Entry: $${trade.entry_price.toFixed(2)} Exit: $${trade.exit_price.toFixed(
-      2
-    )} Rise: ${risePct.toFixed(2)}% ${emoji} Return: ${returnColor(`${returnPct.toFixed(2)}%`)}`
+    `${emoji} 📅 ${date} ⏰ ${entryTime} → ${exitTime} Open: ${open} Entry: ${entry} Exit: ${exit} Rise: ${riseText} ${returnEmoji} Return: ${returnColor(returnPct)}`
   );
 };
 
@@ -76,7 +113,11 @@ export const printYearSummary = (year: number, trades: Trade[]) => {
   const minReturn = Math.min(...returns);
   const maxReturn = Math.max(...returns);
 
-  const winningTrades = trades.filter(t => t.return_pct > 0).length;
+  // For short positions, we invert the success criteria
+  const isShort = trades[0]?.direction === 'short';
+  const winningTrades = isShort
+    ? trades.filter(t => t.return_pct > 0).length
+    : trades.filter(t => t.return_pct >= 0).length;
   const winRate = (winningTrades / totalTrades) * 100;
 
   const meanReturn = trades[0]?.median_return || 0;
@@ -89,7 +130,7 @@ export const printYearSummary = (year: number, trades: Trade[]) => {
     `Trading Days: ${tradingDays} | Trades: ${totalTrades} (${tradePercentage}% of days)`
   );
   console.log(
-    `Move: ${minRise.toFixed(2)}% to ${maxRise.toFixed(2)}% (avg: ${avgRise.toFixed(2)}%) | Return: ${minReturn.toFixed(
+    `Rise: ${minRise.toFixed(2)}% to ${maxRise.toFixed(2)}% (avg: ${avgRise.toFixed(2)}%) | Return: ${minReturn.toFixed(
       2
     )}% to ${maxReturn.toFixed(2)}%`
   );
@@ -104,28 +145,43 @@ export const printYearSummary = (year: number, trades: Trade[]) => {
 export const printOverallSummary = (stats: {
   total_trading_days: number;
   total_matches: number;
+  total_return_sum: number;
   median_return: number;
   std_dev_return: number;
   win_rate: number;
-  total_return_sum: number;
+  direction?: 'long' | 'short';
 }) => {
-  console.log('\n================================================================================');
-  console.log('📊 Overall Summary');
+  const {
+    total_trading_days,
+    total_matches,
+    total_return_sum,
+    median_return,
+    std_dev_return,
+    win_rate,
+    direction,
+  } = stats;
+  const avgMatches = (total_matches / total_trading_days) * 100;
+  const isShort = direction === 'short';
+
+  console.log('\n');
+  console.log(chalk.bold(`📈 Overall Statistics (${isShort ? 'Short ↘️' : 'Long ↗️'}):`));
   console.log(
-    `Trading Days: ${stats.total_trading_days} | Trades: ${stats.total_matches} (${(
-      (stats.total_matches / stats.total_trading_days) *
-      100
-    ).toFixed(1)}% of days)`
+    `Total Trading Days: ${total_trading_days} | Total Trades: ${total_matches} (${avgMatches.toFixed(
+      1
+    )}% of days)`
   );
-  console.log('✅ Performance Stats:');
   console.log(
-    `  Mean: ${stats.median_return.toFixed(4)}% | Median: ${stats.median_return.toFixed(4)}% | StdDev: ${stats.std_dev_return.toFixed(4)}%`
+    `Average Return: ${total_return_sum.toFixed(4)}% | Median Return: ${median_return.toFixed(
+      4
+    )}% | StdDev: ${std_dev_return.toFixed(4)}%`
   );
-  console.log(`  Win Rate: ${(stats.win_rate * 100).toFixed(1)}%`);
-  console.log('================================================================================\n');
-  console.log('ℹ️ Analysis complete.\n');
+  console.log(`Win Rate: ${(win_rate * 100).toFixed(1)}%`);
 };
 
 export const printFooter = () => {
-  console.log('ℹ️ Analysis complete.');
+  console.log('\n');
+  console.log(
+    chalk.gray('═══════════════════════════════════════════════════════════════════════')
+  );
+  console.log(chalk.gray('Thanks for using AlphaGroove! ♥'));
 };

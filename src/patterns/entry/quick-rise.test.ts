@@ -1,138 +1,203 @@
 import { describe, it, expect } from 'vitest';
 
-import { PatternDefinition } from '../pattern-factory.js';
 import { Bar } from '../types.js';
 
 import { detectQuickRiseEntry, QuickRiseEntryConfig, quickRisePattern } from './quick-rise.js';
 
-type ConfigurablePattern = PatternDefinition & {
-  config: QuickRiseEntryConfig;
-  updateConfig: (newConfig: Partial<QuickRiseEntryConfig>) => ConfigurablePattern;
-};
-
-describe('Quick Rise Entry Pattern', () => {
-  describe('pattern definition', () => {
-    it('should have correct name and description', () => {
-      expect(quickRisePattern.name).toBe('Quick Rise');
-      expect(quickRisePattern.description).toBeTruthy();
-      expect(quickRisePattern.description.length).toBeGreaterThan(0);
+describe('Quick Rise Pattern', () => {
+  describe('pattern configuration', () => {
+    it('should have default values', () => {
+      // Cast quickRisePattern to unknown first to avoid TypeScript error
+      const pattern = quickRisePattern as unknown as {
+        config: QuickRiseEntryConfig;
+        direction?: 'long' | 'short';
+      };
+      expect(pattern.config.percentIncrease).toBe(0.3);
+      expect(pattern.config.maxBars).toBe(5);
+      expect(pattern.config.direction).toBe('long');
     });
 
-    it('should have valid SQL query', () => {
-      expect(quickRisePattern.name).toBe('Quick Rise');
-      expect(quickRisePattern.sql).toContain('FROM');
-      expect(quickRisePattern.sql).toContain('WHERE');
-      expect(quickRisePattern.sql).toContain('0.003'); // Default 0.3% as decimal
-    });
-
-    it('should handle different rise percentages', () => {
-      const pattern1 = (quickRisePattern as unknown as ConfigurablePattern).updateConfig({
+    it('should update configuration with updateConfig', () => {
+      const updatedPattern = quickRisePattern.updateConfig({
         percentIncrease: 0.5,
+        maxBars: 3,
+        direction: 'short',
       });
-      expect(pattern1.sql).toContain('0.005'); // 0.5% as decimal
 
-      const pattern2 = (pattern1 as unknown as ConfigurablePattern).updateConfig({
-        percentIncrease: 0.1,
-      });
-      expect(pattern2.sql).toContain('0.001'); // 0.1% as decimal
+      // Cast updatedPattern to unknown first to avoid TypeScript error
+      const pattern = updatedPattern as unknown as {
+        config: QuickRiseEntryConfig;
+        direction?: 'long' | 'short';
+      };
+      expect(pattern.config.percentIncrease).toBe(0.5);
+      expect(pattern.config.maxBars).toBe(3);
+      expect(pattern.config.direction).toBe('short');
+      expect(pattern.direction).toBe('short');
     });
 
-    it('should create new instances for each configuration', () => {
-      // First get pattern with default config
-      expect(quickRisePattern.sql).toContain('0.003'); // Default 0.3% as decimal
-
-      // Then get pattern with custom config
-      const pattern2 = (quickRisePattern as unknown as ConfigurablePattern).updateConfig({
+    it('should update SQL query when configuration is changed', () => {
+      const longPattern = quickRisePattern.updateConfig({
         percentIncrease: 0.5,
+        direction: 'long',
       });
-      expect(pattern2.sql).toContain('0.005'); // 0.5% as decimal
+      const shortPattern = quickRisePattern.updateConfig({
+        percentIncrease: 0.5,
+        direction: 'short',
+      });
 
-      // Original pattern should still have default config
-      expect(quickRisePattern.sql).toContain('0.003'); // Default 0.3% as decimal
+      // Both should be looking for the same rise pattern
+      expect(longPattern.sql).toContain('((five_min_high - market_open) / market_open) >= 0.005');
+      expect(shortPattern.sql).toContain('((five_min_high - market_open) / market_open) >= 0.005');
     });
   });
 
-  describe('pattern detection', () => {
-    const createBar = (timestamp: string, open: number, high: number): Bar => ({
+  describe('long direction pattern detection', () => {
+    const createBar = (timestamp: string, open: number, high: number, low = open): Bar => ({
       timestamp,
       open,
       high,
-      low: open,
+      low,
       close: high,
       volume: 1000,
     });
 
-    it('should detect a quick rise when price increases by configured percentage', () => {
-      // Using real data example: 566.83 → 568.53 (+0.3%)
+    it('should detect a 0.3% rise over 5 bars', () => {
       const bars: Bar[] = [
-        createBar('2025-05-02 09:31:00', 566.83, 566.85),
-        createBar('2025-05-02 09:32:00', 566.85, 567.5),
-        createBar('2025-05-02 09:33:00', 567.5, 568.0),
-        createBar('2025-05-02 09:34:00', 568.0, 568.25),
-        createBar('2025-05-02 09:35:00', 568.25, 568.53),
-      ];
-
-      const config: QuickRiseEntryConfig = {
-        percentIncrease: 0.3,
-        maxBars: 5,
-      };
-
-      const result = detectQuickRiseEntry(bars, config);
-      expect(result).not.toBeNull();
-      expect(result?.type).toBe('entry');
-      expect(result?.price).toBe(568.53);
-      expect(result?.timestamp).toBe('2025-05-02 09:35:00');
-    });
-
-    it('should not detect a rise when price increase is below threshold', () => {
-      // Using real data example with smaller rise
-      const bars: Bar[] = [
-        createBar('2025-05-02 09:31:00', 566.83, 566.85),
-        createBar('2025-05-02 09:32:00', 566.85, 566.87),
-        createBar('2025-05-02 09:33:00', 566.87, 566.9),
-        createBar('2025-05-02 09:34:00', 566.9, 566.92),
-        createBar('2025-05-02 09:35:00', 566.92, 566.95),
-      ];
-
-      const config: QuickRiseEntryConfig = {
-        percentIncrease: 0.3,
-        maxBars: 5,
-      };
-
-      const result = detectQuickRiseEntry(bars, config);
-      expect(result).toBeNull();
-    });
-
-    it('should return null when not enough bars are provided', () => {
-      const bars: Bar[] = [
-        createBar('2025-05-02 09:31:00', 566.83, 566.85),
-        createBar('2025-05-02 09:32:00', 566.85, 566.9),
-        createBar('2025-05-02 09:33:00', 566.9, 567.05),
-      ];
-
-      const config: QuickRiseEntryConfig = {
-        percentIncrease: 0.3,
-        maxBars: 5,
-      };
-
-      const result = detectQuickRiseEntry(bars, config);
-      expect(result).toBeNull();
-    });
-
-    it('should use default configuration when none provided', () => {
-      // Using real data example: 566.83 → 568.53 (+0.3%)
-      const bars: Bar[] = [
-        createBar('2025-05-02 09:31:00', 566.83, 566.85),
-        createBar('2025-05-02 09:32:00', 566.85, 567.5),
-        createBar('2025-05-02 09:33:00', 567.5, 568.0),
-        createBar('2025-05-02 09:34:00', 568.0, 568.25),
-        createBar('2025-05-02 09:35:00', 568.25, 568.53),
+        createBar('2025-05-02 09:31:00', 100.0, 100.1),
+        createBar('2025-05-02 09:32:00', 100.1, 100.2),
+        createBar('2025-05-02 09:33:00', 100.2, 100.25),
+        createBar('2025-05-02 09:34:00', 100.25, 100.29),
+        createBar('2025-05-02 09:35:00', 100.29, 100.4), // 0.4% rise from 100.0
       ];
 
       const result = detectQuickRiseEntry(bars);
       expect(result).not.toBeNull();
+      expect(result?.timestamp).toBe('2025-05-02 09:35:00');
+      expect(result?.price).toBe(100.4);
       expect(result?.type).toBe('entry');
-      expect(result?.price).toBe(568.53);
+      expect(result?.direction).toBe('long');
+    });
+
+    it('should not detect a rise below threshold', () => {
+      const bars: Bar[] = [
+        createBar('2025-05-02 09:31:00', 100.0, 100.05),
+        createBar('2025-05-02 09:32:00', 100.05, 100.1),
+        createBar('2025-05-02 09:33:00', 100.1, 100.15),
+        createBar('2025-05-02 09:34:00', 100.15, 100.2),
+        createBar('2025-05-02 09:35:00', 100.2, 100.25), // 0.25% rise from 100.0
+      ];
+
+      const result = detectQuickRiseEntry(bars);
+      expect(result).toBeNull();
+    });
+
+    it('should handle custom percentage threshold', () => {
+      const bars: Bar[] = [
+        createBar('2025-05-02 09:31:00', 100.0, 100.1),
+        createBar('2025-05-02 09:32:00', 100.1, 100.2),
+        createBar('2025-05-02 09:33:00', 100.2, 100.3),
+        createBar('2025-05-02 09:34:00', 100.3, 100.4),
+        createBar('2025-05-02 09:35:00', 100.4, 100.5), // 0.5% rise from 100.0
+      ];
+
+      // Should detect with 0.4% threshold
+      const config1: QuickRiseEntryConfig = {
+        percentIncrease: 0.4,
+        maxBars: 5,
+        direction: 'long',
+      };
+      const result1 = detectQuickRiseEntry(bars, config1);
+      expect(result1).not.toBeNull();
+
+      // Should not detect with 0.6% threshold
+      const config2: QuickRiseEntryConfig = {
+        percentIncrease: 0.6,
+        maxBars: 5,
+        direction: 'long',
+      };
+      const result2 = detectQuickRiseEntry(bars, config2);
+      expect(result2).toBeNull();
+    });
+  });
+
+  describe('short direction pattern detection', () => {
+    const createBar = (timestamp: string, open: number, high: number, low: number): Bar => ({
+      timestamp,
+      open,
+      high,
+      low,
+      close: low,
+      volume: 1000,
+    });
+
+    it('should detect a 0.3% rise and return short direction signal', () => {
+      const bars: Bar[] = [
+        createBar('2025-05-02 09:31:00', 100.0, 100.1, 99.9),
+        createBar('2025-05-02 09:32:00', 100.1, 100.2, 99.8),
+        createBar('2025-05-02 09:33:00', 100.2, 100.25, 99.75),
+        createBar('2025-05-02 09:34:00', 100.25, 100.29, 99.7),
+        createBar('2025-05-02 09:35:00', 100.29, 100.4, 99.6), // 0.4% rise from 100.0
+      ];
+
+      const config: QuickRiseEntryConfig = {
+        percentIncrease: 0.3,
+        maxBars: 5,
+        direction: 'short',
+      };
+
+      const result = detectQuickRiseEntry(bars, config);
+      expect(result).not.toBeNull();
+      expect(result?.timestamp).toBe('2025-05-02 09:35:00');
+      expect(result?.price).toBe(100.4); // Shorting at the peak
+      expect(result?.type).toBe('entry');
+      expect(result?.direction).toBe('short');
+    });
+
+    it('should not detect a rise below threshold for short direction', () => {
+      const bars: Bar[] = [
+        createBar('2025-05-02 09:31:00', 100.0, 100.05, 99.95),
+        createBar('2025-05-02 09:32:00', 100.05, 100.1, 99.9),
+        createBar('2025-05-02 09:33:00', 100.1, 100.15, 99.85),
+        createBar('2025-05-02 09:34:00', 100.15, 100.2, 99.8),
+        createBar('2025-05-02 09:35:00', 100.2, 100.25, 99.75), // 0.25% rise from 100.0
+      ];
+
+      const config: QuickRiseEntryConfig = {
+        percentIncrease: 0.3,
+        maxBars: 5,
+        direction: 'short',
+      };
+
+      const result = detectQuickRiseEntry(bars, config);
+      expect(result).toBeNull();
+    });
+
+    it('should handle custom percentage threshold for short direction', () => {
+      const bars: Bar[] = [
+        createBar('2025-05-02 09:31:00', 100.0, 100.1, 99.9),
+        createBar('2025-05-02 09:32:00', 100.1, 100.2, 99.8),
+        createBar('2025-05-02 09:33:00', 100.2, 100.3, 99.7),
+        createBar('2025-05-02 09:34:00', 100.3, 100.4, 99.6),
+        createBar('2025-05-02 09:35:00', 100.4, 100.5, 99.5), // 0.5% rise from 100.0
+      ];
+
+      // Should detect with 0.4% threshold
+      const config1: QuickRiseEntryConfig = {
+        percentIncrease: 0.4,
+        maxBars: 5,
+        direction: 'short',
+      };
+      const result1 = detectQuickRiseEntry(bars, config1);
+      expect(result1).not.toBeNull();
+
+      // Should not detect with 0.6% threshold
+      const config2: QuickRiseEntryConfig = {
+        percentIncrease: 0.6,
+        maxBars: 5,
+        direction: 'short',
+      };
+      const result2 = detectQuickRiseEntry(bars, config2);
+      expect(result2).toBeNull();
     });
   });
 });

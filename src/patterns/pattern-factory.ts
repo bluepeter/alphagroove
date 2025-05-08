@@ -5,12 +5,14 @@ export interface PatternDefinition {
   name: string;
   description: string;
   sql: string;
+  direction?: 'long' | 'short';
 }
 
 // Each pattern can define its own options
 export type PatternOptions = {
   'quick-rise'?: {
     percentIncrease: number;
+    direction?: 'long' | 'short';
   };
 };
 
@@ -36,11 +38,12 @@ export const getEntryPattern = (name: string, options?: PatternOptions): Pattern
   }
 
   // If it's quick-rise pattern and we have options, update the configuration
-  if (name === 'quick-rise' && options?.['quick-rise']?.percentIncrease) {
+  if (name === 'quick-rise' && options?.['quick-rise']) {
     const quickRise = pattern as typeof quickRisePattern;
     return quickRise.updateConfig({
-      percentIncrease: options['quick-rise'].percentIncrease,
-      maxBars: 5, // Keep the default maxBars
+      percentIncrease: options['quick-rise'].percentIncrease ?? quickRise.config.percentIncrease,
+      maxBars: quickRise.config.maxBars,
+      direction: options['quick-rise'].direction ?? 'long',
     });
   }
 
