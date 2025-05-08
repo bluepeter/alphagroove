@@ -15,11 +15,26 @@ describe('Configuration System', () => {
             from: '2023-01-01',
             to: '2023-12-31',
           },
+          patterns: {
+            entry: 'quick-rise',
+            exit: 'fixed-time',
+          },
         },
         patterns: {
-          'quick-rise': {
-            'rise-pct': 0.3,
-            'within-minutes': 5,
+          entry: {
+            'quick-rise': {
+              'rise-pct': 0.3,
+              'within-minutes': 5,
+            },
+            'quick-fall': {
+              'fall-pct': 0.3,
+              'within-minutes': 5,
+            },
+          },
+          exit: {
+            'fixed-time': {
+              'hold-minutes': 10,
+            },
           },
         },
       };
@@ -39,6 +54,8 @@ describe('Configuration System', () => {
         direction: 'long',
         from: '2024-01-01',
         to: '2023-12-31',
+        entryPattern: 'quick-rise',
+        exitPattern: 'fixed-time',
         'quick-rise': {
           'rise-pct': 0.3,
           'within-minutes': 5,
@@ -53,11 +70,26 @@ describe('Configuration System', () => {
           ticker: 'SPY',
           timeframe: '1min',
           direction: 'long',
+          patterns: {
+            entry: 'quick-rise',
+            exit: 'fixed-time',
+          },
         },
         patterns: {
-          'quick-rise': {
-            'rise-pct': 0.3,
-            'within-minutes': 5,
+          entry: {
+            'quick-rise': {
+              'rise-pct': 0.3,
+              'within-minutes': 5,
+            },
+            'quick-fall': {
+              'fall-pct': 0.3,
+              'within-minutes': 5,
+            },
+          },
+          exit: {
+            'fixed-time': {
+              'hold-minutes': 10,
+            },
           },
         },
       };
@@ -89,11 +121,26 @@ describe('Configuration System', () => {
           ticker: 'SPY',
           timeframe: '1min',
           direction: 'long',
+          patterns: {
+            entry: 'quick-rise',
+            exit: 'fixed-time',
+          },
         },
         patterns: {
-          'quick-rise': {
-            'rise-pct': 0.3,
-            'within-minutes': 5,
+          entry: {
+            'quick-rise': {
+              'rise-pct': 0.3,
+              'within-minutes': 5,
+            },
+            'quick-fall': {
+              'fall-pct': 0.3,
+              'within-minutes': 5,
+            },
+          },
+          exit: {
+            'fixed-time': {
+              'hold-minutes': 10,
+            },
           },
         },
       };
@@ -114,6 +161,47 @@ describe('Configuration System', () => {
           'within-minutes': 5,
         },
       });
+    });
+
+    it('should use entry pattern specified in config when not provided in CLI', () => {
+      // Setup
+      const config: Config = {
+        default: {
+          ticker: 'SPY',
+          timeframe: '1min',
+          direction: 'long',
+          patterns: {
+            entry: 'quick-fall',
+            exit: 'fixed-time',
+          },
+        },
+        patterns: {
+          entry: {
+            'quick-rise': {
+              'rise-pct': 0.3,
+              'within-minutes': 5,
+            },
+            'quick-fall': {
+              'fall-pct': 0.3,
+              'within-minutes': 5,
+            },
+          },
+          exit: {
+            'fixed-time': {
+              'hold-minutes': 10,
+            },
+          },
+        },
+      };
+
+      const cliOptions = {};
+
+      // Execute
+      const merged = mergeConfigWithCliOptions(config, cliOptions);
+
+      // Verify
+      expect(merged.entryPattern).toBe('quick-fall');
+      expect(merged.exitPattern).toBe('fixed-time');
     });
   });
 });

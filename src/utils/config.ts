@@ -10,21 +10,44 @@ const QuickRiseConfigSchema = z.object({
   'within-minutes': z.number().default(5),
 });
 
+// Define schema for the quick-fall pattern
+const QuickFallConfigSchema = z.object({
+  'fall-pct': z.number().default(0.3),
+  'within-minutes': z.number().default(5),
+});
+
 // Define schema for the fixed-time pattern
 const FixedTimeConfigSchema = z.object({
   'hold-minutes': z.number().default(10),
 });
 
+// Define schema for entry pattern configurations
+const EntryPatternsConfigSchema = z.object({
+  'quick-rise': QuickRiseConfigSchema.optional(),
+  'quick-fall': QuickFallConfigSchema.optional(),
+});
+
+// Define schema for exit pattern configurations
+const ExitPatternsConfigSchema = z.object({
+  'fixed-time': FixedTimeConfigSchema.optional(),
+});
+
 // Define schema for pattern configurations
 const PatternsConfigSchema = z.object({
-  'quick-rise': QuickRiseConfigSchema.optional(),
-  'fixed-time': FixedTimeConfigSchema.optional(),
+  entry: EntryPatternsConfigSchema,
+  exit: ExitPatternsConfigSchema,
 });
 
 // Schema for date range
 const DateRangeSchema = z.object({
   from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
   to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date must be in YYYY-MM-DD format'),
+});
+
+// Schema for default pattern selection
+const DefaultPatternsSchema = z.object({
+  entry: z.string().default('quick-rise'),
+  exit: z.string().default('fixed-time'),
 });
 
 // Define the root config schema
@@ -34,8 +57,9 @@ const ConfigSchema = z.object({
     ticker: z.string().default('SPY'),
     timeframe: z.string().default('1min'),
     direction: z.enum(['long', 'short']).default('long'),
+    patterns: DefaultPatternsSchema.optional(),
   }),
-  patterns: PatternsConfigSchema.optional(),
+  patterns: PatternsConfigSchema,
 });
 
 // Type for the validated config
@@ -49,14 +73,26 @@ const DEFAULT_CONFIG: Config = {
     ticker: 'SPY',
     timeframe: '1min',
     direction: 'long',
+    patterns: {
+      entry: 'quick-rise',
+      exit: 'fixed-time',
+    },
   },
   patterns: {
-    'quick-rise': {
-      'rise-pct': 0.3,
-      'within-minutes': 5,
+    entry: {
+      'quick-rise': {
+        'rise-pct': 0.3,
+        'within-minutes': 5,
+      },
+      'quick-fall': {
+        'fall-pct': 0.3,
+        'within-minutes': 5,
+      },
     },
-    'fixed-time': {
-      'hold-minutes': 10,
+    exit: {
+      'fixed-time': {
+        'hold-minutes': 10,
+      },
     },
   },
 };
@@ -126,6 +162,7 @@ interface MergedConfig {
   entryPattern: string;
   exitPattern: string;
   'quick-rise'?: Record<string, any>;
+  'quick-fall'?: Record<string, any>;
   'fixed-time'?: Record<string, any>;
   [key: string]: any;
 }
@@ -141,6 +178,10 @@ export const mergeConfigWithCliOptions = (
   config: Config,
   cliOptions: Record<string, any>
 ): MergedConfig => {
+  // Get default patterns from config
+  const defaultEntryPattern = config.default.patterns?.entry || 'quick-rise';
+  const defaultExitPattern = config.default.patterns?.exit || 'fixed-time';
+
   // Start with the default settings
   const mergedConfig: MergedConfig = {
     // Base options
@@ -152,9 +193,9 @@ export const mergeConfigWithCliOptions = (
     from: cliOptions.from || config.default.date?.from || '2010-01-01',
     to: cliOptions.to || config.default.date?.to || '2025-12-31',
 
-    // Pattern selection
-    entryPattern: cliOptions.entryPattern || 'quick-rise',
-    exitPattern: cliOptions.exitPattern || 'fixed-time',
+    // Pattern selection - handle both camelCase and kebab-case
+    entryPattern: cliOptions.entryPattern || cliOptions['entry-pattern'] || defaultEntryPattern,
+    exitPattern: cliOptions.exitPattern || cliOptions['exit-pattern'] || defaultExitPattern,
   };
 
   // Handle namespaced options for specific patterns
@@ -192,8 +233,32 @@ export const mergeConfigWithCliOptions = (
     // Merge with config file values for this pattern
     mergedConfig['quick-rise'] = {
       ...quickRiseDefaults,
-      ...(config.patterns?.['quick-rise'] || {}),
+      ...(config.patterns.entry['quick-rise'] || {}),
       ...(patternOptions['quick-rise'] || {}),
+    };
+  }
+
+  // Handle quick-fall pattern options
+  if (mergedConfig.entryPattern === 'quick-fall') {
+    // Legacy option handling
+    if (cliOptions.fallPct !== undefined) {
+      if (!patternOptions['quick-fall']) {
+        patternOptions['quick-fall'] = {};
+      }
+      patternOptions['quick-fall']['fall-pct'] = parseFloat(cliOptions.fallPct);
+    }
+
+    // Default values for quick-fall
+    const quickFallDefaults = {
+      'fall-pct': 0.3,
+      'within-minutes': 5,
+    };
+
+    // Merge with config file values for this pattern
+    mergedConfig['quick-fall'] = {
+      ...quickFallDefaults,
+      ...(config.patterns.entry['quick-fall'] || {}),
+      ...(patternOptions['quick-fall'] || {}),
     };
   }
 
@@ -206,7 +271,7 @@ export const mergeConfigWithCliOptions = (
     // Merge with config file values for this pattern
     mergedConfig['fixed-time'] = {
       ...fixedTimeDefaults,
-      ...(config.patterns?.['fixed-time'] || {}),
+      ...(config.patterns.exit['fixed-time'] || {}),
       ...(patternOptions['fixed-time'] || {}),
     };
   }

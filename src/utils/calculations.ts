@@ -75,6 +75,13 @@ export const calculateStdDevReturn = (returns: number[], meanReturn: number): nu
   );
 };
 
+// Check if a trade is a winning trade based on return percentage and direction
 export const isWinningTrade = (returnPct: number, isShort: boolean): boolean => {
-  return isShort ? returnPct > 0 : returnPct >= 0;
+  if (isShort) {
+    // For shorts, a positive return means a winning trade
+    return returnPct > 0;
+  } else {
+    // For longs, a non-negative return means a winning trade
+    return returnPct >= 0;
+  }
 };

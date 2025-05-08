@@ -80,8 +80,12 @@ export const printTradeDetails = (trade: Trade, direction: 'long' | 'short' = 'l
   const entry = formatDollar(trade.entry_price);
   const exit = formatDollar(trade.exit_price);
 
-  // For both directions, we're detecting a rise pattern
-  const riseText = formatPercent(trade.rise_pct);
+  // Determine if this is a rise or fall pattern based on the entry price vs open price
+  const isFallPattern = trade.entry_price < trade.market_open;
+
+  // Format the price change percentage appropriately - show negative values for falls, positive for rises
+  const changeValue = isFallPattern ? -trade.rise_pct : trade.rise_pct;
+  const changeText = `Change: ${formatPercent(changeValue)}`;
 
   // Return is calculated differently based on direction
   const returnPct = formatPercent(trade.return_pct);
@@ -91,7 +95,7 @@ export const printTradeDetails = (trade: Trade, direction: 'long' | 'short' = 'l
 
   // Print the formatted output
   console.log(
-    `${emoji} ${date} ⏰ ${entryTime} → ${exitTime} Open: ${open} Entry: ${entry} Exit: ${exit} Rise: ${riseText} ${returnEmoji} Return: ${returnColor(returnPct)}`
+    `${emoji} ${date} ⏰ ${entryTime} → ${exitTime} Open: ${open} Entry: ${entry} Exit: ${exit} ${changeText} ${returnEmoji} Return: ${returnColor(returnPct)}`
   );
 };
 

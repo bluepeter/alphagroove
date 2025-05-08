@@ -4,12 +4,20 @@ default:
     to: '2025-05-02'
   ticker: 'SPY'
   timeframe: '1min'
-  direction: 'long'
+  direction: 'short'
+  patterns:
+    entry: 'quick-fall'
+    exit: 'fixed-time'
 
 patterns:
-  quick-rise:
-    rise-pct: 0.1
-    within-minutes: 5
+  entry:
+    quick-rise:
+      rise-pct: 0.1
+      within-minutes: 5
+    quick-fall:
+      fall-pct: 0.2
+      within-minutes: 5
 
-  fixed-time:
-    hold-minutes: 10
+  exit:
+    fixed-time:
+      hold-minutes: 10

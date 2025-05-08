@@ -7,8 +7,14 @@ const mockConfig = {
   ticker: 'SPY',
   timeframe: '1min',
   direction: 'long',
+  entryPattern: 'quick-rise',
+  exitPattern: 'fixed-time',
   'quick-rise': {
     'rise-pct': 0.3,
+    'within-minutes': 5,
+  },
+  'quick-fall': {
+    'fall-pct': 0.3,
     'within-minutes': 5,
   },
   'fixed-time': {
@@ -53,6 +59,50 @@ describe('pattern factory', () => {
       const pattern2 = getEntryPattern('quick-rise', mockConfig);
 
       expect(pattern1).toStrictEqual(pattern2);
+    });
+
+    // New tests for quick-fall pattern
+    it('should return valid quick-fall pattern with required properties', () => {
+      const pattern = getEntryPattern('quick-fall', mockConfig);
+      expect(pattern).toHaveProperty('name');
+      expect(pattern).toHaveProperty('description');
+      expect(pattern).toHaveProperty('sql');
+      expect(pattern.name).toBe('Quick Fall');
+    });
+
+    it('should create unique instances for different quick-fall configurations', () => {
+      const pattern1 = getEntryPattern('quick-fall', mockConfig);
+
+      const customConfig = {
+        ...mockConfig,
+        'quick-fall': {
+          'fall-pct': 0.5,
+          'within-minutes': 5,
+        },
+      };
+
+      const pattern2 = getEntryPattern('quick-fall', customConfig);
+
+      expect(pattern1).not.toBe(pattern2);
+      expect(pattern1.sql).not.toBe(pattern2.sql);
+    });
+
+    it('should apply direction setting to quick-fall pattern', () => {
+      const shortConfig = {
+        ...mockConfig,
+        direction: 'short',
+      };
+
+      const longConfig = {
+        ...mockConfig,
+        direction: 'long',
+      };
+
+      const shortPattern = getEntryPattern('quick-fall', shortConfig);
+      const longPattern = getEntryPattern('quick-fall', longConfig);
+
+      expect(shortPattern.direction).toBe('short');
+      expect(longPattern.direction).toBe('long');
     });
   });
 

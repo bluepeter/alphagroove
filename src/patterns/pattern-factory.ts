@@ -1,3 +1,4 @@
+import { quickFallPattern } from './entry/quick-fall.js';
 import { quickRisePattern } from './entry/quick-rise.js';
 import { fixedTimeExitPattern } from './exit/fixed-time.js';
 
@@ -19,6 +20,7 @@ type PatternMap = {
 // Map of available patterns
 const entryPatterns: PatternMap = {
   'quick-rise': quickRisePattern,
+  'quick-fall': quickFallPattern,
 };
 
 const exitPatterns: PatternMap = {
@@ -43,6 +45,19 @@ export const getEntryPattern = (name: string, mergedConfig: PatternOptions): Pat
       percentIncrease: quickRiseOptions['rise-pct'] ?? quickRise.config.percentIncrease,
       maxBars: quickRiseOptions['within-minutes'] ?? quickRise.config.maxBars,
       direction: mergedConfig.direction ?? 'long',
+    });
+  }
+
+  // If it's quick-fall pattern and we have options, update the configuration
+  if (name === 'quick-fall' && mergedConfig['quick-fall']) {
+    const quickFallOptions = mergedConfig['quick-fall'];
+    const quickFall = pattern as typeof quickFallPattern;
+
+    return quickFall.updateConfig({
+      // Use new property names from config but map to internal format
+      percentDecrease: quickFallOptions['fall-pct'] ?? quickFall.config.percentDecrease,
+      maxBars: quickFallOptions['within-minutes'] ?? quickFall.config.maxBars,
+      direction: mergedConfig.direction ?? 'short',
     });
   }
 

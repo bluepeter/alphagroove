@@ -6,6 +6,7 @@ export interface QueryOptions {
   entryPattern?: string;
   exitPattern?: string;
   risePct?: string;
+  fallPct?: string;
   direction?: 'long' | 'short';
 }
 
@@ -13,31 +14,46 @@ export interface QueryOptions {
 export type MergedConfig = Record<string, any>;
 
 export const buildAnalysisQuery = (options: QueryOptions | MergedConfig): string => {
-  const { ticker, timeframe, from, to, direction } = options;
+  const { ticker, timeframe, from, to, direction, entryPattern } = options;
+  const isQuickFall = entryPattern === 'quick-fall';
+  const isShort = direction === 'short';
 
-  // Determine rise percentage - first check if options has the new format,
-  // then check old format, finally use default
-  let riseThreshold = 0.3; // default value
-  if ('quick-rise' in options && options['quick-rise'] && 'rise-pct' in options['quick-rise']) {
-    riseThreshold = options['quick-rise']['rise-pct'];
-  } else if ('risePct' in options && options.risePct !== undefined) {
-    riseThreshold = parseFloat(options.risePct as string);
+  // Set threshold based on pattern type (rise or fall)
+  let threshold = 0.3; // default value
+
+  if (isQuickFall) {
+    // Determine fall percentage
+    if ('quick-fall' in options && options['quick-fall'] && 'fall-pct' in options['quick-fall']) {
+      threshold = options['quick-fall']['fall-pct'];
+    } else if ('fallPct' in options && options.fallPct !== undefined) {
+      threshold = parseFloat(options.fallPct as string);
+    }
+  } else {
+    // Determine rise percentage
+    if ('quick-rise' in options && options['quick-rise'] && 'rise-pct' in options['quick-rise']) {
+      threshold = options['quick-rise']['rise-pct'];
+    } else if ('risePct' in options && options.risePct !== undefined) {
+      threshold = parseFloat(options.risePct as string);
+    }
   }
 
   // Convert to decimal representation
-  riseThreshold = riseThreshold / 100;
+  threshold = threshold / 100;
 
-  const isShort = direction === 'short';
+  // Define pattern condition based on pattern type
+  let patternCondition, patternPctCalc, entryPriceField;
 
-  // For both directions, we look for the same pattern - a quick rise
-  // But for short, we enter at a different price
-  const riseCondition = `((five_min_high - market_open) / market_open) >= ${riseThreshold}`;
-
-  // For both directions, calculate the rise percentage the same way
-  const risePctCalc = `((five_min_high - market_open) / market_open) as rise_pct`;
-
-  // Entry price is different based on direction
-  const entryPriceField = 'five_min_high'; // Both long and short use the same price point
+  if (isQuickFall) {
+    // For quick-fall, we look for a price decrease
+    patternCondition = `((market_open - five_min_low) / market_open) >= ${threshold}`;
+    patternPctCalc = `((market_open - five_min_low) / market_open) as rise_pct`; // Keep column name as rise_pct for compatibility
+    entryPriceField = 'five_min_low'; // For quick-fall, we enter at the low price
+  } else {
+    // For quick-rise, we look for a price increase
+    patternCondition = `((five_min_high - market_open) / market_open) >= ${threshold}`;
+    patternPctCalc = `((five_min_high - market_open) / market_open) as rise_pct`;
+    entryPriceField = 'five_min_high'; // For quick-rise, we enter at the high price
+  }
 
   // Return calculation differs by direction
   const returnPctCalc = isShort
@@ -116,10 +132,10 @@ export const buildAnalysisQuery = (options: QueryOptions | MergedConfig): string
         exit_price,
         entry_time,
         exit_time,
-        ${risePctCalc},
+        ${patternPctCalc},
         ${returnPctCalc}
       FROM exit_prices
-      WHERE ${riseCondition}
+      WHERE ${patternCondition}
     ),
     yearly_stats AS (
       SELECT 
@@ -137,7 +153,7 @@ export const buildAnalysisQuery = (options: QueryOptions | MergedConfig): string
         CASE WHEN COUNT(*) > 1 THEN STDDEV(t.return_pct * 100) ELSE 0 END as std_dev_return,
         ${
           isShort
-            ? 'SUM(CASE WHEN t.return_pct < 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT as win_rate'
+            ? 'SUM(CASE WHEN t.return_pct > 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT as win_rate'
             : 'SUM(CASE WHEN t.return_pct >= 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT as win_rate'
         }
       FROM individual_trades t

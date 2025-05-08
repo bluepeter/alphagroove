@@ -92,15 +92,29 @@ default:
   ticker: 'SPY'
   timeframe: '1min'
   direction: 'long'
+  patterns:
+    entry: 'quick-rise' # Default entry pattern to use
+    exit: 'fixed-time' # Default exit pattern to use
 
 patterns:
-  quick-rise:
-    rise-pct: 0.3
-    within-minutes: 5
+  entry:
+    quick-rise:
+      rise-pct: 0.3
+      within-minutes: 5
+    quick-fall:
+      fall-pct: 0.3
+      within-minutes: 5
 
-  fixed-time:
-    hold-minutes: 10
+  exit:
+    fixed-time:
+      hold-minutes: 10
 ```
+
+This configuration structure allows you to:
+
+1. Define default entry and exit patterns to use when none are specified via CLI
+2. Organize patterns by type (entry vs exit)
+3. Configure parameters for each pattern
 
 You can generate a default config file by running:
 
@@ -145,6 +159,13 @@ CLI options override values from the configuration file.
 | `--quick-rise.rise-pct`       | Minimum percentage rise to trigger pattern | 0.3     |
 | `--quick-rise.within-minutes` | Number of minutes to look for the rise     | 5       |
 
+#### Quick Fall Pattern Options
+
+| Option                        | Description                                | Default |
+| ----------------------------- | ------------------------------------------ | ------- |
+| `--quick-fall.fall-pct`       | Minimum percentage fall to trigger pattern | 0.3     |
+| `--quick-fall.within-minutes` | Number of minutes to look for the fall     | 5       |
+
 #### Fixed Time Pattern Options
 
 | Option                      | Description                                    | Default |
@@ -172,10 +193,17 @@ Common timeframes include:
 #### Entry Patterns
 
 - `quick-rise`: Detects a percentage rise in the first 5 minutes of trading (default: 0.3%)
+
   - Can be combined with the `--direction` parameter to interpret the pattern for long or short
     positions
   - For `--direction long`: Takes a long position at the peak of the rise (default)
   - For `--direction short`: Takes a short position at the peak of the rise
+
+- `quick-fall`: Detects a percentage fall in the first 5 minutes of trading (default: 0.3%)
+  - Can be combined with the `--direction` parameter to interpret the pattern for long or short
+    positions
+  - For `--direction short`: Takes a short position at the bottom of the fall (default)
+  - For `--direction long`: Takes a long position at the bottom of the fall (buying the dip)
 
 #### Exit Patterns
 
@@ -207,6 +235,9 @@ pnpm dev:start --from 2020-01-01 --to 2025-05-02
 
 # Specify pattern options
 pnpm dev:start --quick-rise.rise-pct=0.5 --fixed-time.hold-minutes=15
+
+# Use the quick-fall pattern
+pnpm dev:start --entry-pattern quick-fall --fall-pct=0.4
 
 # Analyze a different ticker with specific timeframe
 pnpm dev:start --ticker QQQ --timeframe 5min
