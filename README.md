@@ -13,6 +13,8 @@ batched analyses across date ranges, and output metrics like mean/median returns
 distribution buckets. AlphaGroove is intended for hands-on quant researchers who prefer scripting
 over spreadsheets, precision over black boxes, and clarity over curve-fitting.
 
+For future enhancement ideas, see [docs/enhancement-ideas.md](docs/enhancement-ideas.md).
+
 ## Prerequisites
 
 ### Required: DuckDB Installation
