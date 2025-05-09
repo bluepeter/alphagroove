@@ -11,3 +11,4 @@ tickers/*
 !tickers/TEST/
 !tickers/TEST/*.csv
 charts/
+test-charts/

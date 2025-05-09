@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 
 import { Signal } from '../patterns/types';
 
@@ -15,13 +15,13 @@ vi.mock('fs', async () => {
       ...originalFs,
       mkdirSync: originalFs.mkdirSync,
       writeFileSync: originalFs.writeFileSync,
-      existsSync: vi.fn(() => true),
-      unlinkSync: vi.fn(),
+      existsSync: originalFs.existsSync,
+      unlinkSync: originalFs.unlinkSync,
     },
     mkdirSync: originalFs.mkdirSync,
     writeFileSync: originalFs.writeFileSync,
-    existsSync: vi.fn(() => true),
-    unlinkSync: vi.fn(),
+    existsSync: originalFs.existsSync,
+    unlinkSync: originalFs.unlinkSync,
   };
 });
 
@@ -56,8 +56,13 @@ describe('Chart Generator', () => {
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
+  afterAll(async () => {
     vi.resetAllMocks();
+    const originalFs = await vi.importActual<typeof fs>('fs');
+    if (originalFs.existsSync(testOutputDir)) {
+      originalFs.rmSync(testOutputDir, { recursive: true, force: true });
+      console.log(`Cleaned up test directory: ${testOutputDir}`);
+    }
   });
 
   it('should generate a chart for a single entry signal', async () => {
