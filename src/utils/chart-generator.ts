@@ -21,8 +21,7 @@ interface ChartGeneratorOptions {
 
 /**
  * Generate a multi-day chart for a specific entry signal
- * Displays the current day's data plus 1 previous day (2 days total)
- * Outputs a high-quality PNG chart file (SVG is an intermediate step and is deleted).
+ * Displays the current day's data plus 1 previous actual trading day with data.
  */
 export const generateEntryChart = async (options: ChartGeneratorOptions): Promise<string> => {
   const {
@@ -38,17 +37,23 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
   fs.mkdirSync(patternDir, { recursive: true });
 
   const baseFileName = `${ticker}_${entryPatternName}_${tradeDate.replace(/-/g, '')}`;
-  const svgOutputPath = path.join(patternDir, `${baseFileName}.svg`); // Still used temporarily
+  const svgOutputPath = path.join(patternDir, `${baseFileName}.svg`);
   const pngOutputPath = path.join(patternDir, `${baseFileName}.png`);
 
+  // Fetch data for the tradeDate and 1 prior actual trading day
   const data = await fetchMultiDayData(ticker, timeframe, tradeDate, 1);
+
+  if (!data || data.length === 0) {
+    console.warn(
+      `No data returned by fetchMultiDayData for ${tradeDate} and prior day. Cannot generate chart.`
+    );
+    // Potentially create a blank chart with a message or handle error differently
+    return ''; // Or throw an error
+  }
+
   const svg = generateSvgChart(ticker, entryPatternName, data, entrySignal);
 
-  // Intermediate SVG is written to be read by sharp, then deleted.
-  // Alternatively, sharp can process the SVG string directly if it doesn't rely on external file references.
-  // For simplicity with current sharp usage (Buffer.from(svg)), an explicit write and delete is clear.
   fs.writeFileSync(svgOutputPath, svg, 'utf-8');
-  // console.log(`Intermediate SVG chart generated: ${svgOutputPath}`); // Optional: for debugging
 
   try {
     await sharp(svgOutputPath, { density: 300 })
@@ -66,34 +71,52 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
 };
 
 /**
- * Fetch market data for multiple days before the signal date
- * Gets 1 day prior + current day (2 days total)
+ * Fetches market data for a given signal date and a specified number of prior *actual trading days* with data.
+ * @param ticker The stock ticker symbol.
+ * @param timeframe The data timeframe (e.g., '1min').
+ * @param signalDate The reference date for the signal (YYYY-MM-DD).
+ * @param numPriorTradingDays The number of prior trading days (with data) to fetch before the signalDate.
+ *                            The signalDate itself is always included if it has data.
+ * @returns A promise that resolves to an array of Bar objects, or an empty array if an error occurs.
  */
 const fetchMultiDayData = async (
   ticker: string,
   timeframe: string,
-  signalDate: string,
-  daysBack: number
+  signalDate: string, // YYYY-MM-DD format
+  numPriorTradingDays: number
 ): Promise<Bar[]> => {
-  const startDate = getPriorTradingDate(signalDate, daysBack);
   const tempFile = path.join(process.cwd(), 'temp_chart_query.sql');
+  const dataFilePath = `tickers/${ticker}/${timeframe}.csv`;
+  const limitDays = numPriorTradingDays + 1;
 
   const query = `
-    WITH raw_data AS (
+    WITH AllAvailableTradingDays AS (
+      SELECT DISTINCT strftime(column0::TIMESTAMP, '%Y-%m-%d') AS trade_date_str
+      FROM read_csv_auto('${dataFilePath}', header=false)
+      WHERE strftime(column0::TIMESTAMP, '%Y-%m-%d') <= '${signalDate}'
+    ),
+    RankedTradingDays AS (
       SELECT 
-        column0::TIMESTAMP as timestamp,
-        column1::DOUBLE as open,
-        column2::DOUBLE as high,
-        column3::DOUBLE as low,
-        column4::DOUBLE as close,
-        column5::BIGINT as volume,
-        strftime(column0, '%Y-%m-%d') as trade_date
-      FROM read_csv_auto('tickers/${ticker}/${timeframe}.csv', header=false)
-      WHERE column0 >= '${startDate} 00:00:00'
-        AND column0 <= '${signalDate} 23:59:59'
-        AND strftime(timestamp, '%H:%M') BETWEEN '09:30' AND '16:00'
+        trade_date_str,
+        row_number() OVER (ORDER BY trade_date_str DESC) as rn
+      FROM AllAvailableTradingDays
+    ),
+    TargetTradingDays AS (
+      SELECT trade_date_str
+      FROM RankedTradingDays
+      WHERE rn <= ${limitDays}
     )
-    SELECT * FROM raw_data
+    SELECT 
+      column0::TIMESTAMP as timestamp,
+      column1::DOUBLE as open,
+      column2::DOUBLE as high,
+      column3::DOUBLE as low,
+      column4::DOUBLE as close,
+      column5::BIGINT as volume,
+      strftime(column0::TIMESTAMP, '%Y-%m-%d') as trade_date
+    FROM read_csv_auto('${dataFilePath}', header=false)
+    WHERE strftime(column0::TIMESTAMP, '%Y-%m-%d') IN (SELECT trade_date_str FROM TargetTradingDays)
+      AND strftime(column0::TIMESTAMP, '%H:%M') BETWEEN '09:30' AND '16:00'
     ORDER BY timestamp ASC;
   `;
 
@@ -106,8 +129,14 @@ const fetchMultiDayData = async (
     });
 
     const [header, ...lines] = result.trim().split('\n');
-    const columns = header.split(',');
+    if (!header || lines.length === 0) {
+      console.warn(
+        `No data returned from DuckDB for ${signalDate} and ${numPriorTradingDays} prior days for ${ticker}.`
+      );
+      return [];
+    }
 
+    const columns = header.split(',');
     const bars = lines.map(line => {
       const values = line.split(',');
       const row = columns.reduce(
@@ -118,7 +147,6 @@ const fetchMultiDayData = async (
         },
         {} as Record<string, string | number>
       );
-
       return {
         timestamp: row.timestamp as string,
         open: row.open as number,
@@ -126,12 +154,15 @@ const fetchMultiDayData = async (
         low: row.low as number,
         close: row.close as number,
         volume: row.volume as number,
+        trade_date: row.trade_date as string,
       };
     });
-
     return bars;
   } catch (error) {
-    console.error('Error fetching multi-day data:', error);
+    console.error(
+      `Error fetching multi-day data for ${signalDate} with ${numPriorTradingDays} prior days for ${ticker}:`,
+      error
+    );
     return [];
   } finally {
     if (fs.existsSync(tempFile)) {
@@ -140,23 +171,10 @@ const fetchMultiDayData = async (
   }
 };
 
-const getPriorTradingDate = (date: string, daysBack: number): string => {
-  const dateObj = new Date(date);
-  let tradingDaysBack = 0;
-  while (tradingDaysBack < daysBack) {
-    dateObj.setDate(dateObj.getDate() - 1);
-    const day = dateObj.getDay();
-    if (day !== 0 && day !== 6) {
-      tradingDaysBack++;
-    }
-  }
-  return dateObj.toISOString().split('T')[0];
-};
-
 const generateSvgChart = (
   ticker: string,
   patternName: string,
-  allData: Bar[],
+  allDataInput: Bar[],
   entrySignal: Signal
 ): string => {
   const width = 1200;
@@ -170,19 +188,40 @@ const generateSvgChart = (
   const volumeHeight = (height - marginTop - marginBottom) * 0.3;
   const volumeTop = marginTop + chartHeight + 20;
 
-  const entryIndexOverall = allData.findIndex(d => d.timestamp === entrySignal.timestamp);
-  const dataToShow = allData.slice(0, entryIndexOverall + 1);
+  // 1. Determine the actual distinct trading days present in the full input from fetchMultiDayData
+  const allInputTradingDays = allDataInput.reduce(
+    (days, bar) => {
+      const date = bar.trade_date;
+      if (!days[date]) {
+        days[date] = [];
+      }
+      return days;
+    },
+    {} as Record<string, Bar[]>
+  );
+  const allUniqueInputDayStrings = Object.keys(allInputTradingDays).sort((a, b) =>
+    a.localeCompare(b)
+  );
+  const numPriorDaysToDisplay = 1;
+  const displayDayStrings = allUniqueInputDayStrings.slice(-(numPriorDaysToDisplay + 1));
 
-  if (dataToShow.length === 0) {
-    console.warn('No data to display after filtering for entry signal.');
+  // 2. Now, filter the data that will actually be plotted:
+  const entryIndexOverall = allDataInput.findIndex(d => d.timestamp === entrySignal.timestamp);
+  const dataUpToEntry = allDataInput.slice(0, entryIndexOverall + 1);
+
+  const finalData = dataUpToEntry.filter(d => displayDayStrings.includes(d.trade_date));
+
+  if (finalData.length === 0) {
+    console.warn('No data to display after filtering for entry signal and selected days.');
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
       <text x="${width / 2}" y="${height / 2}" text-anchor="middle" font-size="18">No data available</text>
     </svg>`;
   }
 
-  const tradingDays = dataToShow.reduce(
+  // This grouping is for creating day-specific labels/boundaries from the final, filtered data
+  const tradingDaysForLabels = finalData.reduce(
     (days, bar) => {
-      const date = new Date(bar.timestamp).toISOString().split('T')[0];
+      const date = bar.trade_date;
       if (!days[date]) {
         days[date] = [];
       }
@@ -191,19 +230,6 @@ const generateSvgChart = (
     },
     {} as Record<string, Bar[]>
   );
-  const uniqueDayStrings = Object.keys(tradingDays).sort((a, b) => a.localeCompare(b));
-  const displayDayStrings = uniqueDayStrings.slice(-2); // Current day and 1 previous
-
-  const finalData = dataToShow.filter(d =>
-    displayDayStrings.includes(new Date(d.timestamp).toISOString().split('T')[0])
-  );
-
-  if (finalData.length === 0) {
-    console.warn('No data for the last 2 relevant days.');
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-      <text x="${width / 2}" y="${height / 2}" text-anchor="middle" font-size="18">No data available for selected days</text>
-    </svg>`;
-  }
 
   const minPrice = Math.min(...finalData.map(d => d.low)) * 0.995;
   const maxPrice = Math.max(...finalData.map(d => d.high)) * 1.005;
@@ -223,23 +249,27 @@ const generateSvgChart = (
     text: string;
     x: number;
     isDate?: boolean;
-    isTime?: boolean; // Flag for time labels to control their rendering
-    isTick?: boolean; // Flag for hourly tick marks without text
+    isTime?: boolean;
+    isTick?: boolean;
   }
 
   const xTicksAndLabels: ChartLabel[] = [];
-  const dayBoundaryLines: { x: number }[] = []; // Only need x for the line
-  const dateLabelsForChartArea: ChartLabel[] = []; // Separate array for date labels in price chart
+  const dayBoundaryLines: { x: number }[] = [];
+  const dateLabelsForChartArea: ChartLabel[] = [];
 
-  // Generate Date Labels for Price Chart Area and Day Boundary Lines
+  // Generate Date Labels for Price Chart Area and Day Boundary Lines using displayDayStrings
   displayDayStrings.forEach((dateStr, dayIdx) => {
-    const dayData = tradingDays[dateStr];
-    if (!dayData || dayData.length === 0) return;
+    const dayData = tradingDaysForLabels[dateStr];
+    if (!dayData || dayData.length === 0) {
+      console.warn(
+        `No actual data in finalData for date ${dateStr}, which was in displayDayStrings. Skipping labels/boundaries for it.`
+      );
+      return;
+    }
 
     const firstBarOfDayIndex = finalData.findIndex(b => b.timestamp === dayData[0].timestamp);
     const xDayStart = getXPosition(firstBarOfDayIndex);
 
-    // Add Date Label for the Price Chart Area
     dateLabelsForChartArea.push({
       text: new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
         month: 'short',
@@ -249,24 +279,21 @@ const generateSvgChart = (
       isDate: true,
     });
 
-    // Add Day Boundary Line (except for the very first day on the chart)
     if (dayIdx > 0) {
-      const boundaryX = xDayStart - chartWidth / finalData.length / 20; // Small offset before day starts
-      dayBoundaryLines.push({ x: Math.max(marginLeft, boundaryX) }); // Ensure not before marginLeft
+      const boundaryX = xDayStart - chartWidth / finalData.length / 20;
+      dayBoundaryLines.push({ x: Math.max(marginLeft, boundaryX) });
     }
   });
 
-  // Generate Time Ticks and Selective Time Labels for X-Axis
+  // Generate Time Ticks and Selective Time Labels for X-Axis, using displayDayStrings and tradingDaysForLabels
   const RTH_START_HOUR = 9;
   const RTH_START_MINUTE = 30;
   const RTH_END_HOUR = 16;
-  const RTH_END_MINUTE = 0; // Market close minute
-
-  // Define which hours get full labels vs just ticks
-  const FULL_LABEL_HOURS = [9, 12, 16]; // e.g., 9:30 AM, 12 PM, 4 PM
+  const RTH_END_MINUTE = 0;
+  const FULL_LABEL_HOURS = [9, 12, 16];
 
   displayDayStrings.forEach(dateStr => {
-    const dayData = tradingDays[dateStr];
+    const dayData = tradingDaysForLabels[dateStr];
     if (!dayData || dayData.length === 0) return;
 
     for (let hour = RTH_START_HOUR; hour <= RTH_END_HOUR; hour++) {
@@ -281,7 +308,6 @@ const generateSvgChart = (
         const barHour = barDate.getHours();
         const barMinute = barDate.getMinutes();
 
-        // Target time for this tick/label
         const targetTimeThisHour = new Date(dateStr);
         targetTimeThisHour.setHours(hour, minute, 0, 0);
 
@@ -302,10 +328,8 @@ const generateSvgChart = (
           const actualTime = new Date(closestBar.timestamp);
           const xPos = getXPosition(barIndex);
 
-          // Add a tick mark for all these hours
           xTicksAndLabels.push({ text: '', x: xPos, isTick: true });
 
-          // Add full text label only for specified hours
           const isFullLabelHour = FULL_LABEL_HOURS.includes(hour);
           const isMarketOpen = hour === RTH_START_HOUR && minute === RTH_START_MINUTE;
           const isMarketClose =
@@ -332,7 +356,6 @@ const generateSvgChart = (
               timeText = actualTime.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
             }
 
-            // Check for proximity to existing labels to avoid overlap
             const tooClose = xTicksAndLabels.some(l => l.isTime && Math.abs(l.x - xPos) < 30);
             if (!tooClose && timeText) {
               xTicksAndLabels.push({
@@ -347,7 +370,6 @@ const generateSvgChart = (
     }
   });
 
-  // Deduplicate and sort xTicksAndLabels by x position
   const uniqueXTicksAndLabels = Array.from(
     new Map(xTicksAndLabels.map(label => [label.x.toFixed(1), label])).values()
   ).sort((a, b) => a.x - b.x);

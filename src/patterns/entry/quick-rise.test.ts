@@ -61,6 +61,7 @@ describe('Quick Rise Pattern', () => {
       low,
       close: high,
       volume: 1000,
+      trade_date: timestamp.substring(0, 10),
     });
 
     it('should detect a 0.3% rise over 5 bars', () => {
@@ -144,6 +145,7 @@ describe('Quick Rise Pattern', () => {
       low,
       close: low,
       volume: 1000,
+      trade_date: timestamp.substring(0, 10),
     });
 
     it('should detect a 0.3% rise and return short direction signal', () => {

@@ -61,6 +61,7 @@ describe('Quick Fall Pattern', () => {
       low,
       close: low,
       volume: 1000,
+      trade_date: timestamp.substring(0, 10),
     });
 
     it('should detect a 0.3% fall over 5 bars', () => {
@@ -114,6 +115,7 @@ describe('Quick Fall Pattern', () => {
       low,
       close: low,
       volume: 1000,
+      trade_date: timestamp.substring(0, 10),
     });
 
     it('should detect a 0.3% fall and return long direction signal', () => {

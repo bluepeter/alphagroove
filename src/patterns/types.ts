@@ -1,10 +1,11 @@
 export interface Bar {
-  timestamp: string;
+  timestamp: string; // Full timestamp, e.g., "2023-05-01 09:35:00"
   open: number;
   high: number;
   low: number;
   close: number;
   volume: number;
+  trade_date: string; // YYYY-MM-DD extracted by SQL
 }
 
 export interface Signal {

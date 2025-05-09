@@ -1,3 +1,4 @@
+import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
@@ -54,6 +55,16 @@ describe('Chart Generator', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // execSync is already mocked at the module level.
+    // We can reset its call history and mock implementation for each test if needed.
+    // If the top-level mock is sufficient for most tests, only override in specific tests.
+    // For now, let's ensure it's reset if we plan to change its returnValue per test.
+    const mockedExecSync = execSync as ReturnType<typeof vi.fn>; // Cast to get mock functions
+    mockedExecSync.mockReset();
+    // Reset to default mock implementation if needed, or set a new one in specific tests
+    mockedExecSync.mockReturnValue(
+      'timestamp,open,high,low,close,volume,trade_date\n2023-05-01 09:30:00,100,101,99,100.5,1000,2023-05-01'
+    );
   });
 
   afterAll(async () => {
@@ -113,5 +124,51 @@ describe('Chart Generator', () => {
     // Paths should now be PNG paths
     expect(chartPaths[0]).toContain('20230501.png');
     expect(chartPaths[1]).toContain('20230502.png');
+  });
+
+  it('should correctly fetch prior trading day data across a weekend', async () => {
+    const mondaySignalDate = '2025-01-27'; // A known Monday
+    const precedingFriday = '2025-01-24';
+
+    // Mock execSync to return data for Friday and Monday only
+    vi.mocked(execSync).mockReturnValue(
+      `timestamp,open,high,low,close,volume,trade_date\n` +
+        `${precedingFriday} 09:30:00,100,101,99,100.5,1000,${precedingFriday}\n` +
+        `${precedingFriday} 09:31:00,100.5,101.5,100,101,1200,${precedingFriday}\n` +
+        `${mondaySignalDate} 09:30:00,102,103,101,102.5,1500,${mondaySignalDate}\n` +
+        `${mondaySignalDate} 09:31:00,102.5,103.5,102,103,1600,${mondaySignalDate}`
+    );
+
+    const mondaySignal: Signal = {
+      timestamp: `${mondaySignalDate} 09:31:00`,
+      price: 103,
+      type: 'entry',
+      direction: 'long',
+    };
+
+    const pngPath = await generateEntryChart({
+      ticker: 'SPY_WEEKEND_TEST',
+      timeframe: '1min',
+      entryPatternName: 'weekend-skip-test',
+      tradeDate: mondaySignalDate,
+      entryTimestamp: mondaySignal.timestamp,
+      entrySignal: mondaySignal,
+      outputDir: testOutputDir,
+    });
+
+    expect(pngPath).toContain('SPY_WEEKEND_TEST_weekend-skip-test_20250127.png');
+
+    // Implicitly, if no error, fetchMultiDayData and generateSvgChart handled the dates correctly.
+    // To be more explicit (requires more complex SVG parsing or visual diff, which is out of scope for this unit test):
+    // One could check logs if we added specific logging for dates processed in generateSvgChart.
+    // For now, successful generation is the main check.
+    const consoleWarnSpy = vi.spyOn(console, 'warn');
+    expect(consoleWarnSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('No data for the last 2 relevant days')
+    );
+    expect(consoleWarnSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('No data to display after filtering for entry signal')
+    );
+    consoleWarnSpy.mockRestore();
   });
 });

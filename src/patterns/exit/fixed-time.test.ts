@@ -78,11 +78,12 @@ describe('Fixed Time Exit Pattern', () => {
   describe('pattern detection', () => {
     const createBar = (timestamp: string, close: number): Bar => ({
       timestamp,
-      open: close,
-      high: close,
-      low: close,
+      open: close - 0.5, // Arbitrary open
+      high: close + 0.5, // Arbitrary high
+      low: close - 1, // Arbitrary low
       close,
       volume: 1000,
+      trade_date: timestamp.substring(0, 10),
     });
 
     const createEntrySignal = (timestamp: string, price: number): Signal => ({
