@@ -53,10 +53,6 @@ const generateChartForLLMDecision = async (
   appOrMergedConfig: MergedConfig,
   entryPatternName: string
 ): Promise<string> => {
-  console.log(
-    `[LLM Prep] Generating chart for LLM decision: ${signalData.ticker} on ${signalData.trade_date}`
-  );
-
   const entrySignalForChart: Signal = {
     timestamp: signalData.timestamp,
     price: signalData.price,
@@ -83,7 +79,7 @@ const generateChartForLLMDecision = async (
       const chartFileName = `${signalData.ticker}_${entryPatternName}_${signalData.trade_date.replace(/-/g, '')}_llm_failed.png`;
       return join(chartDir, chartFileName);
     }
-    console.log(`[LLM Prep] Chart for LLM generated at: ${chartPath}`);
+
     return chartPath;
   } catch (error) {
     console.error(`[LLM Prep] Error generating chart for ${signalData.trade_date}:`, error);
@@ -101,13 +97,10 @@ export const handleLlmTradeScreeningInternal = async (
   screenSpecificLLMConfig: ScreenLLMConfig | undefined,
   mergedConfig: MergedConfig,
   rawConfig: any // Consider typing this better if possible
-): Promise<boolean> => {
+): Promise<{ proceed: boolean; chartPath?: string }> => {
   if (!llmScreenInstance || !screenSpecificLLMConfig?.enabled) {
-    return true;
+    return { proceed: true };
   }
-  console.log(
-    `[INFO] LLM Screen: Processing signal for ${currentSignal.ticker} on ${currentSignal.trade_date} at ${currentSignal.timestamp}`
-  );
   const chartPathForLLM = await generateChartForLLMDecision(
     currentSignal,
     mergedConfig,
@@ -120,15 +113,10 @@ export const handleLlmTradeScreeningInternal = async (
     rawConfig
   );
   if (!proceed) {
-    console.log(
-      `[INFO] LLM Screen: Signal for ${currentSignal.ticker} on ${currentSignal.trade_date} was filtered out.`
-    );
+    return { proceed: false };
   } else {
-    console.log(
-      `[INFO] LLM Screen: Signal for ${currentSignal.ticker} on ${currentSignal.trade_date} approved.`
-    );
+    return { proceed: true, chartPath: chartPathForLLM };
   }
-  return proceed;
 };
 
 // Export for testing
@@ -165,7 +153,6 @@ export const initializeAnalysis = (cliOptions: Record<string, any>) => {
 
   if (screenSpecificLLMConfig?.enabled) {
     llmScreenInstance = new LlmConfirmationScreen();
-    console.log('[INFO] LLM Confirmation Screen is enabled.');
   }
 
   const entryPattern = getEntryPattern(mergedConfig.entryPattern, mergedConfig);
@@ -204,17 +191,6 @@ export const processTradesLoop = async (
   const confirmedTrades: Trade[] = [];
 
   for (const rawTradeData of tradesFromQuery) {
-    if (
-      llmScreenInstance &&
-      screenSpecificLLMConfig?.enabled &&
-      Object.keys(rawTradeData).length > 0
-    ) {
-      console.log(
-        '[DEBUG INDEX.TS] Raw trade data for LLM processing:',
-        JSON.stringify(rawTradeData)
-      );
-    }
-
     const entryTimestamp = rawTradeData.entry_time as string;
     const currentSignal: EnrichedSignal = {
       ticker: mergedConfig.ticker,
@@ -223,18 +199,26 @@ export const processTradesLoop = async (
       timestamp: entryTimestamp,
       type: 'entry',
       direction: entryPattern.direction as 'long' | 'short',
+      // chartPath will be added below if LLM proceeds
     };
 
-    const proceedFromLlm = await handleLlmTradeScreeningInternal(
-      currentSignal,
-      entryPattern.name,
-      llmScreenInstance,
-      screenSpecificLLMConfig,
-      mergedConfig,
-      rawConfig
-    );
+    const { proceed: proceedFromLlm, chartPath: llmChartPath } =
+      await handleLlmTradeScreeningInternal(
+        currentSignal,
+        entryPattern.name,
+        llmScreenInstance,
+        screenSpecificLLMConfig,
+        mergedConfig,
+        rawConfig
+      );
+
     if (!proceedFromLlm) {
       continue;
+    }
+
+    // If LLM approved, store the chart path
+    if (llmChartPath) {
+      currentSignal.chartPath = llmChartPath;
     }
 
     totalStats.total_return_sum += rawTradeData.return_pct as number;
@@ -247,7 +231,12 @@ export const processTradesLoop = async (
     handleYearlyUpdatesInternal(rawTradeData, statsContext);
     currentYear = statsContext.currentYear;
 
-    const tradeObj = mapRawDataToTrade(rawTradeData, entryPattern.direction!);
+    // Pass the chartPath (if it exists) to mapRawDataToTrade
+    const tradeObj = mapRawDataToTrade(
+      rawTradeData,
+      entryPattern.direction!,
+      currentSignal.chartPath
+    );
 
     statsContext.yearTrades.push(tradeObj); // This should be yearTrades.push(tradeObj)
     confirmedTrades.push(tradeObj);
@@ -281,25 +270,49 @@ export const finalizeAnalysis = async (
   });
 
   if (mergedConfig.generateCharts && confirmedTrades.length > 0) {
-    console.log('\nGenerating multiday charts for LLM-confirmed entry points...');
-    const tradesForBulkCharts = confirmedTrades.map(ct => ({
-      trade_date: ct.trade_date,
-      entry_time: ct.entry_time,
-      entry_price: ct.entry_price,
-      direction: ct.direction,
-    }));
-    const chartPaths = await generateBulkEntryCharts(
-      mergedConfig.ticker,
-      mergedConfig.timeframe,
-      entryPattern.name,
-      tradesForBulkCharts,
-      mergedConfig.chartsDir || './charts'
-    );
-    console.log(
-      `\nGenerated ${chartPaths.length} charts in ${mergedConfig.chartsDir || './charts'}/${entryPattern.name}/`
-    );
+    const llmScreenEnabled = mergedConfig.llmConfirmationScreen?.enabled;
+
+    if (llmScreenEnabled) {
+      console.log('\nLLM-confirmed charts were generated during screening:');
+      const chartPaths: string[] = [];
+      confirmedTrades.forEach(trade => {
+        if (trade.chartPath) {
+          chartPaths.push(trade.chartPath);
+          // Optionally log each path, or just the summary count
+          // console.log(`- ${trade.chartPath}`);
+        }
+      });
+      if (chartPaths.length > 0) {
+        console.log(
+          `\nFound ${chartPaths.length} charts in ${mergedConfig.chartsDir || './charts'}/${entryPattern.name}/ (from LLM screening).`
+        );
+      } else {
+        console.log(
+          '\nLLM screening was enabled, but no chart paths were found for confirmed trades.'
+        );
+      }
+    } else {
+      // LLM screen is not enabled, generate charts now if generateCharts is true
+      console.log('\nGenerating multiday charts for confirmed entry points...');
+      const tradesForBulkCharts = confirmedTrades.map(ct => ({
+        trade_date: ct.trade_date,
+        entry_time: ct.entry_time,
+        entry_price: ct.entry_price,
+        direction: ct.direction,
+      }));
+      const chartPaths = await generateBulkEntryCharts(
+        mergedConfig.ticker,
+        mergedConfig.timeframe,
+        entryPattern.name,
+        tradesForBulkCharts,
+        mergedConfig.chartsDir || './charts'
+      );
+      console.log(
+        `\nGenerated ${chartPaths.length} charts in ${mergedConfig.chartsDir || './charts'}/${entryPattern.name}/`
+      );
+    }
   } else if (mergedConfig.generateCharts && confirmedTrades.length === 0) {
-    console.log('\nChart generation enabled, but no LLM-confirmed trades to chart.');
+    console.log('\nChart generation enabled, but no trades to chart.');
   }
 
   printFooter();

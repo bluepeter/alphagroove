@@ -60,7 +60,6 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
       .flatten({ background: '#FFFFFF' })
       .png()
       .toFile(pngOutputPath);
-    console.log(`PNG chart generated (300 DPI, white background): ${pngOutputPath}`);
 
     fs.unlinkSync(svgOutputPath);
     return pngOutputPath;

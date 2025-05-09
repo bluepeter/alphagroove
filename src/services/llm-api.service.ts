@@ -147,11 +147,6 @@ export class LlmApiService {
               ? response.content[0].text
               : '';
 
-          // --- DEBUGGING: Log raw response and bypass strict parsing ---
-          console.log(
-            `[DEBUG LlmApiService] Raw text from LLM for call ${i + 1}: ${messageTextContent}`
-          );
-
           // Attempt to parse, but be more forgiving for debugging
           let parsedAction: 'long' | 'short' | 'do_nothing' = 'do_nothing';
           let parsedRationalization: string | undefined = undefined;
@@ -172,7 +167,6 @@ export class LlmApiService {
             );
             // Keep action as 'do_nothing', rationalization undefined
           }
-          // --- END DEBUGGING SECTION ---
 
           return {
             action: parsedAction,

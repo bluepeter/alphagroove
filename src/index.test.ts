@@ -233,7 +233,7 @@ describe('runAnalysis refactored components', () => {
     const mockLocalRawConfig = {};
 
     it('should return true if LLM screen is not enabled', async () => {
-      const proceed = await mainModule.handleLlmTradeScreeningInternal(
+      const result = await mainModule.handleLlmTradeScreeningInternal(
         mockSignal,
         mockChartName,
         null,
@@ -241,13 +241,17 @@ describe('runAnalysis refactored components', () => {
         mockMergedConfigValue,
         mockLocalRawConfig
       );
-      expect(proceed).toBe(true);
+      expect(result).toEqual({ proceed: true });
     });
 
     it('should call LLM screen if enabled and return its decision', async () => {
       const localMockLlmInstance = new (LlmConfirmationScreen as any)(); // LlmConfirmationScreen itself is mocked
       vi.mocked(localMockLlmInstance.shouldSignalProceed).mockResolvedValueOnce(false);
-      const proceed = await mainModule.handleLlmTradeScreeningInternal(
+      // For this test, we expect generateEntryChart to be called, which returns a path
+      const expectedChartPath = 'path/to/chart.png';
+      vi.mocked(generateEntryChart).mockResolvedValueOnce(expectedChartPath);
+
+      const result = await mainModule.handleLlmTradeScreeningInternal(
         mockSignal,
         mockChartName,
         localMockLlmInstance,
@@ -257,7 +261,24 @@ describe('runAnalysis refactored components', () => {
       );
       expect(generateEntryChart).toHaveBeenCalled();
       expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalled();
-      expect(proceed).toBe(false);
+      // When proceed is false, chartPath is not expected to be returned by handleLlmTradeScreeningInternal
+      expect(result).toEqual({ proceed: false });
+
+      // Test case where LLM proceeds
+      vi.mocked(localMockLlmInstance.shouldSignalProceed).mockResolvedValueOnce(true);
+      vi.mocked(generateEntryChart).mockResolvedValueOnce(expectedChartPath); // Mock again for this call path
+
+      const resultProceedTrue = await mainModule.handleLlmTradeScreeningInternal(
+        mockSignal,
+        mockChartName,
+        localMockLlmInstance,
+        { enabled: true }, // LLM screen enabled
+        mockMergedConfigValue,
+        mockLocalRawConfig
+      );
+      expect(generateEntryChart).toHaveBeenCalledTimes(2); // Called again
+      expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalledTimes(2); // Called again
+      expect(resultProceedTrue).toEqual({ proceed: true, chartPath: expectedChartPath });
     });
   });
 

@@ -2,7 +2,8 @@ import { type Trade } from './output.js';
 
 export const mapRawDataToTrade = (
   rawTradeData: Record<string, any>,
-  entryPatternDirection: 'long' | 'short'
+  entryPatternDirection: 'long' | 'short',
+  chartPath?: string
 ): Trade => {
   return {
     trade_date: rawTradeData.trade_date as string,
@@ -23,5 +24,6 @@ export const mapRawDataToTrade = (
     match_count: rawTradeData.match_count as number,
     all_trading_days: rawTradeData.all_trading_days as number,
     direction: entryPatternDirection,
+    chartPath,
   };
 };

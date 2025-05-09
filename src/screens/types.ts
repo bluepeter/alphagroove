@@ -23,6 +23,7 @@ export interface LLMScreenConfig {
 export interface EnrichedSignal extends Signal {
   ticker: string;
   trade_date: string; // YYYY-MM-DD format as in Bar
+  chartPath?: string; // Path to the chart generated for LLM screening
   // Add other properties that might have been part of the original EntrySignal context if necessary
   // For example, if the original signal.entryPrice was distinct from signal.price:
   // entryPrice?: number;

@@ -33,6 +33,7 @@ export interface Trade {
   total_matches?: number;
   match_count?: number;
   direction?: 'long' | 'short';
+  chartPath?: string; // Path to the chart generated for LLM screening
 }
 
 export interface TotalStats {
