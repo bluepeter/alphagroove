@@ -2,6 +2,8 @@ import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 
+import sharp from 'sharp';
+
 import { Bar, Signal } from '../patterns/types';
 
 // Choose lightweight-charts from Trading View as the charting library
@@ -19,7 +21,8 @@ interface ChartGeneratorOptions {
 
 /**
  * Generate a multi-day chart for a specific entry signal
- * Displays the current day's data plus 2 previous days (3 days total)
+ * Displays the current day's data plus 1 previous day (2 days total)
+ * Outputs a high-quality PNG chart file (SVG is an intermediate step and is deleted).
  */
 export const generateEntryChart = async (options: ChartGeneratorOptions): Promise<string> => {
   const {
@@ -34,20 +37,37 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
   const patternDir = path.join(outputDir, entryPatternName);
   fs.mkdirSync(patternDir, { recursive: true });
 
-  const fileName = `${ticker}_${entryPatternName}_${tradeDate.replace(/-/g, '')}.svg`;
-  const outputPath = path.join(patternDir, fileName);
+  const baseFileName = `${ticker}_${entryPatternName}_${tradeDate.replace(/-/g, '')}`;
+  const svgOutputPath = path.join(patternDir, `${baseFileName}.svg`); // Still used temporarily
+  const pngOutputPath = path.join(patternDir, `${baseFileName}.png`);
 
-  const data = await fetchMultiDayData(ticker, timeframe, tradeDate, 2);
+  const data = await fetchMultiDayData(ticker, timeframe, tradeDate, 1);
   const svg = generateSvgChart(ticker, entryPatternName, data, entrySignal);
-  fs.writeFileSync(outputPath, svg, 'utf-8');
-  console.log(`Chart image generated: ${outputPath}`);
 
-  return outputPath;
+  // Intermediate SVG is written to be read by sharp, then deleted.
+  // Alternatively, sharp can process the SVG string directly if it doesn't rely on external file references.
+  // For simplicity with current sharp usage (Buffer.from(svg)), an explicit write and delete is clear.
+  fs.writeFileSync(svgOutputPath, svg, 'utf-8');
+  // console.log(`Intermediate SVG chart generated: ${svgOutputPath}`); // Optional: for debugging
+
+  try {
+    await sharp(svgOutputPath, { density: 300 })
+      .flatten({ background: '#FFFFFF' })
+      .png()
+      .toFile(pngOutputPath);
+    console.log(`PNG chart generated (300 DPI, white background): ${pngOutputPath}`);
+
+    fs.unlinkSync(svgOutputPath);
+    return pngOutputPath;
+  } catch (err) {
+    console.error(`Error generating PNG from SVG for ${baseFileName}:`, err);
+    throw err;
+  }
 };
 
 /**
  * Fetch market data for multiple days before the signal date
- * Gets 2 days prior + current day (3 days total)
+ * Gets 1 day prior + current day (2 days total)
  */
 const fetchMultiDayData = async (
   ticker: string,
@@ -172,14 +192,14 @@ const generateSvgChart = (
     {} as Record<string, Bar[]>
   );
   const uniqueDayStrings = Object.keys(tradingDays).sort((a, b) => a.localeCompare(b));
-  const displayDayStrings = uniqueDayStrings.slice(-3); // Current day and 2 previous
+  const displayDayStrings = uniqueDayStrings.slice(-2); // Current day and 1 previous
 
   const finalData = dataToShow.filter(d =>
     displayDayStrings.includes(new Date(d.timestamp).toISOString().split('T')[0])
   );
 
   if (finalData.length === 0) {
-    console.warn('No data for the last 3 relevant days.');
+    console.warn('No data for the last 2 relevant days.');
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
       <text x="${width / 2}" y="${height / 2}" text-anchor="middle" font-size="18">No data available for selected days</text>
     </svg>`;
@@ -195,84 +215,142 @@ const generateSvgChart = (
   const volumeToHeight = (volume: number) => (volume / maxVolume) * volumeHeight;
 
   const getXPosition = (index: number) => {
-    if (finalData.length <= 1) return marginLeft + chartWidth / 2; // Center if 1 or 0 points
+    if (finalData.length <= 1) return marginLeft + chartWidth / 2;
     return marginLeft + (index / (finalData.length - 1)) * chartWidth;
   };
 
   interface ChartLabel {
     text: string;
     x: number;
+    isDate?: boolean;
+    isTime?: boolean; // Flag for time labels to control their rendering
+    isTick?: boolean; // Flag for hourly tick marks without text
   }
 
-  const xLabels: ChartLabel[] = [];
-  const dayBoundaryLines: { x: number; date: string }[] = [];
-  let lastDateString = '';
+  const xTicksAndLabels: ChartLabel[] = [];
+  const dayBoundaryLines: { x: number }[] = []; // Only need x for the line
+  const dateLabelsForChartArea: ChartLabel[] = []; // Separate array for date labels in price chart
 
-  finalData.forEach((d, i) => {
-    const currentDateString = new Date(d.timestamp).toISOString().split('T')[0];
-    if (currentDateString !== lastDateString) {
-      if (i > 0) {
-        // Don't add boundary for the very first data point
-        dayBoundaryLines.push({
-          x: getXPosition(i - 1) + (getXPosition(i) - getXPosition(i - 1)) / 2, // Midpoint between last of old day and first of new
-          date: new Date(currentDateString).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-          }),
-        });
-      }
-      // Add day label at the start of the day section
-      xLabels.push({
-        text: new Date(currentDateString).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-        }),
-        x: getXPosition(i) + 5, // Slightly offset to the right of the data start for the day
-      });
-      lastDateString = currentDateString;
+  // Generate Date Labels for Price Chart Area and Day Boundary Lines
+  displayDayStrings.forEach((dateStr, dayIdx) => {
+    const dayData = tradingDays[dateStr];
+    if (!dayData || dayData.length === 0) return;
+
+    const firstBarOfDayIndex = finalData.findIndex(b => b.timestamp === dayData[0].timestamp);
+    const xDayStart = getXPosition(firstBarOfDayIndex);
+
+    // Add Date Label for the Price Chart Area
+    dateLabelsForChartArea.push({
+      text: new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      }),
+      x: xDayStart + 5,
+      isDate: true,
+    });
+
+    // Add Day Boundary Line (except for the very first day on the chart)
+    if (dayIdx > 0) {
+      const boundaryX = xDayStart - chartWidth / finalData.length / 20; // Small offset before day starts
+      dayBoundaryLines.push({ x: Math.max(marginLeft, boundaryX) }); // Ensure not before marginLeft
     }
   });
 
-  // Add time labels (e.g., first, middle, last point of the displayed data)
-  if (finalData.length > 0) {
-    xLabels.push({
-      text: new Date(finalData[0].timestamp).toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      x: getXPosition(0),
-    });
-    if (finalData.length > 2) {
-      const midIndex = Math.floor(finalData.length / 2);
-      xLabels.push({
-        text: new Date(finalData[midIndex].timestamp).toLocaleTimeString('en-US', {
-          hour: '2-digit',
-          minute: '2-digit',
-        }),
-        x: getXPosition(midIndex),
-      });
+  // Generate Time Ticks and Selective Time Labels for X-Axis
+  const RTH_START_HOUR = 9;
+  const RTH_START_MINUTE = 30;
+  const RTH_END_HOUR = 16;
+  const RTH_END_MINUTE = 0; // Market close minute
+
+  // Define which hours get full labels vs just ticks
+  const FULL_LABEL_HOURS = [9, 12, 16]; // e.g., 9:30 AM, 12 PM, 4 PM
+
+  displayDayStrings.forEach(dateStr => {
+    const dayData = tradingDays[dateStr];
+    if (!dayData || dayData.length === 0) return;
+
+    for (let hour = RTH_START_HOUR; hour <= RTH_END_HOUR; hour++) {
+      const minute = hour === RTH_START_HOUR ? RTH_START_MINUTE : 0;
+      if (hour === RTH_END_HOUR && minute > RTH_END_MINUTE) continue;
+
+      let closestBar: Bar | null = null;
+      let minDiff = Infinity;
+
+      for (const bar of dayData) {
+        const barDate = new Date(bar.timestamp);
+        const barHour = barDate.getHours();
+        const barMinute = barDate.getMinutes();
+
+        // Target time for this tick/label
+        const targetTimeThisHour = new Date(dateStr);
+        targetTimeThisHour.setHours(hour, minute, 0, 0);
+
+        if (barHour === hour && barMinute === minute) {
+          closestBar = bar;
+          break;
+        }
+        const diff = Math.abs(barDate.getTime() - targetTimeThisHour.getTime());
+        if (diff < minDiff && barDate.getTime() >= targetTimeThisHour.getTime()) {
+          minDiff = diff;
+          closestBar = bar;
+        }
+      }
+
+      if (closestBar) {
+        const barIndex = finalData.findIndex(b => b.timestamp === closestBar!.timestamp);
+        if (barIndex !== -1) {
+          const actualTime = new Date(closestBar.timestamp);
+          const xPos = getXPosition(barIndex);
+
+          // Add a tick mark for all these hours
+          xTicksAndLabels.push({ text: '', x: xPos, isTick: true });
+
+          // Add full text label only for specified hours
+          const isFullLabelHour = FULL_LABEL_HOURS.includes(hour);
+          const isMarketOpen = hour === RTH_START_HOUR && minute === RTH_START_MINUTE;
+          const isMarketClose =
+            hour === RTH_END_HOUR &&
+            minute === RTH_END_MINUTE &&
+            actualTime.getHours() === RTH_END_HOUR &&
+            actualTime.getMinutes() === RTH_END_MINUTE;
+
+          if (isMarketOpen || isMarketClose || (isFullLabelHour && actualTime.getMinutes() === 0)) {
+            let timeText = '';
+            if (isMarketOpen) {
+              timeText = actualTime.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true,
+              });
+            } else if (isMarketClose) {
+              timeText = actualTime.toLocaleTimeString('en-US', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true,
+              });
+            } else if (isFullLabelHour) {
+              timeText = actualTime.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
+            }
+
+            // Check for proximity to existing labels to avoid overlap
+            const tooClose = xTicksAndLabels.some(l => l.isTime && Math.abs(l.x - xPos) < 30);
+            if (!tooClose && timeText) {
+              xTicksAndLabels.push({
+                text: timeText,
+                x: xPos,
+                isTime: true,
+              });
+            }
+          }
+        }
+      }
     }
-    xLabels.push({
-      text: new Date(finalData[finalData.length - 1].timestamp).toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      x: getXPosition(finalData.length - 1),
-    });
-  }
+  });
 
-  // Deduplicate and sort xLabels by x position to prevent overlap
-  const uniqueXLabels = Array.from(new Map(xLabels.map(label => [label.x, label])).values()).sort(
-    (a, b) => a.x - b.x
-  );
-
-  const linePath = finalData
-    .map((d, i) => {
-      const x = getXPosition(i);
-      const y = priceToY(d.close);
-      return (i === 0 ? 'M' : 'L') + `${x},${y}`;
-    })
-    .join(' ');
+  // Deduplicate and sort xTicksAndLabels by x position
+  const uniqueXTicksAndLabels = Array.from(
+    new Map(xTicksAndLabels.map(label => [label.x.toFixed(1), label])).values()
+  ).sort((a, b) => a.x - b.x);
 
   const entryDateFormatted = new Date(entrySignal.timestamp).toLocaleDateString('en-US', {
     year: 'numeric',
@@ -291,17 +369,23 @@ const generateSvgChart = (
     Date: ${entryDateFormatted}, Time: ${entryTime}, Current Price: $${entrySignal.price.toFixed(2)}
   </text>
   
-  <rect x="${marginLeft}" y="${marginTop}" width="${chartWidth}" height="${chartHeight}" fill="none" stroke="#ccc" stroke-width="1" />
+  <rect x="${marginLeft}" y="${marginTop}" width="${chartWidth}" height="${chartHeight}" fill="none" stroke="none" />
   
   ${dayBoundaryLines
     .map(
-      line => `
-    <line x1="${line.x}" y1="${marginTop}" x2="${line.x}" y2="${marginTop + chartHeight}" stroke="#999" stroke-width="1" stroke-dasharray="5,5" />
-    <text x="${line.x + 5}" y="${marginTop + 15}" font-size="10" fill="#666">${line.date}</text>
-  `
+      line =>
+        `<line x1="${line.x}" y1="${marginTop}" x2="${line.x}" y2="${marginTop + chartHeight}" stroke="#999" stroke-width="1" stroke-dasharray="5,5" />`
     )
     .join('\n')}
     
+  {/* Date Labels in Price Chart Area */}
+  ${dateLabelsForChartArea
+    .map(
+      label =>
+        `<text x="${label.x}" y="${marginTop + 15}" font-size="10" fill="#333" font-weight="bold">${label.text}</text>`
+    )
+    .join('\n  ')}
+  
   <line x1="${marginLeft}" y1="${marginTop}" x2="${marginLeft}" y2="${marginTop + chartHeight}" stroke="#333" stroke-width="1" />
   ${Array.from({ length: 6 }, (_, i) => {
     const price = minPrice + (i / 5) * priceRange;
@@ -309,14 +393,41 @@ const generateSvgChart = (
   }).join('\n  ')}
   <line x1="${marginLeft}" y1="${marginTop + chartHeight}" x2="${marginLeft + chartWidth}" y2="${marginTop + chartHeight}" stroke="#333" stroke-width="1" />
   
-  <path d="${linePath}" fill="none" stroke="#0066cc" stroke-width="2" />
+  {/* Horizontal Grid Lines */}
+  ${Array.from({ length: 6 }, (_, i) => {
+    const price = minPrice + (i / 5) * priceRange;
+    const y = priceToY(price);
+    if (y < marginTop + 5 || y > marginTop + chartHeight - 5) return '';
+    return `<line x1="${marginLeft}" y1="${y}" x2="${marginLeft + chartWidth}" y2="${y}" stroke="#e0e0e0" stroke-width="0.5" stroke-dasharray="2,2" />`;
+  }).join('\n  ')}
+  
+  {/* Candlestick drawing logic START */}
+  ${finalData
+    .map((d, i) => {
+      const x = getXPosition(i);
+      const candleWidth = Math.max(2, (chartWidth / finalData.length) * 0.7);
+      const yOpen = priceToY(d.open);
+      const yClose = priceToY(d.close);
+      const yHigh = priceToY(d.high);
+      const yLow = priceToY(d.low);
+      const bodyTop = Math.min(yOpen, yClose);
+      const bodyHeight = yOpen === yClose ? 1 : Math.abs(yOpen - yClose);
+      const color = d.close >= d.open ? '#26a69a' : '#ef5350';
+      const wick = `<line x1="${x}" y1="${yHigh}" x2="${x}" y2="${yLow}" stroke="black" stroke-width="0.5" />`;
+      const body = `<rect x="${x - candleWidth / 2}" y="${bodyTop}" width="${candleWidth}" height="${bodyHeight}" fill="${color}" />`;
+      return `
+      ${wick}
+      ${body}
+    `;
+    })
+    .join('\n  ')}
+  {/* Candlestick drawing logic END */}
 
-  <rect x="${marginLeft}" y="${volumeTop}" width="${chartWidth}" height="${volumeHeight}" fill="none" stroke="#ccc" stroke-width="1" />
+  <rect x="${marginLeft}" y="${volumeTop}" width="${chartWidth}" height="${volumeHeight}" fill="none" stroke="none" />
   ${dayBoundaryLines
     .map(
-      line => `
-    <line x1="${line.x}" y1="${volumeTop}" x2="${line.x}" y2="${volumeTop + volumeHeight}" stroke="#999" stroke-width="1" stroke-dasharray="5,5" />
-  `
+      line =>
+        `<line x1="${line.x}" y1="${volumeTop}" x2="${line.x}" y2="${volumeTop + volumeHeight}" stroke="#999" stroke-width="1" stroke-dasharray="5,5" />`
     )
     .join('\n')}
     
@@ -344,9 +455,15 @@ const generateSvgChart = (
   }).join('\n  ')}
   <line x1="${marginLeft}" y1="${volumeTop + volumeHeight}" x2="${marginLeft + chartWidth}" y2="${volumeTop + volumeHeight}" stroke="#333" stroke-width="1" />
   
-  ${uniqueXLabels
+  ${uniqueXTicksAndLabels
     .map(label => {
-      return `<text x="${label.x}" y="${volumeTop + volumeHeight + 20}" text-anchor="middle" font-size="11" transform="rotate(45, ${label.x}, ${volumeTop + volumeHeight + 20})">${label.text}</text>`;
+      if (label.isTick && !label.isTime) {
+        return `<line x1="${label.x}" y1="${volumeTop + volumeHeight}" x2="${label.x}" y2="${volumeTop + volumeHeight + 5}" stroke="#333" stroke-width="1" />`;
+      }
+      if (label.isTime && label.text) {
+        return `<text x="${label.x}" y="${volumeTop + volumeHeight + 20}" text-anchor="middle" font-size="11" transform="rotate(45, ${label.x}, ${volumeTop + volumeHeight + 20})">${label.text}</text>`;
+      }
+      return '';
     })
     .join('\n  ')}
   
@@ -359,6 +476,7 @@ const generateSvgChart = (
 
 /**
  * Generate charts for all entry signals found in a backtest
+ * Outputs PNG files (SVG is an intermediate step and is deleted).
  */
 export const generateEntryCharts = async (
   ticker: string,
@@ -372,7 +490,8 @@ export const generateEntryCharts = async (
   }>,
   outputDir: string = './charts'
 ): Promise<string[]> => {
-  const outputPaths: string[] = [];
+  // Now returns array of PNG paths
+  const outputPngPaths: string[] = [];
 
   for (const trade of trades) {
     const entrySignal: Signal = {
@@ -383,7 +502,7 @@ export const generateEntryCharts = async (
     };
 
     try {
-      const outputPath = await generateEntryChart({
+      const pngPath = await generateEntryChart({
         ticker,
         timeframe,
         entryPatternName,
@@ -392,12 +511,18 @@ export const generateEntryCharts = async (
         entrySignal,
         outputDir,
       });
-
-      outputPaths.push(outputPath);
+      if (pngPath) {
+        // Check if a path was returned (might be empty on error)
+        outputPngPaths.push(pngPath);
+      }
     } catch (error) {
-      console.error(`Error generating chart for trade on ${trade.trade_date}:`, error);
+      // Log the specific error encountered for this trade's chart generation
+      console.error(
+        `Skipping chart for trade on ${trade.trade_date}. Error during PNG generation:`,
+        error instanceof Error ? error.message : error
+      );
     }
   }
 
-  return outputPaths;
+  return outputPngPaths;
 };

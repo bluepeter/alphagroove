@@ -32,7 +32,7 @@ duckdb --version
 
 If you don't have Homebrew installed, you can install it from [brew.sh](https://brew.sh).
 
-### Node.js Setup
+### Node.js Setup & Dependencies
 
 The project requires Node.js 18 or later. We recommend using `pnpm` as the package manager.
 
@@ -40,6 +40,13 @@ The project requires Node.js 18 or later. We recommend using `pnpm` as the packa
 # Install dependencies
 pnpm install
 ```
+
+This command will install all necessary Node.js packages, including `sharp` which is used for
+generating PNG chart images. `sharp` includes native C++ components; `pnpm` typically handles its
+compilation and any system dependencies. However, if you encounter issues during `sharp`
+installation related to `libvips` or similar missing libraries, you may need to install `libvips`
+manually using your system's package manager (e.g., `brew install vips` on macOS, or
+`sudo apt-get install libvips-dev` on Debian/Ubuntu) and then try `pnpm install` again.
 
 Note: The project uses a `pnpm-workspace.yaml` file to configure build behavior. This file tells
 pnpm to ignore build scripts for DuckDB since we're using the Homebrew-installed version instead of
@@ -242,13 +249,14 @@ This approach lets you analyze the same market conditions but test both long and
 
 AlphaGroove can generate high-quality chart images for each entry signal it detects. These charts:
 
-- Show 5 trading days prior to the entry signal plus the current day's data
-- Include OHLC candlesticks for price action analysis
-- Display volume data
-- Highlight the entry point with a marker
+- Show the current day (up to the entry point) and 1 previous trading day
+- Are rendered as Candlestick charts for detailed OHLC analysis
+- Display volume data below the price chart
+- Highlight the entry point with a marker (Note: entry point marker not yet implemented)
 - Only include regular market hours (9:30 AM - 4:00 PM ET)
 - Organize charts by pattern name for easy reference
-- Save as PNG image files for easy sharing and inclusion in reports
+- Save as both SVG (vector) and high-quality PNG (300 DPI, white background) image files for easy
+  sharing and inclusion in reports
 
 To generate charts:
 
@@ -265,11 +273,11 @@ Chart images are automatically generated and saved to the specified directory, w
 organized by entry pattern name. Each chart is named with the pattern, ticker, and date for easy
 identification.
 
-> **Note:** If the system cannot generate PNG images due to Puppeteer/Chrome issues, AlphaGroove
-> will automatically fall back to creating HTML charts instead. These HTML files can be opened in
-> any browser and provide the same visualization capabilities.
+> **Note on former HTML/Puppeteer fallback:** Previously, the system might fall back to HTML charts
+> if Puppeteer had issues. With the current direct SVG-to-PNG generation using `sharp`, this
+> fallback is no longer in place. Ensure `sharp` installs correctly for PNG output.
 
-The image format makes it easy to:
+The image formats make it easy to:
 
 - Include charts in research reports and presentations
 - Share findings with colleagues
