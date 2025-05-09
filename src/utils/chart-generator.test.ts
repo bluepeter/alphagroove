@@ -171,4 +171,48 @@ describe('Chart Generator', () => {
     );
     consoleWarnSpy.mockRestore();
   });
+
+  it('should correctly fetch prior trading day data across a holiday', async () => {
+    const tuesdaySignalDate = '2025-01-21'; // Tuesday after MLK Day (Jan 20, 2025)
+    const precedingFriday = '2025-01-17'; // Friday before MLK Day
+
+    // Mock execSync to return data for Friday (Jan 17) and Tuesday (Jan 21),
+    // simulating no data for Monday (Jan 20 - MLK Day holiday)
+    vi.mocked(execSync).mockReturnValue(
+      `timestamp,open,high,low,close,volume,trade_date\n` +
+        `${precedingFriday} 15:59:00,100,101,99,100.5,1000,${precedingFriday}\n` +
+        `${precedingFriday} 16:00:00,100.5,101.5,100,101,1200,${precedingFriday}\n` +
+        `${tuesdaySignalDate} 09:30:00,102,103,101,102.5,1500,${tuesdaySignalDate}\n` +
+        `${tuesdaySignalDate} 09:31:00,102.5,103.5,102,103,1600,${tuesdaySignalDate}`
+    );
+
+    const tuesdaySignal: Signal = {
+      timestamp: `${tuesdaySignalDate} 09:31:00`,
+      price: 103,
+      type: 'entry',
+      direction: 'long',
+    };
+
+    const pngPath = await generateEntryChart({
+      ticker: 'SPY_HOLIDAY_TEST',
+      timeframe: '1min',
+      entryPatternName: 'holiday-skip-test',
+      tradeDate: tuesdaySignalDate,
+      entryTimestamp: tuesdaySignal.timestamp,
+      entrySignal: tuesdaySignal,
+      outputDir: testOutputDir,
+    });
+
+    expect(pngPath).toContain('SPY_HOLIDAY_TEST_holiday-skip-test_20250121.png');
+
+    // Check that no warnings about missing data for the expected 2 days occurred
+    const consoleWarnSpy = vi.spyOn(console, 'warn');
+    expect(consoleWarnSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('No data for the last 2 relevant days')
+    );
+    expect(consoleWarnSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('No data to display after filtering for entry signal')
+    );
+    consoleWarnSpy.mockRestore();
+  });
 });
