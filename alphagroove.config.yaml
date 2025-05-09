@@ -6,7 +6,7 @@ default:
   timeframe: '1min'
   direction: 'long'
   patterns:
-    entry: 'quick-rise'
+    entry: 'quick-fall'
     exit: 'fixed-time'
   charts:
     generate: true
