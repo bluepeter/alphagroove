@@ -12,7 +12,7 @@ export class LlmConfirmationScreen implements EntryScreen {
     signal: EnrichedSignal,
     chartPath: string,
     screenConfig: LLMScreenConfig,
-    _appConfig: AppConfig, // appConfig might be used later for more complex logic
+    appConfig: AppConfig, // Renamed from _appConfig to appConfig
     _context?: EntryScreenContext // context might be used later
   ): Promise<boolean> {
     if (!screenConfig.enabled) {
@@ -55,23 +55,21 @@ export class LlmConfirmationScreen implements EntryScreen {
       }
     });
 
-    if (longVotes >= screenConfig.agreementThreshold) {
-      console.log(`LLM consensus to GO LONG. Signal proceeds.`);
+    const configuredDirection = appConfig.default.direction;
+
+    if (configuredDirection === 'long' && longVotes >= screenConfig.agreementThreshold) {
+      console.log(`LLM consensus to GO LONG, matching configured direction. Signal proceeds.`);
       return true;
     }
 
-    if (shortVotes >= screenConfig.agreementThreshold) {
-      // For a short signal, proceeding means the system should indeed go short.
-      // If the overall strategy implies this screen CONFIRMS the original signal's direction,
-      // this logic is fine. If it can FLIP a signal, that's more complex.
-      // Based on prompt, LLM decides long/short/nothing, not just confirm/deny entry pattern.
-      console.log(`LLM consensus to GO SHORT. Signal proceeds.`);
+    if (configuredDirection === 'short' && shortVotes >= screenConfig.agreementThreshold) {
+      console.log(`LLM consensus to GO SHORT, matching configured direction. Signal proceeds.`);
       return true;
     }
 
     console.log(
-      `LLM consensus NOT MET or advises DO NOTHING for ${signal.ticker} on ${signal.trade_date}. Signal is filtered out.`
+      `LLM consensus (${longVotes} long, ${shortVotes} short) does not meet threshold for configured direction '${configuredDirection}' for ${signal.ticker} on ${signal.trade_date}. Signal is filtered out.`
     );
-    return false; // Filter out the signal if threshold not met for long/short
+    return false; // Filter out the signal
   }
 }

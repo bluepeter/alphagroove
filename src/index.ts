@@ -191,6 +191,30 @@ export const processTradesLoop = async (
   const confirmedTrades: Trade[] = [];
 
   for (const rawTradeData of tradesFromQuery) {
+    const tradeYear = rawTradeData.year as string;
+
+    // If year changes, print summary for the completed year before processing the new trade
+    if (tradeYear !== currentYear && currentYear !== '') {
+      if (yearTrades.length > 0) {
+        printYearSummary(Number(currentYear), [...yearTrades]);
+      }
+      yearTrades.length = 0; // Reset for the new year
+    }
+    currentYear = tradeYear; // Set current year to the trade's year
+
+    // Handle total_matches for newly seen years (original logic from handleYearlyUpdatesInternal)
+    if (!seenYears.has(tradeYear)) {
+      seenYears.add(tradeYear);
+      // Assuming 'match_count' is available and relevant per year, not per trade.
+      // If match_count comes from a yearly aggregate in query, this might need adjustment
+      // or be handled when initially fetching data. For now, assume rawTradeData might have it
+      // if it's the first trade of a new year from a specific group in the query.
+      // This part of the logic might be brittle if match_count isn't consistently provided.
+      if (rawTradeData.match_count) {
+        totalStats.total_matches += rawTradeData.match_count as number;
+      }
+    }
+
     const entryTimestamp = rawTradeData.entry_time as string;
     const currentSignal: EnrichedSignal = {
       ticker: mergedConfig.ticker,
@@ -221,32 +245,31 @@ export const processTradesLoop = async (
       currentSignal.chartPath = llmChartPath;
     }
 
+    // Process the trade (stats, mapping, adding to lists)
     totalStats.total_return_sum += rawTradeData.return_pct as number;
     if ((rawTradeData.return_pct as number) >= 0) {
       totalStats.winning_trades++;
     }
     allReturns.push(rawTradeData.return_pct as number);
 
-    const statsContext = { currentYear, yearTrades, seenYears, totalStats };
-    handleYearlyUpdatesInternal(rawTradeData, statsContext);
-    currentYear = statsContext.currentYear;
-
-    // Pass the chartPath (if it exists) to mapRawDataToTrade
     const tradeObj = mapRawDataToTrade(
       rawTradeData,
       entryPattern.direction!,
       currentSignal.chartPath
     );
 
-    statsContext.yearTrades.push(tradeObj); // This should be yearTrades.push(tradeObj)
+    yearTrades.push(tradeObj);
     confirmedTrades.push(tradeObj);
 
+    // Print details for the current trade
     printTradeDetails(tradeObj, entryPattern.direction!);
   }
-  if (yearTrades.length > 0) {
+
+  // After the loop, print the summary for the last processed year
+  if (yearTrades.length > 0 && currentYear !== '') {
     printYearSummary(Number(currentYear), yearTrades);
   }
-  return { confirmedTrades, currentYear, yearTrades }; // Added currentYear and yearTrades for finalizeAnalysis
+  return { confirmedTrades, currentYear, yearTrades };
 };
 
 // Export for testing

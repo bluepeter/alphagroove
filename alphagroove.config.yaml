@@ -1,7 +1,7 @@
 default:
   date:
     from: '2023-01-01'
-    to: '2023-06-02'
+    to: '2025-06-02'
   ticker: 'SPY'
   timeframe: '1min'
   direction: 'long'
@@ -34,7 +34,8 @@ llmConfirmationScreen:
   agreementThreshold: 2
   temperatures: [0.1, 0.5, 1.0]
   systemPrompt: >-
-    You are a seasoned day trader that focudes on trades at the beginning of each trading day. 
+    You are a seasoned day trader that focuses on trades at the beginning of each trading day when
+    there is significant volatility. 
 
     You will be provided with a stock chart for the previous day at the current day. The current day
     may only be a few bars, but pay attention carefully to the current day as that is what we are
@@ -47,15 +48,15 @@ llmConfirmationScreen:
     an example of the JSON output required.  Respond ONLY with the valid JSON object described by
     the user. Do not include any other text, narration, or explanations.
   prompts:
-    - You are a seasoned day trader that focuses on trades at the beginning of each trading day.
-    - You are a swing trader that focuses on the first few bars of each trading day.
-    - You are a scalping trader that focuses on the first few minutes of each trading day.
+    - You are a seasoned but conservative day trader. You are mindful of sudden reversals,
+      continuations, and other interesting patterns.
+    - You are a quant trader that focuses on the first few bars of each trading day.
+    - You are a YOLO trader that is super-savvy and has exceptional intuition.
   commonPromptSuffixForJson: >-
     Based on the provided chart, what action would you take: go long, go short, or do nothing?
     Provide a one-sentence rationalization for your decision.
 
     Your response MUST be a valid JSON object and nothing else.  For example: `{"action": "long",
-    "rationalization": "Price broke resistance with volume."}` or  `{"action": "short",
-    "rationalization": "Bearish engulfing pattern at key level."}` or  `{"action": "do_nothing",
-    "rationalization": "Market is choppy, no clear direction."}`
+    "rationalization": "<would appear here>"}` or  `{"action": "short", "rationalization": "<would
+    appear here>"}` or  `{"action": "do_nothing", "rationalization": "<would appear here>"}`
   maxOutputTokens: 150

@@ -35,11 +35,11 @@ const getBaseSignal = (): EnrichedSignal => ({
   direction: 'long',
 });
 
-const getBaseAppConfig = (): AppConfig => ({
+const getBaseAppConfig = (direction: 'long' | 'short' = 'long'): AppConfig => ({
   default: {
     ticker: 'SPY',
     timeframe: '1min',
-    direction: 'long',
+    direction,
     patterns: { entry: 'quick-rise', exit: 'fixed-time' },
     charts: { generate: false, outputDir: './charts' },
     date: { from: '2023-01-01', to: '2023-12-31' },
@@ -101,8 +101,9 @@ describe('LlmConfirmationScreen', () => {
     consoleWarnSpy.mockRestore();
   });
 
-  it('should return true if longVotes meet agreementThreshold', async () => {
+  it('should return true if longVotes meet threshold and config is long', async () => {
     const screenConfig = getBaseScreenConfig();
+    const appConfig = getBaseAppConfig('long');
     const llmResponses: LLMResponse[] = [
       { action: 'long' },
       { action: 'long' },
@@ -114,14 +115,34 @@ describe('LlmConfirmationScreen', () => {
       getBaseSignal(),
       mockChartPath,
       screenConfig,
-      getBaseAppConfig()
+      appConfig
     );
     expect(result).toBe(true);
     expect(mockLlmApiServiceInstance.getTradeDecisions).toHaveBeenCalledWith(mockChartPath);
   });
 
-  it('should return true if shortVotes meet agreementThreshold', async () => {
+  it('should return false if longVotes meet threshold but config is short', async () => {
     const screenConfig = getBaseScreenConfig();
+    const appConfig = getBaseAppConfig('short');
+    const llmResponses: LLMResponse[] = [
+      { action: 'long' },
+      { action: 'long' },
+      { action: 'do_nothing' },
+    ];
+    mockLlmApiServiceInstance.getTradeDecisions.mockResolvedValue(llmResponses);
+
+    const result = await screen.shouldSignalProceed(
+      getBaseSignal(),
+      mockChartPath,
+      screenConfig,
+      appConfig
+    );
+    expect(result).toBe(false);
+  });
+
+  it('should return true if shortVotes meet threshold and config is short', async () => {
+    const screenConfig = getBaseScreenConfig();
+    const appConfig = getBaseAppConfig('short');
     const llmResponses: LLMResponse[] = [
       { action: 'short' },
       { action: 'do_nothing' },
@@ -133,13 +154,33 @@ describe('LlmConfirmationScreen', () => {
       getBaseSignal(),
       mockChartPath,
       screenConfig,
-      getBaseAppConfig()
+      appConfig
     );
     expect(result).toBe(true);
   });
 
-  it('should return false if no action meets agreementThreshold', async () => {
+  it('should return false if shortVotes meet threshold but config is long', async () => {
     const screenConfig = getBaseScreenConfig();
+    const appConfig = getBaseAppConfig('long');
+    const llmResponses: LLMResponse[] = [
+      { action: 'short' },
+      { action: 'do_nothing' },
+      { action: 'short' },
+    ];
+    mockLlmApiServiceInstance.getTradeDecisions.mockResolvedValue(llmResponses);
+
+    const result = await screen.shouldSignalProceed(
+      getBaseSignal(),
+      mockChartPath,
+      screenConfig,
+      appConfig
+    );
+    expect(result).toBe(false);
+  });
+
+  it('should return false if no action meets threshold (config long)', async () => {
+    const screenConfig = getBaseScreenConfig();
+    const appConfig = getBaseAppConfig('long');
     const llmResponses: LLMResponse[] = [
       { action: 'long' },
       { action: 'short' },
@@ -151,13 +192,33 @@ describe('LlmConfirmationScreen', () => {
       getBaseSignal(),
       mockChartPath,
       screenConfig,
-      getBaseAppConfig()
+      appConfig
     );
     expect(result).toBe(false);
   });
 
-  it('should return false if agreementThreshold is higher and not met', async () => {
+  it('should return false if no action meets threshold (config short)', async () => {
+    const screenConfig = getBaseScreenConfig();
+    const appConfig = getBaseAppConfig('short');
+    const llmResponses: LLMResponse[] = [
+      { action: 'long' },
+      { action: 'short' },
+      { action: 'do_nothing' },
+    ];
+    mockLlmApiServiceInstance.getTradeDecisions.mockResolvedValue(llmResponses);
+
+    const result = await screen.shouldSignalProceed(
+      getBaseSignal(),
+      mockChartPath,
+      screenConfig,
+      appConfig
+    );
+    expect(result).toBe(false);
+  });
+
+  it('should return false if agreementThreshold is higher and not met (config long)', async () => {
     const screenConfig = { ...getBaseScreenConfig(), agreementThreshold: 3 };
+    const appConfig = getBaseAppConfig('long');
     const llmResponses: LLMResponse[] = [
       { action: 'long' },
       { action: 'long' },
@@ -169,13 +230,14 @@ describe('LlmConfirmationScreen', () => {
       getBaseSignal(),
       mockChartPath,
       screenConfig,
-      getBaseAppConfig()
+      appConfig
     );
     expect(result).toBe(false);
   });
 
-  it('should count errored responses as do_nothing for voting', async () => {
+  it('should return true if longVotes meet threshold and config is long, ignoring errored responses', async () => {
     const screenConfig = getBaseScreenConfig();
+    const appConfig = getBaseAppConfig('long');
     const llmResponses: LLMResponse[] = [
       { action: 'long' },
       { action: 'do_nothing', error: 'API failed' },
@@ -187,40 +249,54 @@ describe('LlmConfirmationScreen', () => {
       getBaseSignal(),
       mockChartPath,
       screenConfig,
-      getBaseAppConfig()
+      appConfig
     );
     expect(result).toBe(true);
   });
 
-  it('should log details of each LLM response', async () => {
+  it('should log details of each LLM response and correct consensus message (config long, proceed)', async () => {
     const screenConfig = getBaseScreenConfig();
+    const appConfig = getBaseAppConfig('long');
     const llmResponses: LLMResponse[] = [
       { action: 'long', rationalization: 'Looks good.' },
-      { action: 'short', error: 'Minor issue', rationalization: 'A bit risky.' },
+      { action: 'long', rationalization: 'Strong signal.' },
       { action: 'do_nothing', rationalization: 'Not sure.' },
     ];
     mockLlmApiServiceInstance.getTradeDecisions.mockResolvedValue(llmResponses);
     const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const signalToTest = getBaseSignal();
-    await screen.shouldSignalProceed(signalToTest, mockChartPath, screenConfig, getBaseAppConfig());
+    await screen.shouldSignalProceed(signalToTest, mockChartPath, screenConfig, appConfig);
 
-    // Check individual LLM response logs based on the new format
-    expect(consoleLogSpy).toHaveBeenCalledWith(`LLM 1/3: Action: long, "Looks good."`);
+    expect(consoleLogSpy).toHaveBeenCalledWith('LLM 1/3: Action: long, "Looks good."');
+    expect(consoleLogSpy).toHaveBeenCalledWith('LLM 2/3: Action: long, "Strong signal."');
+    expect(consoleLogSpy).toHaveBeenCalledWith('LLM 3/3: Action: do_nothing, "Not sure."');
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      `LLM 2/3: Action: short, Error:Minor issue,"A bit risky."`
+      `LLM consensus to GO LONG, matching configured direction. Signal proceeds.`
     );
-    expect(consoleLogSpy).toHaveBeenCalledWith(`LLM 3/3: Action: do_nothing, "Not sure."`);
+    consoleLogSpy.mockRestore();
+  });
 
-    // Check consensus log (in this case, no consensus will be met with threshold 2)
+  it('should log details of each LLM response and correct consensus message (config short, no proceed)', async () => {
+    const screenConfig = getBaseScreenConfig();
+    const appConfig = getBaseAppConfig('short');
+    const signalToTest = getBaseSignal();
+    const llmResponses: LLMResponse[] = [
+      { action: 'long', rationalization: 'Looks good.' },
+      { action: 'long', rationalization: 'Still long.' },
+      { action: 'do_nothing', rationalization: 'Not sure.' },
+    ];
+    mockLlmApiServiceInstance.getTradeDecisions.mockResolvedValue(llmResponses);
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await screen.shouldSignalProceed(signalToTest, mockChartPath, screenConfig, appConfig);
+
+    expect(consoleLogSpy).toHaveBeenCalledWith('LLM 1/3: Action: long, "Looks good."');
+    expect(consoleLogSpy).toHaveBeenCalledWith('LLM 2/3: Action: long, "Still long."');
+    expect(consoleLogSpy).toHaveBeenCalledWith('LLM 3/3: Action: do_nothing, "Not sure."');
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      `LLM consensus NOT MET or advises DO NOTHING for ${signalToTest.ticker} on ${signalToTest.trade_date}. Signal is filtered out.`
+      `LLM consensus (2 long, 0 short) does not meet threshold for configured direction 'short' for ${signalToTest.ticker} on ${signalToTest.trade_date}. Signal is filtered out.`
     );
-
-    expect(consoleLogSpy).not.toHaveBeenCalledWith(
-      expect.stringContaining('Requesting LLM decisions for signal:')
-    );
-
     consoleLogSpy.mockRestore();
   });
 });
