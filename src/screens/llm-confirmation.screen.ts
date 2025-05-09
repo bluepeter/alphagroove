@@ -43,7 +43,7 @@ export class LlmConfirmationScreen implements EntryScreen {
       const costString =
         typeof response.cost === 'number' ? ` (Cost: $${response.cost.toFixed(6)})` : '';
       console.log(
-        `LLM ${index + 1}/${screenConfig.numCalls}: Action: ${response.action}, ${response.error ? 'Error:' + response.error + ',' : ''}${rationalizationLog}${costString}`
+        `   LLM ${index + 1}: ${response.action} — ${response.error ? 'Error:' + response.error + ' — ' : ''}${rationalizationLog}${costString}`
       );
       switch (response.action) {
         case 'long':
@@ -63,20 +63,20 @@ export class LlmConfirmationScreen implements EntryScreen {
 
     if (configuredDirection === 'long' && longVotes >= screenConfig.agreementThreshold) {
       console.log(
-        `LLM consensus to GO LONG, matching configured direction. Signal proceeds.${totalCostString}`
+        `  LLM consensus to GO LONG, matching configured direction. Signal proceeds.${totalCostString}`
       );
       return { proceed: true, cost: totalCost };
     }
 
     if (configuredDirection === 'short' && shortVotes >= screenConfig.agreementThreshold) {
       console.log(
-        `LLM consensus to GO SHORT, matching configured direction. Signal proceeds.${totalCostString}`
+        `  LLM consensus to GO SHORT, matching configured direction. Signal proceeds.${totalCostString}`
       );
       return { proceed: true, cost: totalCost };
     }
 
     console.log(
-      `LLM consensus (${longVotes} long, ${shortVotes} short) does not meet threshold for configured direction '${configuredDirection}' for ${signal.ticker} on ${signal.trade_date}. Signal is filtered out.${totalCostString}`
+      `  LLM consensus (${longVotes} long, ${shortVotes} short) does not meet threshold for configured direction '${configuredDirection}' for ${signal.ticker} on ${signal.trade_date}. Signal is filtered out.${totalCostString}`
     );
     return { proceed: false, cost: totalCost };
   }

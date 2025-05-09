@@ -280,13 +280,14 @@ export const finalizeAnalysis = async (
   confirmedTrades: Trade[]
 ) => {
   totalStats.win_rate =
-    totalStats.total_matches > 0 ? totalStats.winning_trades / totalStats.total_matches : 0;
+    confirmedTrades.length > 0 ? totalStats.winning_trades / confirmedTrades.length : 0;
   const meanReturn = calculateMeanReturn(allReturns);
   totalStats.median_return = calculateMedianReturn(allReturns);
   totalStats.std_dev_return = calculateStdDevReturn(allReturns, meanReturn);
 
   printOverallSummary({
     ...totalStats,
+    total_matches: confirmedTrades.length,
     total_return_sum: meanReturn,
     direction: entryPattern.direction!,
     llmCost: totalStats.grandTotalLlmCost,
@@ -367,7 +368,7 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
       entryPattern.direction!
     );
 
-    const totalStats: TotalStats = {
+    const totalStats: TotalStats & { grandTotalLlmCost?: number } = {
       total_trading_days: 0,
       total_matches: 0,
       total_return_sum: 0,
@@ -375,6 +376,7 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
       std_dev_return: 0,
       win_rate: 0,
       winning_trades: 0,
+      grandTotalLlmCost: 0,
     };
     const allReturns: number[] = [];
 
@@ -444,7 +446,7 @@ const parseCLI = async () => {
 
   program.allowUnknownOption(true);
 
-  program.action(async () => {});
+  program.action(() => {});
 
   await program.parseAsync(process.argv);
 
@@ -474,7 +476,7 @@ const parseCLI = async () => {
   return allOptions;
 };
 
-async function main() {
+const main = async () => {
   try {
     const cliOptions = await parseCLI();
     await runAnalysis(cliOptions);
@@ -482,6 +484,6 @@ async function main() {
     console.error('Error:', error);
     process.exit(1);
   }
-}
+};
 
 main();
