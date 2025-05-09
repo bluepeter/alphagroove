@@ -96,6 +96,9 @@ default:
   patterns:
     entry: 'quick-rise' # Default entry pattern to use
     exit: 'fixed-time' # Default exit pattern to use
+  charts:
+    generate: false # Set to true to automatically generate charts for each entry
+    outputDir: './charts' # Directory to store chart outputs
 
 patterns:
   entry:
@@ -116,6 +119,7 @@ This configuration structure allows you to:
 1. Define default entry and exit patterns to use when none are specified via CLI
 2. Organize patterns by type (entry vs exit)
 3. Configure parameters for each pattern
+4. Set default chart generation options
 
 All pattern configuration lives in this file - there are no hardcoded defaults in the code. The
 system follows a clear hierarchy for configuration:
@@ -157,6 +161,8 @@ CLI options override values from the configuration file.
 | `--timeframe <period>`      | Data resolution                                | 1min                      |
 | `--direction <direction>`   | Trading direction for position (long or short) | long                      |
 | `--config <path>`           | Path to custom configuration file              | ./alphagroove.config.yaml |
+| `--generate-charts`         | Generate multiday charts for each entry        | false                     |
+| `--charts-dir <path>`       | Directory for chart output                     | ./charts                  |
 
 ### Pattern-Specific Options
 
@@ -232,6 +238,44 @@ interpreted:
 
 This approach lets you analyze the same market conditions but test both long and short strategies.
 
+### Chart Generation
+
+AlphaGroove can generate high-quality chart images for each entry signal it detects. These charts:
+
+- Show 5 trading days prior to the entry signal plus the current day's data
+- Include OHLC candlesticks for price action analysis
+- Display volume data
+- Highlight the entry point with a marker
+- Only include regular market hours (9:30 AM - 4:00 PM ET)
+- Organize charts by pattern name for easy reference
+- Save as PNG image files for easy sharing and inclusion in reports
+
+To generate charts:
+
+```bash
+# Generate charts for all entry signals with specific output directory
+pnpm dev:start --generate-charts --charts-dir ./my-charts
+
+# Using configuration file settings
+# (Set default.charts.generate: true in alphagroove.config.yaml)
+pnpm dev:start
+```
+
+Chart images are automatically generated and saved to the specified directory, with folders
+organized by entry pattern name. Each chart is named with the pattern, ticker, and date for easy
+identification.
+
+> **Note:** If the system cannot generate PNG images due to Puppeteer/Chrome issues, AlphaGroove
+> will automatically fall back to creating HTML charts instead. These HTML files can be opened in
+> any browser and provide the same visualization capabilities.
+
+The image format makes it easy to:
+
+- Include charts in research reports and presentations
+- Share findings with colleagues
+- Document market behavior around specific entry conditions
+- Compare patterns visually across multiple days
+
 ### Command Examples
 
 ```bash
@@ -253,6 +297,9 @@ pnpm dev:start --ticker QQQ --timeframe 5min
 # Compare both long and short strategies
 pnpm dev:start --direction long
 pnpm dev:start --direction short
+
+# Generate charts for entry signals
+pnpm dev:start --generate-charts
 
 # List available patterns
 pnpm dev:start list-patterns

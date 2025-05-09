@@ -10,3 +10,4 @@ dist/
 tickers/*
 !tickers/TEST/
 !tickers/TEST/*.csv
+charts/

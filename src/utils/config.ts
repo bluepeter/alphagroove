@@ -50,6 +50,12 @@ const DefaultPatternsSchema = z.object({
   exit: z.string().default('fixed-time'),
 });
 
+// Schema for chart options
+const ChartOptionsSchema = z.object({
+  generate: z.boolean().default(false),
+  outputDir: z.string().default('./charts'),
+});
+
 // Define the root config schema
 const ConfigSchema = z.object({
   default: z.object({
@@ -58,6 +64,7 @@ const ConfigSchema = z.object({
     timeframe: z.string().default('1min'),
     direction: z.enum(['long', 'short']).default('long'),
     patterns: DefaultPatternsSchema.optional(),
+    charts: ChartOptionsSchema.optional(),
   }),
   patterns: PatternsConfigSchema,
 });
@@ -76,6 +83,10 @@ const DEFAULT_CONFIG: Config = {
     patterns: {
       entry: 'quick-rise',
       exit: 'fixed-time',
+    },
+    charts: {
+      generate: false,
+      outputDir: './charts',
     },
   },
   patterns: {
@@ -161,6 +172,8 @@ interface MergedConfig {
   to: string;
   entryPattern: string;
   exitPattern: string;
+  generateCharts: boolean;
+  chartsDir: string;
   'quick-rise'?: Record<string, any>;
   'quick-fall'?: Record<string, any>;
   'fixed-time'?: Record<string, any>;
@@ -196,6 +209,10 @@ export const mergeConfigWithCliOptions = (
     // Pattern selection - handle both camelCase and kebab-case
     entryPattern: cliOptions.entryPattern || cliOptions['entry-pattern'] || defaultEntryPattern,
     exitPattern: cliOptions.exitPattern || cliOptions['exit-pattern'] || defaultExitPattern,
+
+    // Chart generation options
+    generateCharts: cliOptions.generateCharts || config.default.charts?.generate || false,
+    chartsDir: cliOptions.chartsDir || config.default.charts?.outputDir || './charts',
   };
 
   // Handle namespaced options for specific patterns
@@ -213,66 +230,70 @@ export const mergeConfigWithCliOptions = (
     }
   });
 
-  // Handle pattern-specific options
-  // For backward compatibility, we still handle old-style CLI options
-  if (mergedConfig.entryPattern === 'quick-rise') {
-    // Legacy option handling
-    if (cliOptions.risePct !== undefined) {
-      if (!patternOptions['quick-rise']) {
-        patternOptions['quick-rise'] = {};
+  // Add pattern-specific config from default config
+  if (mergedConfig.entryPattern === 'quick-rise' && config.patterns.entry['quick-rise']) {
+    mergedConfig['quick-rise'] = { ...config.patterns.entry['quick-rise'] };
+  } else if (mergedConfig.entryPattern === 'quick-fall' && config.patterns.entry['quick-fall']) {
+    mergedConfig['quick-fall'] = { ...config.patterns.entry['quick-fall'] };
+  }
+
+  if (mergedConfig.exitPattern === 'fixed-time' && config.patterns.exit['fixed-time']) {
+    mergedConfig['fixed-time'] = { ...config.patterns.exit['fixed-time'] };
+  }
+
+  // Handle legacy option pattern (backward compatibility)
+  if (mergedConfig.entryPattern === 'quick-rise' && cliOptions.risePct !== undefined) {
+    if (!mergedConfig['quick-rise']) {
+      mergedConfig['quick-rise'] = { ...config.patterns.entry['quick-rise'] };
+    }
+    mergedConfig['quick-rise']['rise-pct'] = parseFloat(cliOptions.risePct);
+  }
+
+  if (mergedConfig.entryPattern === 'quick-fall' && cliOptions.fallPct !== undefined) {
+    if (!mergedConfig['quick-fall']) {
+      mergedConfig['quick-fall'] = { ...config.patterns.entry['quick-fall'] };
+    }
+    mergedConfig['quick-fall']['fall-pct'] = parseFloat(cliOptions.fallPct);
+  }
+
+  // Apply pattern-specific options from dot notation
+  Object.entries(patternOptions).forEach(([pattern, options]) => {
+    if (!mergedConfig[pattern]) {
+      // If this pattern hasn't been set up yet, use config defaults
+      if (pattern === 'quick-rise' && config.patterns.entry['quick-rise']) {
+        mergedConfig[pattern] = { ...config.patterns.entry['quick-rise'] };
+      } else if (pattern === 'quick-fall' && config.patterns.entry['quick-fall']) {
+        mergedConfig[pattern] = { ...config.patterns.entry['quick-fall'] };
+      } else if (pattern === 'fixed-time' && config.patterns.exit['fixed-time']) {
+        mergedConfig[pattern] = { ...config.patterns.exit['fixed-time'] };
+      } else {
+        mergedConfig[pattern] = {};
       }
-      patternOptions['quick-rise']['rise-pct'] = parseFloat(cliOptions.risePct);
     }
 
-    // Default values for quick-rise
-    const quickRiseDefaults = {
-      'rise-pct': 0.3,
-      'within-minutes': 5,
-    };
+    // Apply the dot notation options
+    mergedConfig[pattern] = { ...mergedConfig[pattern], ...options };
+  });
 
-    // Merge with config file values for this pattern
+  // Override with CLI options for pattern-specific config objects
+  if (cliOptions['quick-rise'] && typeof cliOptions['quick-rise'] === 'object') {
     mergedConfig['quick-rise'] = {
-      ...quickRiseDefaults,
-      ...(config.patterns.entry['quick-rise'] || {}),
-      ...(patternOptions['quick-rise'] || {}),
+      ...mergedConfig['quick-rise'],
+      ...cliOptions['quick-rise'],
     };
   }
 
-  // Handle quick-fall pattern options
-  if (mergedConfig.entryPattern === 'quick-fall') {
-    // Legacy option handling
-    if (cliOptions.fallPct !== undefined) {
-      if (!patternOptions['quick-fall']) {
-        patternOptions['quick-fall'] = {};
-      }
-      patternOptions['quick-fall']['fall-pct'] = parseFloat(cliOptions.fallPct);
-    }
-
-    // Default values for quick-fall
-    const quickFallDefaults = {
-      'fall-pct': 0.3,
-      'within-minutes': 5,
-    };
-
-    // Merge with config file values for this pattern
+  if (cliOptions['quick-fall'] && typeof cliOptions['quick-fall'] === 'object') {
     mergedConfig['quick-fall'] = {
-      ...quickFallDefaults,
-      ...(config.patterns.entry['quick-fall'] || {}),
-      ...(patternOptions['quick-fall'] || {}),
+      ...mergedConfig['quick-fall'],
+      ...cliOptions['quick-fall'],
     };
   }
 
-  if (mergedConfig.exitPattern === 'fixed-time') {
-    // Default values for fixed-time
-    const fixedTimeDefaults = {
-      'hold-minutes': 10,
-    };
-
-    // Merge with config file values for this pattern
+  if (cliOptions['fixed-time'] && typeof cliOptions['fixed-time'] === 'object') {
     mergedConfig['fixed-time'] = {
-      ...fixedTimeDefaults,
-      ...(config.patterns.exit['fixed-time'] || {}),
-      ...(patternOptions['fixed-time'] || {}),
+      ...mergedConfig['fixed-time'],
+      ...cliOptions['fixed-time'],
     };
   }
 

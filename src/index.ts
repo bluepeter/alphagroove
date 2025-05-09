@@ -15,6 +15,7 @@ import {
   calculateMedianReturn,
   calculateStdDevReturn,
 } from './utils/calculations.js';
+import { generateEntryCharts } from './utils/chart-generator.js';
 import { createDefaultConfigFile, loadConfig, mergeConfigWithCliOptions } from './utils/config.js';
 import {
   printHeader,
@@ -110,6 +111,7 @@ const runAnalysis = async (cliOptions: Record<string, any>): Promise<void> => {
     let yearTrades: Trade[] = [];
     let seenYears = new Set();
     let allReturns: number[] = [];
+    let allTrades: Trade[] = [];
 
     // Get total trading days from first trade (all trades will have the same value)
     if (trades.length > 0) {
@@ -139,8 +141,8 @@ const runAnalysis = async (cliOptions: Record<string, any>): Promise<void> => {
         }
       }
 
-      // Add trade to current year's trades
-      yearTrades.push({
+      // Create trade object
+      const tradeObj: Trade = {
         trade_date: trade.trade_date as string,
         entry_time: trade.entry_time as string,
         exit_time: trade.exit_time as string,
@@ -155,7 +157,11 @@ const runAnalysis = async (cliOptions: Record<string, any>): Promise<void> => {
         std_dev_return: trade.std_dev_return as number,
         win_rate: trade.win_rate as number,
         direction: entryPattern.direction,
-      });
+      };
+
+      // Add trade to current year's trades and all trades
+      yearTrades.push(tradeObj);
+      allTrades.push(tradeObj);
 
       // Print trade details
       printTradeDetails(
@@ -199,73 +205,122 @@ const runAnalysis = async (cliOptions: Record<string, any>): Promise<void> => {
       direction: entryPattern.direction,
     });
 
-    // Print footer
+    // Generate charts if option is enabled
+    if (mergedConfig.generateCharts) {
+      console.log('\nGenerating multiday charts for entry points...');
+      const chartPaths = await generateEntryCharts(
+        mergedConfig.ticker,
+        mergedConfig.timeframe,
+        entryPattern.name,
+        allTrades,
+        mergedConfig.chartsDir || './charts'
+      );
+      console.log(
+        `\nGenerated ${chartPaths.length} charts in ${mergedConfig.chartsDir || './charts'}/${entryPattern.name}/`
+      );
+    }
+
     printFooter();
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error running analysis:', error);
     process.exit(1);
   }
 };
 
-// Parse CLI arguments using a raw approach
-const parseCLI = () => {
-  const args = process.argv.slice(2);
-  const options: Record<string, any> = {};
+// Parse command line arguments
+const parseCLI = async () => {
+  // Import commander using dynamic import for ESM compatibility
+  const { program } = await import('commander');
 
-  // Process arguments
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
+  program
+    .name('alphagroove')
+    .description('Intraday trading pattern analysis tool')
+    .version('1.0.0')
+    .option('--from <date>', 'Start date (YYYY-MM-DD)')
+    .option('--to <date>', 'End date (YYYY-MM-DD)')
+    .option('--ticker <symbol>', 'Ticker symbol to analyze')
+    .option('--timeframe <period>', 'Data timeframe (e.g., 1min, 5min)')
+    .option('--entry-pattern <name>', 'Entry pattern name')
+    .option('--exit-pattern <name>', 'Exit pattern name')
+    .option('--config <path>', 'Path to configuration file')
+    .option('--direction <direction>', 'Trading direction (long/short)')
+    .option('--generate-charts', 'Generate multiday charts for each entry')
+    .option('--charts-dir <path>', 'Directory for chart output')
+    .option('--debug', 'Show debug information')
+    .option('--dry-run', 'Show query without executing');
 
-    // Handle commands
-    if (arg === 'init') {
+  program
+    .command('init')
+    .description('Create default configuration file')
+    .action(() => {
       createDefaultConfigFile();
+      console.log('Created default configuration file: alphagroove.config.yaml');
       process.exit(0);
-    } else if (arg === 'list-patterns') {
-      console.log('Available Entry Patterns:');
-      getAvailableEntryPatterns().forEach(pattern => {
-        console.log(`- ${pattern}`);
-      });
+    });
+
+  program
+    .command('list-patterns')
+    .description('List available patterns')
+    .action(() => {
+      console.log('\nAvailable Entry Patterns:');
+      getAvailableEntryPatterns().forEach(pattern => console.log(`- ${pattern}`));
 
       console.log('\nAvailable Exit Patterns:');
-      getAvailableExitPatterns().forEach(pattern => {
-        console.log(`- ${pattern}`);
-      });
+      getAvailableExitPatterns().forEach(pattern => console.log(`- ${pattern}`));
+
       process.exit(0);
-    }
+    });
 
-    // Skip arguments that aren't options
-    if (!arg.startsWith('--')) continue;
+  // Allow any options to be passed - they'll be used for pattern-specific config
+  program.allowUnknownOption(true);
 
-    const optName = arg.slice(2); // Remove --
+  // Add a default action to process the main command
+  program.action(async () => {
+    // This is intentionally left empty as we'll handle the options after parsing
+  });
 
-    // Handle options with equals sign
-    if (optName.includes('=')) {
-      const [name, value] = optName.split('=');
-      options[name] = value;
-      continue;
-    }
+  // Parse arguments
+  await program.parseAsync(process.argv);
 
-    // Handle options with space
-    if (i + 1 < args.length && !args[i + 1].startsWith('--')) {
-      options[optName] = args[i + 1];
+  // Get all options including unknown ones for pattern-specific config
+  const options = program.opts();
+  const allOptions = { ...options };
+
+  // Handle pattern-specific options (anything with a dot in the name)
+  const args = process.argv.slice(2);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg.startsWith('--') && arg.includes('.') && args[i + 1] && !args[i + 1].startsWith('--')) {
+      const key = arg.slice(2); // Remove leading --
+      const value = args[i + 1];
+
+      // Handle nested properties (e.g., quick-rise.rise-pct)
+      const [patternName, propName] = key.split('.');
+
+      if (!allOptions[patternName]) {
+        allOptions[patternName] = {};
+      }
+
+      // Convert number strings to numbers
+      const numValue = Number(value);
+      allOptions[patternName][propName] = isNaN(numValue) ? value : numValue;
+
       i++; // Skip the value in the next iteration
-    } else {
-      // Flag option (boolean)
-      options[optName] = true;
     }
   }
 
-  return options;
+  return allOptions;
 };
 
-// Main entry point
+// Main function to run the program
 async function main() {
-  const options = parseCLI();
-  await runAnalysis(options);
+  try {
+    const cliOptions = await parseCLI();
+    await runAnalysis(cliOptions);
+  } catch (error) {
+    console.error('Error:', error);
+    process.exit(1);
+  }
 }
 
-// Start the application
-main().catch(error => {
-  console.error('Unhandled error:', error);
-  process.exit(1);
-});
+main();

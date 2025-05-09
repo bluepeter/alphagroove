@@ -1,21 +1,24 @@
 default:
   date:
-    from: '2015-01-01'
+    from: '2023-01-01'
     to: '2025-05-02'
   ticker: 'SPY'
   timeframe: '1min'
-  direction: 'short'
+  direction: 'long'
   patterns:
     entry: 'quick-rise'
     exit: 'fixed-time'
+  charts:
+    generate: true
+    outputDir: './charts'
 
 patterns:
   entry:
     quick-rise:
-      rise-pct: 0.1
+      rise-pct: 0.3
       within-minutes: 5
     quick-fall:
-      fall-pct: 0.2
+      fall-pct: 0.3
       within-minutes: 5
 
   exit:
