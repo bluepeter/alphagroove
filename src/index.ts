@@ -97,25 +97,25 @@ export const handleLlmTradeScreeningInternal = async (
   screenSpecificLLMConfig: ScreenLLMConfig | undefined,
   mergedConfig: MergedConfig,
   rawConfig: any // Consider typing this better if possible
-): Promise<{ proceed: boolean; chartPath?: string }> => {
+): Promise<{ proceed: boolean; chartPath?: string; cost: number }> => {
   if (!llmScreenInstance || !screenSpecificLLMConfig?.enabled) {
-    return { proceed: true };
+    return { proceed: true, cost: 0 };
   }
   const chartPathForLLM = await generateChartForLLMDecision(
     currentSignal,
     mergedConfig,
     chartEntryPatternName
   );
-  const proceed = await llmScreenInstance.shouldSignalProceed(
+  const screenDecision = await llmScreenInstance.shouldSignalProceed(
     currentSignal,
     chartPathForLLM,
     screenSpecificLLMConfig,
     rawConfig
   );
-  if (!proceed) {
-    return { proceed: false };
+  if (!screenDecision.proceed) {
+    return { proceed: false, cost: screenDecision.cost ?? 0 };
   } else {
-    return { proceed: true, chartPath: chartPathForLLM };
+    return { proceed: true, chartPath: chartPathForLLM, cost: screenDecision.cost ?? 0 };
   }
 };
 
@@ -182,34 +182,32 @@ export const processTradesLoop = async (
   llmScreenInstance: LlmConfirmationScreen | null,
   screenSpecificLLMConfig: ScreenLLMConfig | undefined,
   rawConfig: any,
-  totalStats: TotalStats,
+  totalStats: TotalStats & { grandTotalLlmCost?: number },
   allReturns: number[]
 ) => {
   let currentYear = '';
   let yearTrades: Trade[] = [];
   const seenYears = new Set<string>();
   const confirmedTrades: Trade[] = [];
+  let currentYearLlmCost = 0;
+  if (totalStats.grandTotalLlmCost === undefined) {
+    totalStats.grandTotalLlmCost = 0;
+  }
 
   for (const rawTradeData of tradesFromQuery) {
     const tradeYear = rawTradeData.year as string;
 
-    // If year changes, print summary for the completed year before processing the new trade
     if (tradeYear !== currentYear && currentYear !== '') {
       if (yearTrades.length > 0) {
-        printYearSummary(Number(currentYear), [...yearTrades]);
+        printYearSummary(Number(currentYear), [...yearTrades], currentYearLlmCost);
       }
-      yearTrades.length = 0; // Reset for the new year
+      yearTrades.length = 0;
+      currentYearLlmCost = 0;
     }
-    currentYear = tradeYear; // Set current year to the trade's year
+    currentYear = tradeYear;
 
-    // Handle total_matches for newly seen years (original logic from handleYearlyUpdatesInternal)
     if (!seenYears.has(tradeYear)) {
       seenYears.add(tradeYear);
-      // Assuming 'match_count' is available and relevant per year, not per trade.
-      // If match_count comes from a yearly aggregate in query, this might need adjustment
-      // or be handled when initially fetching data. For now, assume rawTradeData might have it
-      // if it's the first trade of a new year from a specific group in the query.
-      // This part of the logic might be brittle if match_count isn't consistently provided.
       if (rawTradeData.match_count) {
         totalStats.total_matches += rawTradeData.match_count as number;
       }
@@ -223,29 +221,32 @@ export const processTradesLoop = async (
       timestamp: entryTimestamp,
       type: 'entry',
       direction: entryPattern.direction as 'long' | 'short',
-      // chartPath will be added below if LLM proceeds
     };
 
-    const { proceed: proceedFromLlm, chartPath: llmChartPath } =
-      await handleLlmTradeScreeningInternal(
-        currentSignal,
-        entryPattern.name,
-        llmScreenInstance,
-        screenSpecificLLMConfig,
-        mergedConfig,
-        rawConfig
-      );
+    const {
+      proceed: proceedFromLlm,
+      chartPath: llmChartPath,
+      cost: screeningCost,
+    } = await handleLlmTradeScreeningInternal(
+      currentSignal,
+      entryPattern.name,
+      llmScreenInstance,
+      screenSpecificLLMConfig,
+      mergedConfig,
+      rawConfig
+    );
+
+    currentYearLlmCost += screeningCost;
+    totalStats.grandTotalLlmCost += screeningCost;
 
     if (!proceedFromLlm) {
       continue;
     }
 
-    // If LLM approved, store the chart path
     if (llmChartPath) {
       currentSignal.chartPath = llmChartPath;
     }
 
-    // Process the trade (stats, mapping, adding to lists)
     totalStats.total_return_sum += rawTradeData.return_pct as number;
     if ((rawTradeData.return_pct as number) >= 0) {
       totalStats.winning_trades++;
@@ -261,22 +262,20 @@ export const processTradesLoop = async (
     yearTrades.push(tradeObj);
     confirmedTrades.push(tradeObj);
 
-    // Print details for the current trade
     printTradeDetails(tradeObj, entryPattern.direction!);
   }
 
-  // After the loop, print the summary for the last processed year
   if (yearTrades.length > 0 && currentYear !== '') {
-    printYearSummary(Number(currentYear), yearTrades);
+    printYearSummary(Number(currentYear), yearTrades, currentYearLlmCost);
   }
   return { confirmedTrades, currentYear, yearTrades };
 };
 
 // Export for testing
 export const finalizeAnalysis = async (
-  totalStats: TotalStats,
+  totalStats: TotalStats & { grandTotalLlmCost?: number },
   allReturns: number[],
-  entryPattern: any, // Consider using a more specific type
+  entryPattern: any,
   mergedConfig: MergedConfig,
   confirmedTrades: Trade[]
 ) => {
@@ -288,8 +287,9 @@ export const finalizeAnalysis = async (
 
   printOverallSummary({
     ...totalStats,
-    total_return_sum: meanReturn, // This was total_return_sum before, now it's meanReturn
+    total_return_sum: meanReturn,
     direction: entryPattern.direction!,
+    llmCost: totalStats.grandTotalLlmCost,
   });
 
   if (mergedConfig.generateCharts && confirmedTrades.length > 0) {
@@ -301,8 +301,6 @@ export const finalizeAnalysis = async (
       confirmedTrades.forEach(trade => {
         if (trade.chartPath) {
           chartPaths.push(trade.chartPath);
-          // Optionally log each path, or just the summary count
-          // console.log(`- ${trade.chartPath}`);
         }
       });
       if (chartPaths.length > 0) {
@@ -315,7 +313,6 @@ export const finalizeAnalysis = async (
         );
       }
     } else {
-      // LLM screen is not enabled, generate charts now if generateCharts is true
       console.log('\nGenerating multiday charts for confirmed entry points...');
       const tradesForBulkCharts = confirmedTrades.map(ct => ({
         trade_date: ct.trade_date,

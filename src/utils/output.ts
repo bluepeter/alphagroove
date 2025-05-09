@@ -100,7 +100,7 @@ export const printTradeDetails = (trade: Trade, direction: 'long' | 'short' = 'l
   );
 };
 
-export const printYearSummary = (year: number, trades: Trade[]) => {
+export const printYearSummary = (year: number, trades: Trade[], llmCost?: number) => {
   const totalTrades = trades.length;
   const tradingDays = trades[0]?.total_trading_days || 252;
   const tradePercentage = calculateTradePercentage(totalTrades, tradingDays);
@@ -112,25 +112,30 @@ export const printYearSummary = (year: number, trades: Trade[]) => {
   const minReturn = returns.length > 0 ? Math.min(...returns) : 0;
   const maxReturn = returns.length > 0 ? Math.max(...returns) : 0;
 
-  // For short positions, we invert the success criteria
   const isShort = trades[0]?.direction === 'short';
   const winningTrades = calculateWinningTrades(trades, isShort);
   const winRate = calculateWinRate(winningTrades, totalTrades);
 
-  const meanReturn = trades[0]?.median_return || 0;
-  const stdDevReturn = trades[0]?.std_dev_return || 0;
+  const meanReturn = trades[0]?.median_return || 0; // This seems to be mislabeled, likely should be calculated mean or use a different field
+  const stdDevReturn = trades[0]?.std_dev_return || 0; // Same as above
 
-  // Format values with color
   const meanColor = meanReturn >= 0 ? chalk.green : chalk.red;
   const winRateColor = winRate >= 50 ? chalk.green : chalk.red;
   const returnRangeColor = maxReturn >= 0 ? (minReturn >= 0 ? chalk.green : chalk.gray) : chalk.red;
+
+  const llmCostString =
+    typeof llmCost === 'number' && llmCost > 0 ? ` | LLM Cost: $${llmCost.toFixed(4)}` : '';
 
   console.log('');
   console.log(
     chalk.cyan(
       `📊 ${year} Summary: ${totalTrades} trades (${tradePercentage}% of days) | ` +
-        `Avg Rise: ${(avgRise * 100).toFixed(2)}% | Return Range: ${returnRangeColor(`${(minReturn * 100).toFixed(2)}% to ${(maxReturn * 100).toFixed(2)}%`)} | ` +
-        `Mean: ${meanColor(`${meanReturn.toFixed(4)}%`)} | StdDev: ${stdDevReturn.toFixed(4)}% | Win Rate: ${winRateColor(`${winRate.toFixed(1)}%`)}`
+        `Avg Rise: ${(avgRise * 100).toFixed(2)}% | Return Range: ${returnRangeColor(
+          `${(minReturn * 100).toFixed(2)}% to ${(maxReturn * 100).toFixed(2)}%`
+        )} | ` +
+        `Mean: ${meanColor(`${meanReturn.toFixed(4)}%`)} | StdDev: ${stdDevReturn.toFixed(4)}% | Win Rate: ${winRateColor(
+          `${winRate.toFixed(1)}%`
+        )}${llmCostString}`
     )
   );
   console.log('');
@@ -144,6 +149,7 @@ export const printOverallSummary = (stats: {
   std_dev_return: number;
   win_rate: number;
   direction?: 'long' | 'short';
+  llmCost?: number; // Added optional llmCost
 }) => {
   const {
     total_trading_days,
@@ -153,22 +159,27 @@ export const printOverallSummary = (stats: {
     std_dev_return,
     win_rate,
     direction,
+    llmCost, // Destructure llmCost
   } = stats;
   const avgMatches = (total_matches / total_trading_days) * 100;
   const isShort = direction === 'short';
 
-  // Format values with color
   const avgReturnColor = total_return_sum >= 0 ? chalk.green : chalk.red;
   const medianReturnColor = median_return >= 0 ? chalk.green : chalk.red;
   const winRateColor = win_rate >= 0.5 ? chalk.green : chalk.red;
+
+  const llmCostString =
+    typeof llmCost === 'number' && llmCost > 0 ? ` | Total LLM Cost: $${llmCost.toFixed(4)}` : '';
 
   console.log('');
   console.log(
     chalk.bold(
       `📈 Overall: ${total_matches} trades (${avgMatches.toFixed(1)}% of days) | ` +
-        `Avg Return: ${avgReturnColor(`${(total_return_sum * 100).toFixed(4)}%`)} | Median: ${medianReturnColor(`${median_return.toFixed(4)}%`)} | ` +
+        `Avg Return: ${avgReturnColor(`${(total_return_sum * 100).toFixed(4)}%`)} | Median: ${medianReturnColor(
+          `${median_return.toFixed(4)}%`
+        )} | ` +
         `StdDev: ${std_dev_return.toFixed(4)}% | Win Rate: ${winRateColor(`${(win_rate * 100).toFixed(1)}%`)} | ` +
-        `Direction: ${isShort ? 'Short ↘️' : 'Long ↗️'}`
+        `Direction: ${isShort ? 'Short ↘️' : 'Long ↗️'}${llmCostString}`
     )
   );
   console.log('');

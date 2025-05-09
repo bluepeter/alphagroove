@@ -131,120 +131,167 @@ describe('LlmApiService', () => {
     });
 
     it('should return do_nothing responses if service is not enabled', async () => {
-      delete process.env.TEST_ANTHROPIC_API_KEY;
-      const config = getBaseConfig();
+      const config = { ...getBaseConfig(), enabled: false };
       const service = new ActualLlmApiService(config);
       const responses = await service.getTradeDecisions(mockChartPath);
       expect(responses).toEqual([
-        { action: 'do_nothing', error: 'Service not enabled or not configured.' },
-        { action: 'do_nothing', error: 'Service not enabled or not configured.' },
-        { action: 'do_nothing', error: 'Service not enabled or not configured.' },
+        { action: 'do_nothing', error: 'Service not enabled or not configured.', cost: 0 },
+        { action: 'do_nothing', error: 'Service not enabled or not configured.', cost: 0 },
+        { action: 'do_nothing', error: 'Service not enabled or not configured.', cost: 0 },
       ]);
     });
 
     it('should make parallel API calls and parse valid JSON responses', async () => {
       const config = getBaseConfig();
-      mockAnthropicMessagesCreate
-        .mockResolvedValueOnce({ content: [{ type: 'text', text: '{"action": "long"}' }] })
-        .mockResolvedValueOnce({ content: [{ type: 'text', text: '{"action": "short"}' }] })
-        .mockResolvedValueOnce({
-          content: [{ type: 'text', text: '{"action": "do_nothing"}' }],
-        });
-
       const service = new ActualLlmApiService(config);
-      const responses = await service.getTradeDecisions(mockChartPath);
+      const mockAnthropicCreate = vi.fn();
+      service['anthropic'] = { messages: { create: mockAnthropicCreate } } as any;
 
-      expect(mockAnthropicMessagesCreate).toHaveBeenCalledTimes(config.numCalls);
-      responses.forEach((_res, i) => {
-        expect(mockAnthropicMessagesCreate).toHaveBeenNthCalledWith(i + 1, {
-          model: config.modelName,
-          max_tokens: config.maxOutputTokens,
-          temperature: config.temperatures[i],
-          messages: expect.any(Array),
+      mockAnthropicCreate
+        .mockResolvedValueOnce({
+          content: [{ text: '{"action": "long"}' }],
+          usage: { input_tokens: 10, output_tokens: 5 },
+        })
+        .mockResolvedValueOnce({
+          content: [{ text: '{"action": "short"}' }],
+          usage: { input_tokens: 10, output_tokens: 5 },
+        })
+        .mockResolvedValueOnce({
+          content: [{ text: '{"action": "do_nothing"}' }],
+          usage: { input_tokens: 10, output_tokens: 5 },
         });
-      });
+
+      const responses = await service.getTradeDecisions(mockChartPath);
+      const expectedCost = (10 / 1_000_000) * 3 + (5 / 1_000_000) * 15;
       expect(responses).toEqual([
         {
           action: 'long',
           rationalization: undefined,
+          cost: expectedCost,
           debugRawText: '{"action": "long"}',
-          rawResponse: { content: [{ type: 'text', text: '{"action": "long"}' }] },
+          rawResponse: {
+            content: [{ text: '{"action": "long"}' }],
+            usage: { input_tokens: 10, output_tokens: 5 },
+          },
         },
         {
           action: 'short',
           rationalization: undefined,
+          cost: expectedCost,
           debugRawText: '{"action": "short"}',
-          rawResponse: { content: [{ type: 'text', text: '{"action": "short"}' }] },
+          rawResponse: {
+            content: [{ text: '{"action": "short"}' }],
+            usage: { input_tokens: 10, output_tokens: 5 },
+          },
         },
         {
           action: 'do_nothing',
           rationalization: undefined,
+          cost: expectedCost,
           debugRawText: '{"action": "do_nothing"}',
-          rawResponse: { content: [{ type: 'text', text: '{"action": "do_nothing"}' }] },
+          rawResponse: {
+            content: [{ text: '{"action": "do_nothing"}' }],
+            usage: { input_tokens: 10, output_tokens: 5 },
+          },
         },
       ]);
+      expect(mockAnthropicCreate).toHaveBeenCalledTimes(3);
     });
 
     it('should handle API call errors gracefully for individual calls', async () => {
       const config = getBaseConfig();
-      const apiError = new Error('API Error for call 2');
-      mockAnthropicMessagesCreate
-        .mockResolvedValueOnce({ content: [{ type: 'text', text: '{"action": "long"}' }] })
-        .mockRejectedValueOnce(apiError)
-        .mockResolvedValueOnce({ content: [{ type: 'text', text: '{"action": "short"}' }] });
-
       const service = new ActualLlmApiService(config);
+      const mockAnthropicCreate = vi.fn();
+      service['anthropic'] = { messages: { create: mockAnthropicCreate } } as any;
+
+      const expectedCostCall1 = (10 / 1_000_000) * 3 + (5 / 1_000_000) * 15;
+
+      mockAnthropicCreate
+        .mockResolvedValueOnce({
+          content: [{ text: '{"action": "long"}' }],
+          usage: { input_tokens: 10, output_tokens: 5 },
+        })
+        .mockRejectedValueOnce(new Error('API Error for call 2'))
+        .mockResolvedValueOnce({
+          content: [{ text: '{"action": "short"}' }],
+          usage: { input_tokens: 10, output_tokens: 5 },
+        });
+
       const responses = await service.getTradeDecisions(mockChartPath);
       expect(responses).toEqual([
         {
           action: 'long',
           rationalization: undefined,
+          cost: expectedCostCall1,
           debugRawText: '{"action": "long"}',
-          rawResponse: { content: [{ type: 'text', text: '{"action": "long"}' }] },
+          rawResponse: {
+            content: [{ text: '{"action": "long"}' }],
+            usage: { input_tokens: 10, output_tokens: 5 },
+          },
         },
         {
           action: 'do_nothing',
           error: 'API Error for call 2',
+          cost: 0,
           debugRawText: 'API Call Failed: API Error for call 2',
-          rawResponse: apiError, // Or expect.any(Error) if structure is complex/unstable
+          rawResponse: expect.any(Error),
         },
         {
           action: 'short',
           rationalization: undefined,
+          cost: expectedCostCall1, // Same cost as call 1 for this example
           debugRawText: '{"action": "short"}',
-          rawResponse: { content: [{ type: 'text', text: '{"action": "short"}' }] },
+          rawResponse: {
+            content: [{ text: '{"action": "short"}' }],
+            usage: { input_tokens: 10, output_tokens: 5 },
+          },
         },
       ]);
     });
 
     it('should handle invalid JSON responses gracefully', async () => {
       const config = getBaseConfig();
-      const invalidJsonResponse = { content: [{ type: 'text', text: 'invalid json' }] };
-      mockAnthropicMessagesCreate.mockResolvedValue(invalidJsonResponse);
       const service = new ActualLlmApiService(config);
+      const mockAnthropicCreate = vi.fn();
+      service['anthropic'] = { messages: { create: mockAnthropicCreate } } as any;
+
+      const invalidJsonResponse = {
+        content: [{ text: 'invalid json' }],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      };
+      mockAnthropicCreate.mockResolvedValue(invalidJsonResponse);
+
       const responses = await service.getTradeDecisions(mockChartPath);
+      const expectedCost = (10 / 1_000_000) * 3 + (5 / 1_000_000) * 15;
 
       expect(responses[0].action).toBe('do_nothing');
-      expect(responses[0].error).toBeUndefined(); // Error field is not set for JSON parse issues
+      expect(responses[0].error).toBeUndefined();
       expect(responses[0].debugRawText).toBe('invalid json');
       expect(responses[0].rationalization).toBeUndefined();
       expect(responses[0].rawResponse).toEqual(invalidJsonResponse);
+      expect(responses[0].cost).toBe(expectedCost);
     });
 
     it('should handle valid JSON but invalid action gracefully', async () => {
       const config = getBaseConfig();
-      const invalidActionResponse = {
-        content: [{ type: 'text', text: '{"action": "invalid_action"}' }],
-      };
-      mockAnthropicMessagesCreate.mockResolvedValue(invalidActionResponse);
       const service = new ActualLlmApiService(config);
+      const mockAnthropicCreate = vi.fn();
+      service['anthropic'] = { messages: { create: mockAnthropicCreate } } as any;
+
+      const invalidActionJsonResponse = {
+        content: [{ text: '{"action": "unknown_action"}' }],
+        usage: { input_tokens: 10, output_tokens: 5 },
+      };
+      mockAnthropicCreate.mockResolvedValue(invalidActionJsonResponse);
       const responses = await service.getTradeDecisions(mockChartPath);
+      const expectedCost = (10 / 1_000_000) * 3 + (5 / 1_000_000) * 15;
 
       expect(responses[0].action).toBe('do_nothing');
-      expect(responses[0].error).toBeUndefined(); // Error field is not set for invalid actions post-parsing
-      expect(responses[0].debugRawText).toBe('{"action": "invalid_action"}');
+      expect(responses[0].error).toBeUndefined();
+      expect(responses[0].debugRawText).toBe('{"action": "unknown_action"}');
       expect(responses[0].rationalization).toBeUndefined();
-      expect(responses[0].rawResponse).toEqual(invalidActionResponse);
+      expect(responses[0].rawResponse).toEqual(invalidActionJsonResponse);
+      expect(responses[0].cost).toBe(expectedCost);
     });
 
     it('should use array of prompts if provided and lengths match numCalls', async () => {

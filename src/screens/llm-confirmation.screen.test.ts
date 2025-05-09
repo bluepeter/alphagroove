@@ -35,6 +35,24 @@ const getBaseSignal = (): EnrichedSignal => ({
   direction: 'long',
 });
 
+// Helper to create mock LLMResponse with cost
+const mockLLMResponse = (
+  action: 'long' | 'short' | 'do_nothing',
+  rationalization?: string,
+  error?: string,
+  inputTokens = 100,
+  outputTokens = 50
+): LLMResponse => {
+  const cost = (inputTokens / 1_000_000) * 3 + (outputTokens / 1_000_000) * 15; // $3/M input, $15/M output
+  return {
+    action,
+    rationalization,
+    error,
+    cost,
+    rawResponse: { usage: { input_tokens: inputTokens, output_tokens: outputTokens } }, // For LlmApiService to calculate
+  };
+};
+
 const getBaseAppConfig = (direction: 'long' | 'short' = 'long'): AppConfig => ({
   default: {
     ticker: 'SPY',
@@ -66,7 +84,7 @@ describe('LlmConfirmationScreen', () => {
     LlmApiService.mockImplementation(() => mockLlmApiServiceInstance);
   });
 
-  it('should return true if screenConfig is not enabled', async () => {
+  it('should return { proceed: true, cost: 0 } if screenConfig is not enabled', async () => {
     const screenConfig = { ...getBaseScreenConfig(), enabled: false };
     const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const result = await screen.shouldSignalProceed(
@@ -75,13 +93,13 @@ describe('LlmConfirmationScreen', () => {
       screenConfig,
       getBaseAppConfig()
     );
-    expect(result).toBe(true);
+    expect(result).toEqual({ proceed: true, cost: 0 });
     expect(LlmApiService).not.toHaveBeenCalled();
     expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Screen not enabled'));
     consoleLogSpy.mockRestore();
   });
 
-  it('should return true if LlmApiService instance reports not enabled', async () => {
+  it('should return { proceed: true, cost: 0 } if LlmApiService instance reports not enabled', async () => {
     mockLlmApiServiceInstance.isEnabled.mockReturnValue(false);
 
     const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
@@ -91,7 +109,7 @@ describe('LlmConfirmationScreen', () => {
       getBaseScreenConfig(),
       getBaseAppConfig()
     );
-    expect(result).toBe(true);
+    expect(result).toEqual({ proceed: true, cost: 0 });
     expect(LlmApiService).toHaveBeenCalledTimes(1);
     expect(mockLlmApiServiceInstance.isEnabled).toHaveBeenCalledTimes(1);
     expect(mockLlmApiServiceInstance.getTradeDecisions).not.toHaveBeenCalled();
@@ -105,11 +123,13 @@ describe('LlmConfirmationScreen', () => {
     const screenConfig = getBaseScreenConfig();
     const appConfig = getBaseAppConfig('long');
     const llmResponses: LLMResponse[] = [
-      { action: 'long' },
-      { action: 'long' },
-      { action: 'do_nothing' },
+      mockLLMResponse('long', undefined, undefined, 100, 50), // cost = 0.00105
+      mockLLMResponse('long', undefined, undefined, 110, 60), // cost = 0.00123
+      mockLLMResponse('do_nothing', undefined, undefined, 90, 40), // cost = 0.00087
     ];
+    const expectedTotalCost = 0.00105 + 0.00123 + 0.00087;
     mockLlmApiServiceInstance.getTradeDecisions.mockResolvedValue(llmResponses);
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const result = await screen.shouldSignalProceed(
       getBaseSignal(),
@@ -117,19 +137,29 @@ describe('LlmConfirmationScreen', () => {
       screenConfig,
       appConfig
     );
-    expect(result).toBe(true);
+    expect(result.proceed).toBe(true);
+    expect(result.cost).toBeCloseTo(expectedTotalCost);
     expect(mockLlmApiServiceInstance.getTradeDecisions).toHaveBeenCalledWith(mockChartPath);
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('(Cost: $0.001050)'));
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('(Cost: $0.001230)'));
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('(Cost: $0.000870)'));
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining(`(Total Cost: $${expectedTotalCost.toFixed(6)})`)
+    );
+    consoleLogSpy.mockRestore();
   });
 
   it('should return false if longVotes meet threshold but config is short', async () => {
     const screenConfig = getBaseScreenConfig();
-    const appConfig = getBaseAppConfig('short');
+    const appConfig = getBaseAppConfig('short'); // Configured for short
     const llmResponses: LLMResponse[] = [
-      { action: 'long' },
-      { action: 'long' },
-      { action: 'do_nothing' },
+      mockLLMResponse('long', undefined, undefined, 100, 50),
+      mockLLMResponse('long', undefined, undefined, 100, 50),
+      mockLLMResponse('do_nothing', undefined, undefined, 100, 50),
     ];
+    const expectedTotalCost = 0.00105 * 3;
     mockLlmApiServiceInstance.getTradeDecisions.mockResolvedValue(llmResponses);
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const result = await screen.shouldSignalProceed(
       getBaseSignal(),
@@ -137,18 +167,24 @@ describe('LlmConfirmationScreen', () => {
       screenConfig,
       appConfig
     );
-    expect(result).toBe(false);
+    expect(result.proceed).toBe(false);
+    expect(result.cost).toBeCloseTo(expectedTotalCost);
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      expect.stringContaining(`(Total Cost: $${expectedTotalCost.toFixed(6)})`)
+    );
+    consoleLogSpy.mockRestore();
   });
 
-  it('should return true if shortVotes meet threshold and config is short', async () => {
+  it('should return { proceed: true, cost: expected } if shortVotes meet threshold and config is short', async () => {
     const screenConfig = getBaseScreenConfig();
-    const appConfig = getBaseAppConfig('short');
+    const appConfig = getBaseAppConfig('short'); // Configured for short
     const llmResponses: LLMResponse[] = [
-      { action: 'short' },
-      { action: 'do_nothing' },
-      { action: 'short' },
+      mockLLMResponse('short', undefined, undefined, 100, 50), //0.00105
+      mockLLMResponse('do_nothing', undefined, undefined, 100, 50), //0.00105
+      mockLLMResponse('short', undefined, undefined, 100, 50), //0.00105
     ];
     mockLlmApiServiceInstance.getTradeDecisions.mockResolvedValue(llmResponses);
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const result = await screen.shouldSignalProceed(
       getBaseSignal(),
@@ -156,18 +192,45 @@ describe('LlmConfirmationScreen', () => {
       screenConfig,
       appConfig
     );
-    expect(result).toBe(true);
+    expect(result.proceed).toBe(true);
+    expect(result.cost).toBeCloseTo(0.00315);
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('(Total Cost: $0.003150)'));
+    consoleLogSpy.mockRestore();
   });
 
-  it('should return false if shortVotes meet threshold but config is long', async () => {
+  it('should return { proceed: false, cost: expected } if shortVotes meet threshold but config is long', async () => {
+    const screenConfig = getBaseScreenConfig();
+    const appConfig = getBaseAppConfig('long'); // Configured for long
+    const llmResponses: LLMResponse[] = [
+      mockLLMResponse('short'),
+      mockLLMResponse('do_nothing'),
+      mockLLMResponse('short'),
+    ];
+    mockLlmApiServiceInstance.getTradeDecisions.mockResolvedValue(llmResponses);
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    const result = await screen.shouldSignalProceed(
+      getBaseSignal(),
+      mockChartPath,
+      screenConfig,
+      appConfig
+    );
+    expect(result.proceed).toBe(false);
+    expect(result.cost).toBeCloseTo(0.00315);
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('(Total Cost: $0.003150)'));
+    consoleLogSpy.mockRestore();
+  });
+
+  it('should return { proceed: false, cost: expected } if no action meets threshold (config long)', async () => {
     const screenConfig = getBaseScreenConfig();
     const appConfig = getBaseAppConfig('long');
     const llmResponses: LLMResponse[] = [
-      { action: 'short' },
-      { action: 'do_nothing' },
-      { action: 'short' },
+      mockLLMResponse('long'), // Not enough for threshold 2
+      mockLLMResponse('short'),
+      mockLLMResponse('do_nothing'),
     ];
     mockLlmApiServiceInstance.getTradeDecisions.mockResolvedValue(llmResponses);
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const result = await screen.shouldSignalProceed(
       getBaseSignal(),
@@ -175,37 +238,22 @@ describe('LlmConfirmationScreen', () => {
       screenConfig,
       appConfig
     );
-    expect(result).toBe(false);
+    expect(result.proceed).toBe(false);
+    expect(result.cost).toBeCloseTo(0.00315);
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('(Total Cost: $0.003150)'));
+    consoleLogSpy.mockRestore();
   });
 
-  it('should return false if no action meets threshold (config long)', async () => {
-    const screenConfig = getBaseScreenConfig();
-    const appConfig = getBaseAppConfig('long');
-    const llmResponses: LLMResponse[] = [
-      { action: 'long' },
-      { action: 'short' },
-      { action: 'do_nothing' },
-    ];
-    mockLlmApiServiceInstance.getTradeDecisions.mockResolvedValue(llmResponses);
-
-    const result = await screen.shouldSignalProceed(
-      getBaseSignal(),
-      mockChartPath,
-      screenConfig,
-      appConfig
-    );
-    expect(result).toBe(false);
-  });
-
-  it('should return false if no action meets threshold (config short)', async () => {
+  it('should return { proceed: false, cost: expected } if no action meets threshold (config short)', async () => {
     const screenConfig = getBaseScreenConfig();
     const appConfig = getBaseAppConfig('short');
     const llmResponses: LLMResponse[] = [
-      { action: 'long' },
-      { action: 'short' },
-      { action: 'do_nothing' },
+      mockLLMResponse('long'),
+      mockLLMResponse('short'), // Not enough for threshold 2
+      mockLLMResponse('do_nothing'),
     ];
     mockLlmApiServiceInstance.getTradeDecisions.mockResolvedValue(llmResponses);
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const result = await screen.shouldSignalProceed(
       getBaseSignal(),
@@ -213,18 +261,22 @@ describe('LlmConfirmationScreen', () => {
       screenConfig,
       appConfig
     );
-    expect(result).toBe(false);
+    expect(result.proceed).toBe(false);
+    expect(result.cost).toBeCloseTo(0.00315);
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('(Total Cost: $0.003150)'));
+    consoleLogSpy.mockRestore();
   });
 
-  it('should return false if agreementThreshold is higher and not met (config long)', async () => {
+  it('should return { proceed: false, cost: expected } if agreementThreshold is higher and not met (config long)', async () => {
     const screenConfig = { ...getBaseScreenConfig(), agreementThreshold: 3 };
     const appConfig = getBaseAppConfig('long');
     const llmResponses: LLMResponse[] = [
-      { action: 'long' },
-      { action: 'long' },
-      { action: 'do_nothing' },
+      mockLLMResponse('long'),
+      mockLLMResponse('long'), // Only 2, needs 3
+      mockLLMResponse('do_nothing'),
     ];
     mockLlmApiServiceInstance.getTradeDecisions.mockResolvedValue(llmResponses);
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const result = await screen.shouldSignalProceed(
       getBaseSignal(),
@@ -232,18 +284,25 @@ describe('LlmConfirmationScreen', () => {
       screenConfig,
       appConfig
     );
-    expect(result).toBe(false);
+    expect(result.proceed).toBe(false);
+    expect(result.cost).toBeCloseTo(0.00315);
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('(Total Cost: $0.003150)'));
+    consoleLogSpy.mockRestore();
   });
 
-  it('should return true if longVotes meet threshold and config is long, ignoring errored responses', async () => {
+  it('should return { proceed: true, cost: expected } if longVotes meet threshold and config is long, ignoring errored responses for cost summation but still logging cost for successful calls', async () => {
     const screenConfig = getBaseScreenConfig();
     const appConfig = getBaseAppConfig('long');
     const llmResponses: LLMResponse[] = [
-      { action: 'long' },
-      { action: 'do_nothing', error: 'API failed' },
-      { action: 'long' },
+      mockLLMResponse('long', undefined, undefined, 100, 50), // cost = 0.00105
+      mockLLMResponse('do_nothing', 'Error', 'API failed', 0, 0), // cost = 0
+      mockLLMResponse('long', undefined, undefined, 120, 70), // cost = 0.00141
     ];
+    llmResponses[1].cost = 0; // Explicitly ensure the errored one has 0 cost for the test
+    llmResponses[1].rawResponse = undefined;
+
     mockLlmApiServiceInstance.getTradeDecisions.mockResolvedValue(llmResponses);
+    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const result = await screen.shouldSignalProceed(
       getBaseSignal(),
@@ -251,16 +310,23 @@ describe('LlmConfirmationScreen', () => {
       screenConfig,
       appConfig
     );
-    expect(result).toBe(true);
+    expect(result.proceed).toBe(true);
+    expect(result.cost).toBeCloseTo(0.00246); // 0.00105 + 0 + 0.00141
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('(Cost: $0.001050)'));
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('Error:API failed'));
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('(Cost: $0.000000)'));
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('(Cost: $0.001410)'));
+    expect(consoleLogSpy).toHaveBeenCalledWith(expect.stringContaining('(Total Cost: $0.002460)'));
+    consoleLogSpy.mockRestore();
   });
 
   it('should log details of each LLM response and correct consensus message (config long, proceed)', async () => {
     const screenConfig = getBaseScreenConfig();
     const appConfig = getBaseAppConfig('long');
     const llmResponses: LLMResponse[] = [
-      { action: 'long', rationalization: 'Looks good.' },
-      { action: 'long', rationalization: 'Strong signal.' },
-      { action: 'do_nothing', rationalization: 'Not sure.' },
+      mockLLMResponse('long', 'Looks good.', undefined, 100, 50), // 0.00105
+      mockLLMResponse('long', 'Strong signal.', undefined, 110, 60), // 0.00123
+      mockLLMResponse('do_nothing', 'Not sure.', undefined, 90, 40), // 0.00087
     ];
     mockLlmApiServiceInstance.getTradeDecisions.mockResolvedValue(llmResponses);
     const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -268,34 +334,46 @@ describe('LlmConfirmationScreen', () => {
     const signalToTest = getBaseSignal();
     await screen.shouldSignalProceed(signalToTest, mockChartPath, screenConfig, appConfig);
 
-    expect(consoleLogSpy).toHaveBeenCalledWith('LLM 1/3: Action: long, "Looks good."');
-    expect(consoleLogSpy).toHaveBeenCalledWith('LLM 2/3: Action: long, "Strong signal."');
-    expect(consoleLogSpy).toHaveBeenCalledWith('LLM 3/3: Action: do_nothing, "Not sure."');
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      `LLM consensus to GO LONG, matching configured direction. Signal proceeds.`
+      'LLM 1/3: Action: long, "Looks good." (Cost: $0.001050)'
+    );
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      'LLM 2/3: Action: long, "Strong signal." (Cost: $0.001230)'
+    );
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      'LLM 3/3: Action: do_nothing, "Not sure." (Cost: $0.000870)'
+    );
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      `LLM consensus to GO LONG, matching configured direction. Signal proceeds. (Total Cost: $0.003150)`
     );
     consoleLogSpy.mockRestore();
   });
 
   it('should log details of each LLM response and correct consensus message (config short, no proceed)', async () => {
     const screenConfig = getBaseScreenConfig();
-    const appConfig = getBaseAppConfig('short');
-    const signalToTest = getBaseSignal();
+    const appConfig = getBaseAppConfig('short'); // Configured for short
+    const signalToTest = getBaseSignal(); // Signal itself is long, but irrelevant here
     const llmResponses: LLMResponse[] = [
-      { action: 'long', rationalization: 'Looks good.' },
-      { action: 'long', rationalization: 'Still long.' },
-      { action: 'do_nothing', rationalization: 'Not sure.' },
+      mockLLMResponse('long', 'Looks good.', undefined, 100, 50), // 0.00105
+      mockLLMResponse('long', 'Still long.', undefined, 110, 60), // 0.00123
+      mockLLMResponse('do_nothing', 'Not sure.', undefined, 90, 40), // 0.00087
     ];
     mockLlmApiServiceInstance.getTradeDecisions.mockResolvedValue(llmResponses);
     const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     await screen.shouldSignalProceed(signalToTest, mockChartPath, screenConfig, appConfig);
 
-    expect(consoleLogSpy).toHaveBeenCalledWith('LLM 1/3: Action: long, "Looks good."');
-    expect(consoleLogSpy).toHaveBeenCalledWith('LLM 2/3: Action: long, "Still long."');
-    expect(consoleLogSpy).toHaveBeenCalledWith('LLM 3/3: Action: do_nothing, "Not sure."');
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      `LLM consensus (2 long, 0 short) does not meet threshold for configured direction 'short' for ${signalToTest.ticker} on ${signalToTest.trade_date}. Signal is filtered out.`
+      'LLM 1/3: Action: long, "Looks good." (Cost: $0.001050)'
+    );
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      'LLM 2/3: Action: long, "Still long." (Cost: $0.001230)'
+    );
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      'LLM 3/3: Action: do_nothing, "Not sure." (Cost: $0.000870)'
+    );
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      `LLM consensus (2 long, 0 short) does not meet threshold for configured direction 'short' for ${signalToTest.ticker} on ${signalToTest.trade_date}. Signal is filtered out. (Total Cost: $0.003150)`
     );
     consoleLogSpy.mockRestore();
   });

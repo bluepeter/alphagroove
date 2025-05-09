@@ -1,5 +1,7 @@
 import { Command } from 'commander';
 import { vi, describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import { type Config as AppConfig } from './utils/config.js';
+import { LlmConfirmationScreen as _ActualLlmConfirmationScreen } from './screens/llm-confirmation.screen.js';
 
 describe('AlphaGroove CLI', () => {
   it('should have required command line options', () => {
@@ -94,7 +96,7 @@ vi.mock('./patterns/pattern-factory.js', async () => {
 
 vi.mock('./screens/llm-confirmation.screen.js', () => ({
   LlmConfirmationScreen: vi.fn().mockImplementation(() => ({
-    shouldSignalProceed: vi.fn(() => Promise.resolve(true)),
+    shouldSignalProceed: vi.fn(() => Promise.resolve({ proceed: true, cost: 0 })),
   })),
 }));
 
@@ -133,7 +135,10 @@ import {
   calculateMedianReturn,
   calculateStdDevReturn,
 } from './utils/calculations.js';
-import { generateEntryChart, generateEntryCharts } from './utils/chart-generator.js';
+import {
+  generateEntryChart as _generateEntryChart,
+  generateEntryCharts,
+} from './utils/chart-generator.js';
 import { loadConfig, mergeConfigWithCliOptions } from './utils/config.js';
 import { fetchTradesFromQuery } from './utils/data-loader.js';
 import { mapRawDataToTrade } from './utils/mappers.js';
@@ -230,55 +235,80 @@ describe('runAnalysis refactored components', () => {
       direction: 'long' as 'long' | 'short',
     };
     const mockChartName = 'test-chart';
-    const mockLocalRawConfig = {};
+    const _mockLocalRawConfig = {};
+    const getMockAppConfig = (): AppConfig => ({
+      default: { direction: 'long', ticker: 'SPY', timeframe: '1min' },
+      patterns: { entry: {}, exit: {} },
+    });
 
-    it('should return true if LLM screen is not enabled', async () => {
-      const result = await mainModule.handleLlmTradeScreeningInternal(
+    it('should return { proceed: true, cost: 0 } if LLM screen is not enabled or instance is null', async () => {
+      const resultNullInstance = await mainModule.handleLlmTradeScreeningInternal(
         mockSignal,
         mockChartName,
         null,
+        { enabled: true },
+        mockMergedConfigValue,
+        getMockAppConfig()
+      );
+      expect(resultNullInstance).toEqual({ proceed: true, cost: 0 });
+
+      const resultDisabled = await mainModule.handleLlmTradeScreeningInternal(
+        mockSignal,
+        mockChartName,
+        new (LlmConfirmationScreen as any)(),
         { enabled: false },
         mockMergedConfigValue,
-        mockLocalRawConfig
+        getMockAppConfig()
       );
-      expect(result).toEqual({ proceed: true });
+      expect(resultDisabled).toEqual({ proceed: true, cost: 0 });
     });
 
-    it('should call LLM screen if enabled and return its decision', async () => {
-      const localMockLlmInstance = new (LlmConfirmationScreen as any)(); // LlmConfirmationScreen itself is mocked
-      vi.mocked(localMockLlmInstance.shouldSignalProceed).mockResolvedValueOnce(false);
-      // For this test, we expect generateEntryChart to be called, which returns a path
+    it('should call LLM screen if enabled and return its decision with cost', async () => {
+      const localMockLlmInstance = new (LlmConfirmationScreen as any)();
       const expectedChartPath = 'path/to/chart.png';
-      vi.mocked(generateEntryChart).mockResolvedValueOnce(expectedChartPath);
+      const mockScreenCost = 0.005;
 
-      const result = await mainModule.handleLlmTradeScreeningInternal(
+      vi.mocked(localMockLlmInstance.shouldSignalProceed).mockResolvedValueOnce({
+        proceed: false,
+        cost: mockScreenCost,
+      });
+
+      const resultFalse = await mainModule.handleLlmTradeScreeningInternal(
         mockSignal,
         mockChartName,
         localMockLlmInstance,
         { enabled: true },
         mockMergedConfigValue,
-        mockLocalRawConfig
+        getMockAppConfig()
       );
-      expect(generateEntryChart).toHaveBeenCalled();
-      expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalled();
-      // When proceed is false, chartPath is not expected to be returned by handleLlmTradeScreeningInternal
-      expect(result).toEqual({ proceed: false });
+      expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalledWith(
+        mockSignal,
+        expectedChartPath,
+        { enabled: true },
+        getMockAppConfig()
+      );
+      expect(resultFalse).toEqual({ proceed: false, cost: mockScreenCost });
 
-      // Test case where LLM proceeds
-      vi.mocked(localMockLlmInstance.shouldSignalProceed).mockResolvedValueOnce(true);
-      vi.mocked(generateEntryChart).mockResolvedValueOnce(expectedChartPath); // Mock again for this call path
+      const secondMockCost = mockScreenCost + 0.001;
+      vi.mocked(localMockLlmInstance.shouldSignalProceed).mockResolvedValueOnce({
+        proceed: true,
+        cost: secondMockCost,
+      });
 
-      const resultProceedTrue = await mainModule.handleLlmTradeScreeningInternal(
+      const resultTrue = await mainModule.handleLlmTradeScreeningInternal(
         mockSignal,
         mockChartName,
         localMockLlmInstance,
-        { enabled: true }, // LLM screen enabled
+        { enabled: true },
         mockMergedConfigValue,
-        mockLocalRawConfig
+        getMockAppConfig()
       );
-      expect(generateEntryChart).toHaveBeenCalledTimes(2); // Called again
-      expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalledTimes(2); // Called again
-      expect(resultProceedTrue).toEqual({ proceed: true, chartPath: expectedChartPath });
+      expect(resultTrue).toEqual({
+        proceed: true,
+        chartPath: expectedChartPath,
+        cost: secondMockCost,
+      });
+      expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -350,9 +380,8 @@ describe('runAnalysis refactored components', () => {
           match_count: 1,
         },
       ];
-      vi.mocked(fetchTradesFromQuery).mockReturnValue(mockTradesFromQueryData as any); // This mock is for runAnalysis; processTradesLoop receives data as arg
+      vi.mocked(fetchTradesFromQuery).mockReturnValue(mockTradesFromQueryData as any);
 
-      // Ensure mapRawDataToTrade returns distinct objects for printTradeDetails assertions if needed
       vi.mocked(mapRawDataToTrade)
         .mockImplementationOnce(
           (rd: any) =>
@@ -376,22 +405,20 @@ describe('runAnalysis refactored components', () => {
       const currentMergedConfig = {
         ...mockMergedConfigValue,
         llmConfirmationScreen: { enabled: false },
-      }; // Explicitly ensure LLM is off for this path
+      };
 
       const { confirmedTrades, yearTrades, currentYear } = await mainModule.processTradesLoop(
         mockTradesFromQueryData,
-        currentMergedConfig, // Use the config where LLM is off
+        currentMergedConfig,
         mockEntryPatternValue,
-        null, // llmScreenInstance - consistent with LLM disabled
-        currentMergedConfig.llmConfirmationScreen, // screenSpecificLLMConfig
+        null,
+        currentMergedConfig.llmConfirmationScreen,
         mockRawConfig,
         totalStats,
         allReturns
       );
 
-      // Expect that handleLlmTradeScreeningInternal effectively allowed trades (since LLM is disabled)
       expect(confirmedTrades.length).toBe(mockTradesFromQueryData.length);
-      // Check that mapRawDataToTrade and printTradeDetails were called for each trade
       expect(mapRawDataToTrade).toHaveBeenCalledTimes(mockTradesFromQueryData.length);
       expect(printTradeDetails).toHaveBeenCalledTimes(mockTradesFromQueryData.length);
       expect(printTradeDetails).toHaveBeenNthCalledWith(
@@ -405,14 +432,11 @@ describe('runAnalysis refactored components', () => {
         mockEntryPatternValue.direction
       );
 
-      // Check accumulation of stats
       expect(totalStats.winning_trades).toBe(1);
       expect(allReturns).toEqual([0.5, -0.2]);
 
-      // Check that printYearSummary was called (by processTradesLoop at the end for the final year's trades)
-      // and implicitly by handleYearlyUpdatesInternal if year changes happened (covered by its own unit test)
       expect(printYearSummary).toHaveBeenCalled();
-      expect(yearTrades.length).toBeGreaterThan(0); // Assuming trades are for the same year and accumulate
+      expect(yearTrades.length).toBeGreaterThan(0);
       expect(currentYear).toBe(mockTradesFromQueryData[0].year.toString());
     });
   });

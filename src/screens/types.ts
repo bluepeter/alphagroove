@@ -19,6 +19,11 @@ export interface LLMScreenConfig {
   totalCost?: number;
 }
 
+export interface ScreenDecision {
+  proceed: boolean;
+  cost?: number; // Optional cost, as not all screens will have it
+}
+
 // Define an enriched signal type that includes context like ticker and trade_date
 export interface EnrichedSignal extends Signal {
   ticker: string;
@@ -40,8 +45,10 @@ export interface EntryScreen {
   shouldSignalProceed: (
     signal: EnrichedSignal, // Use the new EnrichedSignal type
     chartPath: string, // Path to the generated chart image for the signal
-    screenConfig: LLMScreenConfig,
+    screenConfig: LLMScreenConfig, // This is specific to LLM. Should be more generic if other screens exist.
+    // For now, assuming LLMScreenConfig is the structure for any screen needing screenConfig.
+    // If other screens have different config structures, this might need to be a union type or a generic.
     appConfig: AppConfig, // Full application config if needed
     context?: EntryScreenContext
-  ) => Promise<boolean>;
+  ) => Promise<ScreenDecision>; // Updated return type
 }

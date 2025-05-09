@@ -25,6 +25,10 @@ export class LlmApiService {
   private config: LLMScreenConfig;
   private apiKey: string | undefined;
 
+  // Pricing for Claude 3.7 Sonnet (ensure this matches the actual model if it changes)
+  private readonly INPUT_COST_PER_MILLION_TOKENS = 3;
+  private readonly OUTPUT_COST_PER_MILLION_TOKENS = 15;
+
   constructor(config: LLMScreenConfig) {
     this.config = config;
     this.apiKey = process.env[this.config.apiKeyEnvVar];
@@ -72,6 +76,7 @@ export class LlmApiService {
       return Array.from({ length: this.config.numCalls }, () => ({
         action: 'do_nothing',
         error: 'Service not enabled or not configured.',
+        cost: 0, // Ensure cost is present even for error cases
       }));
     }
 
@@ -105,6 +110,7 @@ export class LlmApiService {
       const temperature = this.config.temperatures[i] || this.config.temperatures[0] || 0.5;
 
       const call = async (): Promise<LLMResponse> => {
+        let callCost = 0;
         try {
           const messagesContent: Anthropic.MessageParam['content'] = [];
           if (imageBase64 && mediaType !== 'application/octet-stream') {
@@ -126,7 +132,8 @@ export class LlmApiService {
 
           const systemPromptContent = this.config.systemPrompt;
 
-          const response = await this.anthropic!.messages.create({
+          // Cast to any to access usage, as it might not be on the default type
+          const response: Anthropic.Messages.Message = await this.anthropic!.messages.create({
             model: this.config.modelName,
             max_tokens: this.config.maxOutputTokens,
             temperature: temperature,
@@ -139,6 +146,15 @@ export class LlmApiService {
             ],
           });
 
+          // Calculate cost if usage data is available
+          if (response.usage) {
+            const inputTokens = response.usage.input_tokens;
+            const outputTokens = response.usage.output_tokens;
+            callCost =
+              (inputTokens / 1_000_000) * this.INPUT_COST_PER_MILLION_TOKENS +
+              (outputTokens / 1_000_000) * this.OUTPUT_COST_PER_MILLION_TOKENS;
+          }
+
           const messageTextContent =
             response.content &&
             Array.isArray(response.content) &&
@@ -147,7 +163,6 @@ export class LlmApiService {
               ? response.content[0].text
               : '';
 
-          // Attempt to parse, but be more forgiving for debugging
           let parsedAction: 'long' | 'short' | 'do_nothing' = 'do_nothing';
           let parsedRationalization: string | undefined = undefined;
           try {
@@ -165,12 +180,12 @@ export class LlmApiService {
             console.warn(
               `[DEBUG LlmApiService] JSON.parse failed for raw text. Error: ${parseError.message}`
             );
-            // Keep action as 'do_nothing', rationalization undefined
           }
 
           return {
             action: parsedAction,
             rationalization: parsedRationalization,
+            cost: callCost,
             debugRawText: messageTextContent,
             rawResponse: response,
           };
@@ -188,6 +203,7 @@ export class LlmApiService {
           return {
             action: 'do_nothing',
             error: error.message || 'Unknown API error',
+            cost: 0, // Cost is 0 for failed calls
             debugRawText: `API Call Failed: ${error.message}`,
             rawResponse: error.response?.data || error,
           };
@@ -198,8 +214,10 @@ export class LlmApiService {
     return Promise.all(apiCalls);
   }
 
-  // TODO: Implement cost estimation logic based on Anthropic's pricing
-  // This might involve token counting for prompts and analyzing response metadata if available.
+  // Cost estimation logic is now part of getTradeDecisions for actual costs
+  // The estimateCost function can be removed or kept if a pre-estimation is ever needed.
+  // For now, removing it to avoid confusion as actual costs are calculated.
+  /*
   public estimateCost(
     _promptTokens: number,
     _completionTokens: number,
@@ -210,4 +228,5 @@ export class LlmApiService {
     console.warn('Cost estimation not fully implemented.');
     return 0.0;
   }
+  */
 }
