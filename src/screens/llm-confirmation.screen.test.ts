@@ -205,25 +205,18 @@ describe('LlmConfirmationScreen', () => {
     const signalToTest = getBaseSignal();
     await screen.shouldSignalProceed(signalToTest, mockChartPath, screenConfig, getBaseAppConfig());
 
-    // Check individual LLM response logs
+    // Check individual LLM response logs based on the new format
+    expect(consoleLogSpy).toHaveBeenCalledWith(`LLM 1/3: Action: long, "Looks good."`);
     expect(consoleLogSpy).toHaveBeenCalledWith(
-      `LLM 1/3: Action: long,  Rationalization: Looks good.`
+      `LLM 2/3: Action: short, Error:Minor issue,"A bit risky."`
     );
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      `LLM 2/3: Action: short, Error:Minor issue, Rationalization: A bit risky.`
-    );
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      `LLM 3/3: Action: do_nothing,  Rationalization: Not sure.`
-    );
+    expect(consoleLogSpy).toHaveBeenCalledWith(`LLM 3/3: Action: do_nothing, "Not sure."`);
 
     // Check consensus log (in this case, no consensus will be met with threshold 2)
     expect(consoleLogSpy).toHaveBeenCalledWith(
       `LLM consensus NOT MET or advises DO NOTHING for ${signalToTest.ticker} on ${signalToTest.trade_date}. Signal is filtered out.`
     );
 
-    // Verify the "Requesting LLM decisions" log is NOT in LlmConfirmationScreen if it was moved.
-    // If it's still intended to be here, this test would need adjustment or the code would.
-    // For now, assuming it's not part of this specific unit's logging responsibility.
     expect(consoleLogSpy).not.toHaveBeenCalledWith(
       expect.stringContaining('Requesting LLM decisions for signal:')
     );
