@@ -5,8 +5,12 @@ export const formatDate = (dateString: string): string => {
   return dateString;
 };
 
-export const formatTime = (timeString: string): string => {
-  return timeString.split(' ')[1];
+export const formatTime = (timeString: string | undefined | null): string => {
+  if (!timeString) {
+    return '--:--:--'; // Default for undefined/null/empty input
+  }
+  const parts = timeString.split(' ');
+  return parts.length > 1 ? parts[1] : parts[0]; // Return time part if available, else the whole string
 };
 
 export const formatDollar = (value: number): string => {

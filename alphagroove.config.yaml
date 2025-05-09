@@ -1,12 +1,12 @@
 default:
   date:
     from: '2023-01-01'
-    to: '2025-05-02'
+    to: '2023-06-02'
   ticker: 'SPY'
   timeframe: '1min'
   direction: 'long'
   patterns:
-    entry: 'quick-fall'
+    entry: 'quick-rise'
     exit: 'fixed-time'
   charts:
     generate: true
@@ -24,3 +24,38 @@ patterns:
   exit:
     fixed-time:
       hold-minutes: 10
+
+llmConfirmationScreen:
+  enabled: true
+  llmProvider: 'anthropic'
+  modelName: 'claude-3-7-sonnet-latest'
+  apiKeyEnvVar: 'ANTHROPIC_API_KEY'
+  numCalls: 3
+  agreementThreshold: 2
+  temperatures: [0.1, 0.5, 1.0]
+  systemPrompt: >-
+    You are a seasoned day trader that focudes on trades at the beginning of each trading day. 
+
+    You will be provided with a stock chart for the previous day at the current day. The current day
+    may only be a few bars, but pay attention carefully to the current day as that is what we are
+    trading. The chart will use candlesticks and volume bars. These are key items to pay attention
+    to. Ignore the ticker symbol, current date, etc. We are backtesting a strategy so you must focus
+    on generating an action based solely on chart mechanics, not any historical knowledge you have
+    of that particular day.
+
+    You strictly follow user instructions for output format.  You will be provided with a task and
+    an example of the JSON output required.  Respond ONLY with the valid JSON object described by
+    the user. Do not include any other text, narration, or explanations.
+  prompts:
+    - You are a seasoned day trader that focuses on trades at the beginning of each trading day.
+    - You are a swing trader that focuses on the first few bars of each trading day.
+    - You are a scalping trader that focuses on the first few minutes of each trading day.
+  commonPromptSuffixForJson: >-
+    Based on the provided chart, what action would you take: go long, go short, or do nothing?
+    Provide a one-sentence rationalization for your decision.
+
+    Your response MUST be a valid JSON object and nothing else.  For example: `{"action": "long",
+    "rationalization": "Price broke resistance with volume."}` or  `{"action": "short",
+    "rationalization": "Bearish engulfing pattern at key level."}` or  `{"action": "do_nothing",
+    "rationalization": "Market is choppy, no clear direction."}`
+  maxOutputTokens: 150

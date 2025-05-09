@@ -56,6 +56,39 @@ const ChartOptionsSchema = z.object({
   outputDir: z.string().default('./charts'),
 });
 
+// Schema for LLM Confirmation Screen
+// Use ExternalLLMScreenConfig to guide the Zod schema definition if needed,
+// but Zod schema is the source of truth for validation and type inference here.
+const LLMScreenConfigSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    llmProvider: z.enum(['anthropic', 'openai']).default('anthropic'),
+    modelName: z.string().default('claude-3-7-sonnet-latest'),
+    apiKeyEnvVar: z.string().default('ANTHROPIC_API_KEY'),
+    numCalls: z.number().int().min(1).default(3),
+    agreementThreshold: z.number().int().min(1).default(2),
+    temperatures: z.array(z.number()).default([0.2, 0.5, 0.8]),
+    prompts: z
+      .union([z.string(), z.array(z.string())])
+      .default(
+        'You are an experienced day trader. Based on this chart, what action would you take: go long, short, or do nothing? Provide a brief one-sentence rationalization for your decision.'
+      ),
+    commonPromptSuffixForJson: z
+      .string()
+      .optional()
+      .default(
+        'Your response MUST be a valid JSON object and nothing else. For example: `{"action": "long", "rationalization": "Price broke resistance with volume."}`'
+      ),
+    systemPrompt: z.string().optional(),
+    maxOutputTokens: z.number().int().min(1).default(150),
+    timeoutMs: z.number().int().optional(),
+  })
+  .default({});
+
+// Infer the type from Zod schema, this will be our internal LLMScreenConfig type
+// This ensures consistency between Zod validation and TypeScript types.
+export type LLMScreenConfig = z.infer<typeof LLMScreenConfigSchema>;
+
 // Define the root config schema
 const ConfigSchema = z.object({
   default: z.object({
@@ -67,6 +100,7 @@ const ConfigSchema = z.object({
     charts: ChartOptionsSchema.optional(),
   }),
   patterns: PatternsConfigSchema,
+  llmConfirmationScreen: LLMScreenConfigSchema.optional(),
 });
 
 // Type for the validated config
@@ -106,6 +140,10 @@ const DEFAULT_CONFIG: Config = {
       },
     },
   },
+  llmConfirmationScreen: LLMScreenConfigSchema.parse({
+    // systemPrompt will be undefined by default due to .optional()
+    // Explicitly set a default system prompt if desired when creating the config file
+  }),
 };
 
 /**
@@ -140,6 +178,9 @@ export const loadConfig = (configPath?: string): Config => {
   }
 
   // Return default config if no file or invalid
+  console.log(
+    'Using default configuration as alphagroove.config.yaml was not found or was invalid.'
+  );
   return DEFAULT_CONFIG;
 };
 
@@ -150,7 +191,45 @@ export const createDefaultConfigFile = (): void => {
   const configPath = path.join(process.cwd(), 'alphagroove.config.yaml');
 
   if (!fs.existsSync(configPath)) {
-    const yamlContent = yaml.dump(DEFAULT_CONFIG, {
+    const completeDefaultConfig: z.input<typeof ConfigSchema> = {
+      default: {
+        ticker: 'SPY',
+        timeframe: '1min',
+        direction: 'long',
+        patterns: {
+          entry: 'quick-rise',
+          exit: 'fixed-time',
+        },
+        charts: {
+          generate: false,
+          outputDir: './charts',
+        },
+      },
+      patterns: {
+        entry: {
+          'quick-rise': {
+            'rise-pct': 0.3,
+            'within-minutes': 5,
+          },
+          'quick-fall': {
+            'fall-pct': 0.3,
+            'within-minutes': 5,
+          },
+        },
+        exit: {
+          'fixed-time': {
+            'hold-minutes': 10,
+          },
+        },
+      },
+      llmConfirmationScreen: {
+        ...LLMScreenConfigSchema.parse({}), // Get all other defaults from Zod
+        systemPrompt:
+          'You are an AI assistant that strictly follows user instructions for output format. You will be provided with a task and an example of the JSON output required. Respond ONLY with the valid JSON object described.', // Example default system prompt
+      },
+    };
+
+    const yamlContent = yaml.dump(completeDefaultConfig, {
       indent: 2,
       lineWidth: 100,
       quotingType: '"',
@@ -164,7 +243,7 @@ export const createDefaultConfigFile = (): void => {
 /**
  * Merged configuration interface with added pattern-specific properties
  */
-interface MergedConfig {
+export interface MergedConfig {
   ticker: string;
   timeframe: string;
   direction: string;
@@ -174,6 +253,7 @@ interface MergedConfig {
   exitPattern: string;
   generateCharts: boolean;
   chartsDir: string;
+  llmConfirmationScreen?: LLMScreenConfig;
   'quick-rise'?: Record<string, any>;
   'quick-fall'?: Record<string, any>;
   'fixed-time'?: Record<string, any>;
@@ -188,113 +268,126 @@ interface MergedConfig {
  * @returns Merged configuration
  */
 export const mergeConfigWithCliOptions = (
-  config: Config,
+  loadedConfig: Config,
   cliOptions: Record<string, any>
 ): MergedConfig => {
-  // Get default patterns from config
-  const defaultEntryPattern = config.default.patterns?.entry || 'quick-rise';
-  const defaultExitPattern = config.default.patterns?.exit || 'fixed-time';
+  const defaultEntryPattern = loadedConfig.default.patterns?.entry || 'quick-rise';
+  const defaultExitPattern = loadedConfig.default.patterns?.exit || 'fixed-time';
 
-  // Start with the default settings
   const mergedConfig: MergedConfig = {
-    // Base options
-    ticker: cliOptions.ticker || config.default.ticker,
-    timeframe: cliOptions.timeframe || config.default.timeframe,
-    direction: cliOptions.direction || config.default.direction,
-
-    // Dates - CLI always takes precedence
-    from: cliOptions.from || config.default.date?.from || '2010-01-01',
-    to: cliOptions.to || config.default.date?.to || '2025-12-31',
-
-    // Pattern selection - handle both camelCase and kebab-case
+    ticker: cliOptions.ticker || loadedConfig.default.ticker,
+    timeframe: cliOptions.timeframe || loadedConfig.default.timeframe,
+    direction: cliOptions.direction || loadedConfig.default.direction,
+    from: cliOptions.from || loadedConfig.default.date?.from || '2010-01-01',
+    to: cliOptions.to || loadedConfig.default.date?.to || '2025-12-31',
     entryPattern: cliOptions.entryPattern || cliOptions['entry-pattern'] || defaultEntryPattern,
     exitPattern: cliOptions.exitPattern || cliOptions['exit-pattern'] || defaultExitPattern,
-
-    // Chart generation options
-    generateCharts: cliOptions.generateCharts || config.default.charts?.generate || false,
-    chartsDir: cliOptions.chartsDir || config.default.charts?.outputDir || './charts',
+    generateCharts:
+      cliOptions.generateCharts !== undefined
+        ? cliOptions.generateCharts
+        : loadedConfig.default.charts?.generate || false,
+    chartsDir: cliOptions.chartsDir || loadedConfig.default.charts?.outputDir || './charts',
+    llmConfirmationScreen: loadedConfig.llmConfirmationScreen
+      ? {
+          ...LLMScreenConfigSchema.parse({}), // Ensure all defaults from Zod schema
+          ...loadedConfig.llmConfirmationScreen, // Then overlay loaded YAML values
+        }
+      : LLMScreenConfigSchema.parse({}), // Fallback to schema defaults if not in YAML
   };
 
-  // Handle namespaced options for specific patterns
-  // Extract pattern-specific options from CLI (format: pattern.option)
   const patternOptions: Record<string, Record<string, any>> = {};
-
-  // Process CLI options that use the namespaced format (pattern.option)
   Object.entries(cliOptions).forEach(([key, value]) => {
     if (key.includes('.')) {
       const [patternName, optionName] = key.split('.');
-      if (!patternOptions[patternName]) {
-        patternOptions[patternName] = {};
+      if (
+        [
+          mergedConfig.entryPattern,
+          mergedConfig.exitPattern,
+          'quick-rise',
+          'quick-fall',
+          'fixed-time',
+        ].includes(patternName)
+      ) {
+        if (!patternOptions[patternName]) {
+          patternOptions[patternName] = {};
+        }
+        patternOptions[patternName][optionName] = value;
       }
-      patternOptions[patternName][optionName] = value;
     }
   });
 
-  // Add pattern-specific config from default config
-  if (mergedConfig.entryPattern === 'quick-rise' && config.patterns.entry['quick-rise']) {
-    mergedConfig['quick-rise'] = { ...config.patterns.entry['quick-rise'] };
-  } else if (mergedConfig.entryPattern === 'quick-fall' && config.patterns.entry['quick-fall']) {
-    mergedConfig['quick-fall'] = { ...config.patterns.entry['quick-fall'] };
+  if (loadedConfig.patterns.entry['quick-rise']) {
+    mergedConfig['quick-rise'] = { ...loadedConfig.patterns.entry['quick-rise'] };
+  }
+  if (loadedConfig.patterns.entry['quick-fall']) {
+    mergedConfig['quick-fall'] = { ...loadedConfig.patterns.entry['quick-fall'] };
+  }
+  if (loadedConfig.patterns.exit['fixed-time']) {
+    mergedConfig['fixed-time'] = { ...loadedConfig.patterns.exit['fixed-time'] };
   }
 
-  if (mergedConfig.exitPattern === 'fixed-time' && config.patterns.exit['fixed-time']) {
-    mergedConfig['fixed-time'] = { ...config.patterns.exit['fixed-time'] };
-  }
-
-  // Handle legacy option pattern (backward compatibility)
-  if (mergedConfig.entryPattern === 'quick-rise' && cliOptions.risePct !== undefined) {
-    if (!mergedConfig['quick-rise']) {
-      mergedConfig['quick-rise'] = { ...config.patterns.entry['quick-rise'] };
-    }
-    mergedConfig['quick-rise']['rise-pct'] = parseFloat(cliOptions.risePct);
-  }
-
-  if (mergedConfig.entryPattern === 'quick-fall' && cliOptions.fallPct !== undefined) {
-    if (!mergedConfig['quick-fall']) {
-      mergedConfig['quick-fall'] = { ...config.patterns.entry['quick-fall'] };
-    }
-    mergedConfig['quick-fall']['fall-pct'] = parseFloat(cliOptions.fallPct);
-  }
-
-  // Apply pattern-specific options from dot notation
   Object.entries(patternOptions).forEach(([pattern, options]) => {
     if (!mergedConfig[pattern]) {
-      // If this pattern hasn't been set up yet, use config defaults
-      if (pattern === 'quick-rise' && config.patterns.entry['quick-rise']) {
-        mergedConfig[pattern] = { ...config.patterns.entry['quick-rise'] };
-      } else if (pattern === 'quick-fall' && config.patterns.entry['quick-fall']) {
-        mergedConfig[pattern] = { ...config.patterns.entry['quick-fall'] };
-      } else if (pattern === 'fixed-time' && config.patterns.exit['fixed-time']) {
-        mergedConfig[pattern] = { ...config.patterns.exit['fixed-time'] };
+      if (pattern === 'quick-rise' && loadedConfig.patterns.entry['quick-rise']) {
+        mergedConfig[pattern] = { ...loadedConfig.patterns.entry['quick-rise'] };
+      } else if (pattern === 'quick-fall' && loadedConfig.patterns.entry['quick-fall']) {
+        mergedConfig[pattern] = { ...loadedConfig.patterns.entry['quick-fall'] };
+      } else if (pattern === 'fixed-time' && loadedConfig.patterns.exit['fixed-time']) {
+        mergedConfig[pattern] = { ...loadedConfig.patterns.exit['fixed-time'] };
       } else {
         mergedConfig[pattern] = {};
       }
     }
-
-    // Apply the dot notation options
     mergedConfig[pattern] = { ...mergedConfig[pattern], ...options };
   });
 
-  // Override with CLI options for pattern-specific config objects
+  // Handle legacy CLI options for backward compatibility
+  if (mergedConfig.entryPattern === 'quick-rise' && cliOptions.risePct !== undefined) {
+    if (!mergedConfig['quick-rise']) mergedConfig['quick-rise'] = {};
+    mergedConfig['quick-rise']['rise-pct'] = parseFloat(cliOptions.risePct as string);
+  }
+  if (mergedConfig.entryPattern === 'quick-fall' && cliOptions.fallPct !== undefined) {
+    if (!mergedConfig['quick-fall']) mergedConfig['quick-fall'] = {};
+    mergedConfig['quick-fall']['fall-pct'] = parseFloat(cliOptions.fallPct as string);
+  }
+  if (mergedConfig.exitPattern === 'fixed-time' && cliOptions.holdMinutes !== undefined) {
+    if (!mergedConfig['fixed-time']) mergedConfig['fixed-time'] = {};
+    mergedConfig['fixed-time']['hold-minutes'] = parseInt(cliOptions.holdMinutes as string, 10);
+  }
+
+  const patternNamesFromConfig = Object.keys(loadedConfig.patterns.entry).concat(
+    Object.keys(loadedConfig.patterns.exit)
+  );
+  patternNamesFromConfig.forEach(patternName => {
+    if (cliOptions[patternName] && typeof cliOptions[patternName] === 'object') {
+      mergedConfig[patternName] = {
+        ...mergedConfig[patternName],
+        ...cliOptions[patternName],
+      };
+    }
+  });
+
   if (cliOptions['quick-rise'] && typeof cliOptions['quick-rise'] === 'object') {
     mergedConfig['quick-rise'] = {
-      ...mergedConfig['quick-rise'],
+      ...(mergedConfig['quick-rise'] || {}),
       ...cliOptions['quick-rise'],
     };
   }
-
   if (cliOptions['quick-fall'] && typeof cliOptions['quick-fall'] === 'object') {
     mergedConfig['quick-fall'] = {
-      ...mergedConfig['quick-fall'],
+      ...(mergedConfig['quick-fall'] || {}),
       ...cliOptions['quick-fall'],
     };
   }
-
   if (cliOptions['fixed-time'] && typeof cliOptions['fixed-time'] === 'object') {
     mergedConfig['fixed-time'] = {
-      ...mergedConfig['fixed-time'],
+      ...(mergedConfig['fixed-time'] || {}),
       ...cliOptions['fixed-time'],
     };
+  }
+
+  if (cliOptions.generateCharts === true && mergedConfig.generateCharts === false) {
+    mergedConfig.generateCharts = true;
   }
 
   return mergedConfig;
