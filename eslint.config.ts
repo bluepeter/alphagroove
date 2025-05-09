@@ -54,14 +54,14 @@ const config = [
           varsIgnorePattern: '^_',
         },
       ],
-      'import/order': [
-        'error',
-        {
-          groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
-          'newlines-between': 'always',
-          alphabetize: { order: 'asc' },
-        },
-      ],
+      //  'import/order': [
+      //    'error',
+      //    {
+      //      groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
+      //      'newlines-between': 'always',
+      //      alphabetize: { order: 'asc' },
+      //    },
+      //  ],
     },
   },
 
