@@ -120,8 +120,6 @@ describe('output utilities', () => {
   describe('printYearSummary', () => {
     it('should print year summary with correct statistics using real data ranges', () => {
       const consoleLogSpy = vi.spyOn(console, 'log');
-
-      // Using real data range summary example
       const trades: Trade[] = [
         {
           trade_date: '2025-05-02',
@@ -134,63 +132,49 @@ describe('output utilities', () => {
           return_pct: 0.0001,
           year: 2025,
           total_trading_days: 252,
-          median_return: 0.12,
-          std_dev_return: 0.25,
-          win_rate: 0.75,
-          avg_return: 0.12,
         },
       ];
-
       printYearSummary(2025, trades);
-
       const logs = consoleLogSpy.mock.calls.map(call => call[0]);
       expect(logs[1]).toContain('📊 2025 Summary: 1 trades (0.4% of days)');
       expect(logs[1]).toContain('Avg Rise: 0.04%');
       expect(logs[1]).toContain('Return Range: 0.01% to 0.01%');
-      expect(logs[1]).toContain('Mean: 0.1200%');
-      expect(logs[1]).toContain('StdDev: 0.2500%');
+      expect(logs[1]).toContain('Mean: 0.01%');
+      expect(logs[1]).toContain('Median: 0.01%');
+      expect(logs[1]).toContain('StdDev: 0.00%');
       expect(logs[1]).toContain('Win Rate: 100.0%');
-
       consoleLogSpy.mockRestore();
     });
 
     it('should handle multiple trades correctly', () => {
       const consoleLogSpy = vi.spyOn(console, 'log');
-
-      // Create 10 distinct trade objects with varying values
       const trades: Trade[] = Array.from({ length: 10 }, (_, i) => ({
         trade_date: '2025-05-02',
         entry_time: '2025-05-02 16:54:00',
         exit_time: '2025-05-02 16:55:00',
         market_open: 566.81,
         entry_price: 566.83,
-        exit_price: 567.19 + i * 0.5, // Slightly different exit prices
-        rise_pct: 0.0036 + i * 0.0005, // Range from 0.36% to 0.81%
-        return_pct: 0.0005 + i * 0.0008, // Range from 0.05% to 0.77%
+        exit_price: 567.19 + i * 0.5,
+        rise_pct: 0.0036 + i * 0.0005,
+        return_pct: 0.0005 + i * 0.0008,
         year: 2025,
         total_trading_days: 252,
-        median_return: 0.04,
-        std_dev_return: 0.34,
-        win_rate: 0.6,
-        avg_return: 0.04,
+        direction: 'long',
       }));
-
       printYearSummary(2025, trades);
-
       const logs = consoleLogSpy.mock.calls.map(call => call[0]);
       expect(logs[1]).toContain('📊 2025 Summary: 10 trades (4.0% of days)');
       expect(logs[1]).toContain('Avg Rise: 0.59%');
       expect(logs[1]).toContain('Return Range: 0.05% to 0.77%');
-      expect(logs[1]).toContain('Mean: 0.0400%');
-      expect(logs[1]).toContain('StdDev: 0.3400%');
+      expect(logs[1]).toContain('Mean: 0.41%');
+      expect(logs[1]).toContain('Median: 0.41%');
+      expect(logs[1]).toContain('StdDev: 0.24%');
       expect(logs[1]).toContain('Win Rate: 100.0%');
-
       consoleLogSpy.mockRestore();
     });
 
     it('should handle single trade correctly', () => {
       const consoleLogSpy = vi.spyOn(console, 'log');
-
       const trades: Trade[] = [
         {
           trade_date: '2025-05-02',
@@ -203,40 +187,33 @@ describe('output utilities', () => {
           return_pct: 0.0005,
           year: 2025,
           total_trading_days: 252,
-          median_return: 0.05,
-          std_dev_return: 0.0,
-          win_rate: 1.0,
-          avg_return: 0.05,
+          direction: 'long',
         },
       ];
-
       printYearSummary(2025, trades);
-
       const logs = consoleLogSpy.mock.calls.map(call => call[0]);
       expect(logs[1]).toContain('📊 2025 Summary: 1 trades (0.4% of days)');
       expect(logs[1]).toContain('Avg Rise: 0.35%');
       expect(logs[1]).toContain('Return Range: 0.05% to 0.05%');
-      expect(logs[1]).toContain('Mean: 0.0500%');
-      expect(logs[1]).toContain('StdDev: 0.0000%');
+      expect(logs[1]).toContain('Mean: 0.05%');
+      expect(logs[1]).toContain('Median: 0.05%');
+      expect(logs[1]).toContain('StdDev: 0.00%');
       expect(logs[1]).toContain('Win Rate: 100.0%');
-
       consoleLogSpy.mockRestore();
     });
 
     it('should handle no trades correctly', () => {
       const consoleLogSpy = vi.spyOn(console, 'log');
-
       const _trades: Trade[] = [];
-
       printYearSummary(2025, _trades);
-
       const logs = consoleLogSpy.mock.calls.map(call => call[0]);
       expect(logs[1]).toContain('📊 2025 Summary: 0 trades (0.0% of days)');
+      expect(logs[1]).not.toContain('Avg Rise:');
       expect(logs[1]).toContain('Return Range: 0.00% to 0.00%');
-      expect(logs[1]).toContain('Mean: 0.0000%');
-      expect(logs[1]).toContain('StdDev: 0.0000%');
+      expect(logs[1]).toContain('Mean: 0.00%');
+      expect(logs[1]).toContain('Median: 0.00%');
+      expect(logs[1]).toContain('StdDev: 0.00%');
       expect(logs[1]).toContain('Win Rate: 0.0%');
-
       consoleLogSpy.mockRestore();
     });
   });

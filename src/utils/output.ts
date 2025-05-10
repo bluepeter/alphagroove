@@ -10,6 +10,9 @@ import {
   calculateWinningTrades,
   calculateWinRate,
   isWinningTrade,
+  calculateMeanReturn,
+  calculateMedianReturn,
+  calculateStdDevReturn,
 } from './calculations';
 
 // We could use date-fns for more advanced date formatting in the future
@@ -89,18 +92,17 @@ export const printTradeDetails = (trade: Trade) => {
 
   const returnPctStr = formatPercent(trade.return_pct);
   const isWin = isWinningTrade(trade.return_pct, isShort);
-  const returnColor = isWin ? chalk.green : chalk.red;
   const returnEmoji = isWin ? '✅' : '❌';
 
   console.log(
-    `${emoji} ${date} ⏰ ${entryTime} → ${exitTime} Open: ${open} Entry: ${entry} Exit: ${exit} ${changeText ? changeText + ' ' : ''}${returnEmoji} Return: ${returnColor(returnPctStr)}`
+    `${emoji} ${date} ⏰ ${entryTime} → ${exitTime} Open: ${open} Entry: ${entry} Exit: ${exit} ${changeText ? changeText + ' ' : ''}${returnEmoji} Return: ${isWin ? chalk.green(returnPctStr) : chalk.red(returnPctStr)}`
   );
 };
 
 export const printYearSummary = (year: number, trades: Trade[], llmCost?: number) => {
   const totalTrades = trades.length;
-  const tradingDays = trades[0]?.total_trading_days || 252;
-  const tradePercentage = calculateTradePercentage(totalTrades, tradingDays);
+  const yearSpecificTradingDays = trades[0]?.total_trading_days || 252;
+  const tradePercentage = calculateTradePercentage(totalTrades, yearSpecificTradingDays);
 
   const rises = trades.map(t => t.rise_pct).filter(r => r !== null) as number[];
   const avgRise = calculateAvgRise(rises);
@@ -109,37 +111,35 @@ export const printYearSummary = (year: number, trades: Trade[], llmCost?: number
   const minReturn = returns.length > 0 ? Math.min(...returns) : 0;
   const maxReturn = returns.length > 0 ? Math.max(...returns) : 0;
 
-  const isShort = trades[0]?.direction === 'short';
+  const isShort = trades.length > 0 ? trades[0]?.direction === 'short' : false;
   const winningTrades = calculateWinningTrades(trades, isShort);
   const winRateValue = calculateWinRate(winningTrades, totalTrades);
 
-  // yearly_stats from SQL provides avg_return, median_return, std_dev_return, win_rate for that year's trades
-  // These are already percentages from SQL (e.g., AVG(t.return_pct * 100))
-  const meanReturnPct = trades[0]?.avg_return || 0; // Use avg_return from SQL (already a percentage)
-  const medianReturnPct = trades[0]?.median_return || 0; // Use median_return from SQL (already a percentage)
-  const stdDevReturnPct = trades[0]?.std_dev_return || 0;
+  const meanReturn = calculateMeanReturn(returns);
+  const medianReturn = calculateMedianReturn(returns);
+  const stdDevReturn = calculateStdDevReturn(returns, meanReturn);
 
-  const meanColor = meanReturnPct >= 0 ? chalk.green : chalk.red;
-  const medianColor = medianReturnPct >= 0 ? chalk.green : chalk.red;
+  const meanColor = meanReturn >= 0 ? chalk.green : chalk.red;
+  const medianColor = medianReturn >= 0 ? chalk.green : chalk.red;
   const winRateColor = winRateValue >= 50 ? chalk.green : chalk.red;
-  const returnRangeColor =
-    maxReturn * 100 >= 0 ? (minReturn * 100 >= 0 ? chalk.green : chalk.gray) : chalk.red;
+  const returnRangeColor = maxReturn >= 0 ? (minReturn >= 0 ? chalk.green : chalk.gray) : chalk.red;
 
   const llmCostString =
     typeof llmCost === 'number' && llmCost > 0 ? ` | LLM Cost: $${llmCost.toFixed(4)}` : '';
 
+  let summaryString = `📊 ${year} Summary: ${totalTrades} trades (${tradePercentage}% of days) | `;
+  if (rises.length > 0) {
+    summaryString += `Avg Rise: ${formatPercent(avgRise)} | `;
+  }
+  summaryString += `Return Range: ${returnRangeColor(
+    `${formatPercent(minReturn)} to ${formatPercent(maxReturn)}`
+  )} | `;
+  summaryString += `Mean: ${meanColor(formatPercent(meanReturn))} | Median: ${medianColor(formatPercent(medianReturn))} | StdDev: ${chalk.gray(formatPercent(stdDevReturn))} | Win Rate: ${winRateColor(
+    `${winRateValue.toFixed(1)}%`
+  )}${llmCostString}`;
+
   console.log('');
-  console.log(
-    chalk.cyan(
-      `📊 ${year} Summary: ${totalTrades} trades (${tradePercentage}% of days) | ` +
-        `Avg Rise: ${(avgRise * 100).toFixed(2)}% | Return Range: ${returnRangeColor(
-          `${(minReturn * 100).toFixed(2)}% to ${(maxReturn * 100).toFixed(2)}%`
-        )} | ` +
-        `Mean: ${meanColor(`${meanReturnPct.toFixed(4)}%`)} | Median: ${medianColor(`${medianReturnPct.toFixed(4)}%`)} | StdDev: ${stdDevReturnPct.toFixed(4)}% | Win Rate: ${winRateColor(
-          `${winRateValue.toFixed(1)}%`
-        )}${llmCostString}`
-    )
-  );
+  console.log(chalk.cyan(summaryString));
   console.log('');
 };
 
