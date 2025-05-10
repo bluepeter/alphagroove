@@ -3,6 +3,8 @@ import { vi, describe, it, expect, beforeAll, beforeEach, afterEach } from 'vite
 import { type Config as AppConfig } from './utils/config.js';
 import { LlmConfirmationScreen as _ActualLlmConfirmationScreen } from './screens/llm-confirmation.screen.js';
 
+const mockQueryValue = 'DRY_RUN_SQL_QUERY_FROM_INDEX_TEST'; // Define it once globally for the test file
+
 describe('AlphaGroove CLI', () => {
   it('should have required command line options', () => {
     const program = new Command();
@@ -78,7 +80,7 @@ vi.mock('./utils/data-loader.js', () => ({
 }));
 
 vi.mock('./utils/query-builder.js', () => ({
-  buildAnalysisQuery: vi.fn(() => 'SELECT * FROM DUMMY'),
+  buildAnalysisQuery: vi.fn(() => mockQueryValue),
 }));
 
 vi.mock('./patterns/pattern-factory.js', async () => {
@@ -163,7 +165,6 @@ describe('runAnalysis refactored components', () => {
   let mockMergedConfigValue: any;
   let mockEntryPatternValue: any;
   let mockExitPatternValue: any;
-  let mockQueryValue: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -183,7 +184,6 @@ describe('runAnalysis refactored components', () => {
     };
     mockEntryPatternValue = { name: 'test-entry', direction: 'long', apply: vi.fn() };
     mockExitPatternValue = { name: 'test-exit', apply: vi.fn() };
-    mockQueryValue = 'SELECT * FROM DUMMY';
 
     vi.mocked(loadConfig).mockReturnValue(mockRawConfig);
     vi.mocked(mergeConfigWithCliOptions).mockReturnValue(mockMergedConfigValue);
@@ -196,7 +196,7 @@ describe('runAnalysis refactored components', () => {
   describe('initializeAnalysis', () => {
     it('should load config, get patterns, and build query', () => {
       const result = mainModule.initializeAnalysis(mockCliOptions);
-      expect(loadConfig).toHaveBeenCalledWith('path/to/config.yaml');
+      expect(loadConfig).toHaveBeenCalledWith(mockCliOptions.config);
       expect(mergeConfigWithCliOptions).toHaveBeenCalledWith(mockRawConfig, mockCliOptions);
       expect(getEntryPattern).toHaveBeenCalledWith(
         mockMergedConfigValue.entryPattern,
@@ -206,9 +206,16 @@ describe('runAnalysis refactored components', () => {
         mockMergedConfigValue.exitPattern,
         mockMergedConfigValue
       );
-      expect(buildAnalysisQuery).toHaveBeenCalledWith(mockMergedConfigValue);
+      expect(buildAnalysisQuery).toHaveBeenCalledWith(
+        mockMergedConfigValue,
+        mockEntryPatternValue,
+        mockExitPatternValue
+      );
       expect(result.query).toBe(mockQueryValue);
       expect(result.entryPattern.name).toBe('test-entry');
+      expect(result.exitPattern.name).toBe('test-exit');
+      expect(result.rawConfig).toEqual(mockRawConfig);
+      expect(result.mergedConfig).toEqual(mockMergedConfigValue);
     });
 
     it('should enable LLM screen if configured', () => {
@@ -542,7 +549,11 @@ describe('runAnalysis refactored components', () => {
 
       expect(loadConfig).toHaveBeenCalledWith(mockCliOptions.config);
       expect(mergeConfigWithCliOptions).toHaveBeenCalledWith(mockRawConfig, mockCliOptions);
-      expect(buildAnalysisQuery).toHaveBeenCalledWith(mockMergedConfigValue);
+      expect(buildAnalysisQuery).toHaveBeenCalledWith(
+        mockMergedConfigValue,
+        mockEntryPatternValue,
+        mockExitPatternValue
+      );
       expect(fetchTradesFromQuery).toHaveBeenCalledWith(mockQueryValue);
       expect(printHeader).toHaveBeenCalledWith(
         mockMergedConfigValue.ticker,
