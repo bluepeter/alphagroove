@@ -193,6 +193,12 @@ CLI options override values from the configuration file.
 | --------------------------- | ---------------------------------------------- | ------------------- |
 | `--fixed-time.hold-minutes` | Number of minutes to hold position before exit | 10                  |
 
+#### Fixed Time Entry Pattern Options
+
+| Option                          | Description                                | Default from Config |
+| ------------------------------- | ------------------------------------------ | ------------------- |
+| `--fixed-time-entry.entry-time` | Entry time in HH:MM format (e.g., "13:00") | "12:00"             |
+
 ### Available Timeframes
 
 The system supports any timeframe granularity using the format `<number><unit>`, where:
@@ -215,16 +221,9 @@ Common timeframes include:
 
 - `quick-rise`: Detects a percentage rise in the first 5 minutes of trading (configurable)
 
-  - Can be combined with the `--direction` parameter to interpret the pattern for long or short
-    positions
-  - For `--direction long`: Takes a long position at the peak of the rise (default)
-  - For `--direction short`: Takes a short position at the peak of the rise
-
 - `quick-fall`: Detects a percentage fall in the first 5 minutes of trading (configurable)
-  - Can be combined with the `--direction` parameter to interpret the pattern for long or short
-    positions
-  - For `--direction short`: Takes a short position at the bottom of the fall (default)
-  - For `--direction long`: Takes a long position at the bottom of the fall (buying the dip)
+
+- `fixed-time-entry`: Triggers an entry at a specific configured time of day (e.g., "13:00").
 
 #### Exit Patterns
 
@@ -257,6 +256,18 @@ AlphaGroove can generate high-quality chart images for each entry signal it dete
 - Organize charts by pattern name for easy reference
 - Save as both SVG (vector) and high-quality PNG (300 DPI, white background) image files for easy
   sharing and inclusion in reports
+
+When chart generation is enabled (`--generate-charts` or via config), two PNG images are produced
+for each signal:
+
+1.  **Standard Chart (e.g., `TICKER_PATTERN_DATE.png`):** This chart displays data up to the entry
+    signal's timestamp on the signal day, plus the full prior trading day. This version is typically
+    used for LLM analysis.
+2.  **Complete Two-Day Chart (e.g., `TICKER_PATTERN_DATE_complete.png`):** This chart displays the
+    _entirety_ of the signal day and the _entirety_ of the prior trading day. This version is
+    intended for more comprehensive manual review and analysis.
+
+Both charts share the same visual style and are saved in the pattern-specific output directory.
 
 To generate charts:
 
