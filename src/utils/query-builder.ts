@@ -22,7 +22,7 @@ export const buildAnalysisQuery = (
 ): string => {
   const { ticker, timeframe, from, to } = options;
 
-  const direction = entryPatternDefinition.direction || options.direction;
+  const direction = options.direction as 'long' | 'short';
   const entryPatternName = entryPatternDefinition.name;
 
   // Determine hold minutes for exit (assuming fixed-time exit for now)
@@ -37,7 +37,7 @@ export const buildAnalysisQuery = (
     .replace(/{timeframe}/g, timeframe)
     .replace(/{from}/g, from)
     .replace(/{to}/g, to)
-    .replace(/{direction}/g, direction); // Ensure direction is part of the SQL if needed
+    .replace(/{direction}/g, direction); // This will now use the global direction
 
   if (entryPatternName === 'Fixed Time Entry') {
     // Logic for Fixed Time Entry
@@ -61,8 +61,8 @@ export const buildAnalysisQuery = (
           strftime(column0, '%Y-%m-%d') as trade_date,
           strftime(column0, '%Y') as year
         FROM read_csv_auto('tickers/${ticker}/${timeframe}.csv', header=false)
-        WHERE column0 >= '${from} 00:00:00' -- Broad range for exit lookup
-          AND column0 <= '${to} 23:59:59' -- Ensure exit is within the overall to_date
+        WHERE column0 >= '${from} 00:00:00'
+          AND column0 <= '${to} 23:59:59'
       ),
       entry_signals AS (
         ${entrySql} -- This is the SQL from FixedTimeEntryPattern
@@ -96,9 +96,9 @@ export const buildAnalysisQuery = (
           ep.exit_price,
           ep.entry_time,
           ep.exit_time,
-          0.0 as rise_pct,
+          NULL as rise_pct,
           ${returnPctCalc},
-          ep.direction
+          ep.direction as direction
         FROM exit_prices ep
       ),
       trading_days AS (
@@ -271,7 +271,8 @@ export const buildAnalysisQuery = (
         entry_time,
         exit_time,
         ${patternPctCalc},
-        ${returnPctCalc}
+        ${returnPctCalc},
+        direction as direction
       FROM exit_prices
       WHERE ${patternCondition}
     ),

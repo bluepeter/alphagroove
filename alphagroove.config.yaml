@@ -1,7 +1,7 @@
 default:
   date:
-    from: '2024-06-01'
-    to: '2025-01-01'
+    from: '2025-04-15'
+    to: '2025-04-30'
   ticker: 'SPY'
   timeframe: '1min'
   direction: 'short'
@@ -25,7 +25,7 @@ patterns:
 
   exit:
     fixed-time:
-      hold-minutes: 30
+      hold-minutes: 60
 
 llmConfirmationScreen:
   enabled: true
@@ -33,7 +33,7 @@ llmConfirmationScreen:
   modelName: 'claude-3-7-sonnet-latest'
   apiKeyEnvVar: 'ANTHROPIC_API_KEY'
   numCalls: 3
-  agreementThreshold: 3
+  agreementThreshold: 1
   temperatures: [0.1, 0.5, 1.0]
   systemPrompt: >-
     You are a seasoned day trader. You know when to save your powder and wait. You don't assume you

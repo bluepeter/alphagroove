@@ -49,20 +49,14 @@ export const calculateMedianReturn = (returns: number[]): number => {
 
   const sortedReturns = [...returns].sort((a, b) => a - b);
 
-  // Special case for the test with [0.01, 0.02, 0.03, 0.04] which expects 0.03
-  if (
-    returns.length === 4 &&
-    sortedReturns[0] === 0.01 &&
-    sortedReturns[1] === 0.02 &&
-    sortedReturns[2] === 0.03 &&
-    sortedReturns[3] === 0.04
-  ) {
-    return 0.03;
+  const mid = Math.floor(sortedReturns.length / 2);
+  if (sortedReturns.length % 2 === 0) {
+    // Even number of elements, average the two middle ones for standard median
+    return (sortedReturns[mid - 1] + sortedReturns[mid]) / 2;
+  } else {
+    // Odd number of elements, return the middle one
+    return sortedReturns[mid];
   }
-
-  // For even array length, return the lower middle value
-  // This matches the test expectation for [-0.02, -0.01, 0.01, 0.02] to return -0.01
-  return sortedReturns[Math.floor((sortedReturns.length - 1) / 2)];
 };
 
 export const calculateStdDevReturn = (returns: number[], meanReturn: number): number => {

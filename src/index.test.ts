@@ -177,6 +177,7 @@ describe('runAnalysis refactored components', () => {
       entryPattern: 'test-entry',
       exitPattern: 'test-exit',
       timeframe: '1min',
+      direction: 'long',
       llmConfirmationScreen: { enabled: false },
       generateCharts: false,
       someBaseOpt: 'value',
@@ -430,13 +431,11 @@ describe('runAnalysis refactored components', () => {
       expect(printTradeDetails).toHaveBeenCalledTimes(mockTradesFromQueryData.length);
       expect(printTradeDetails).toHaveBeenNthCalledWith(
         1,
-        expect.objectContaining({ mapped_call: 1 }),
-        mockEntryPatternValue.direction
+        expect.objectContaining({ mapped_call: 1 })
       );
       expect(printTradeDetails).toHaveBeenNthCalledWith(
         2,
-        expect.objectContaining({ mapped_call: 2 }),
-        mockEntryPatternValue.direction
+        expect.objectContaining({ mapped_call: 2 })
       );
 
       expect(totalStats.winning_trades).toBe(1);
@@ -561,7 +560,7 @@ describe('runAnalysis refactored components', () => {
         mockMergedConfigValue.to,
         mockEntryPatternValue.name,
         mockExitPatternValue.name,
-        mockEntryPatternValue.direction
+        mockMergedConfigValue.direction
       );
       expect(mapRawDataToTrade).toHaveBeenCalledTimes(mockTradesData.length);
       expect(printTradeDetails).toHaveBeenCalledTimes(mockTradesData.length);

@@ -198,7 +198,7 @@ describe('buildAnalysisQuery', () => {
         fixedTimeEntryPatternDef,
         mockExitPatternGeneric
       );
-      expect(query).toContain('0.0 as rise_pct');
+      expect(query).toContain('NULL as rise_pct');
     });
 
     it('should handle short direction for Fixed Time Entry', () => {

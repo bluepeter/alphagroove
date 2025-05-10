@@ -151,8 +151,8 @@ describe('calculation functions', () => {
   describe('calculateMedianReturn', () => {
     it('should calculate median return correctly', () => {
       expect(calculateMedianReturn([0.01, 0.02, 0.03])).toBe(0.02);
-      expect(calculateMedianReturn([0.01, 0.02, 0.03, 0.04])).toBe(0.03);
-      expect(calculateMedianReturn([-0.02, -0.01, 0.01, 0.02])).toBe(-0.01);
+      expect(calculateMedianReturn([0.01, 0.02, 0.03, 0.04])).toBe(0.025);
+      expect(calculateMedianReturn([-0.02, -0.01, 0.01, 0.02])).toBe(0);
       expect(calculateMedianReturn([])).toBe(0);
     });
   });

@@ -12,7 +12,12 @@ export const mapRawDataToTrade = (
     market_open: rawTradeData.market_open as number,
     entry_price: rawTradeData.entry_price as number,
     exit_price: rawTradeData.exit_price as number,
-    rise_pct: rawTradeData.rise_pct as number,
+    rise_pct:
+      rawTradeData.rise_pct === undefined ||
+      rawTradeData.rise_pct === null ||
+      Number.isNaN(Number(rawTradeData.rise_pct))
+        ? null
+        : Number(rawTradeData.rise_pct),
     return_pct: rawTradeData.return_pct as number,
     year: parseInt(rawTradeData.year as string, 10),
     total_trading_days: rawTradeData.total_trading_days as number,
@@ -25,5 +30,6 @@ export const mapRawDataToTrade = (
     all_trading_days: rawTradeData.all_trading_days as number,
     direction: entryPatternDirection,
     chartPath,
+    avg_return: rawTradeData.avg_return as number | undefined,
   };
 };

@@ -57,7 +57,10 @@ export function detectFixedTimeEntry(
 /**
  * Creates the SQL query for the fixed time entry pattern based on the given configuration
  */
-export function createSqlQuery(config: FixedTimeEntryConfig, direction: 'long' | 'short'): string {
+export function createSqlQuery(
+  config: FixedTimeEntryConfig,
+  _patternSpecificDirection: 'long' | 'short'
+): string {
   const entryTime = config.time;
 
   return `
@@ -82,7 +85,7 @@ export function createSqlQuery(config: FixedTimeEntryConfig, direction: 'long' |
       year,
       open as open_price_at_entry,
       close as entry_price,
-      '${direction}' as direction
+      '{direction}' as direction
     FROM raw_data
     WHERE bar_time = '${entryTime}'
   `;
@@ -117,11 +120,10 @@ export const fixedTimeEntryPattern: PatternDefinition & {
     const updatedConfig = { ...this.config, ...newConfig };
     // Ensure a defined direction for SQL query generation during config update.
     // The actual strategy execution might use a different direction passed at runtime.
-    const sqlDirection = this.direction ?? 'long';
     return {
       ...this,
       config: updatedConfig,
-      sql: createSqlQuery(updatedConfig, sqlDirection), // Use defined direction
+      sql: createSqlQuery(updatedConfig, this.direction ?? 'long'), // Pass a direction, though it will be ignored if placeholder used and replaced
     };
   },
 };

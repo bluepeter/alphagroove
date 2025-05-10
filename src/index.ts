@@ -35,6 +35,7 @@ import {
   printOverallSummary,
   printFooter,
   type Trade,
+  printYearHeader,
 } from './utils/output.js';
 import { buildAnalysisQuery } from './utils/query-builder.js';
 
@@ -191,6 +192,8 @@ export const processTradesLoop = async (
   const seenYears = new Set<string>();
   const confirmedTrades: Trade[] = [];
   let currentYearLlmCost = 0;
+  let currentYearTradesCount = 0;
+
   if (totalStats.grandTotalLlmCost === undefined) {
     totalStats.grandTotalLlmCost = 0;
   }
@@ -204,6 +207,7 @@ export const processTradesLoop = async (
       }
       yearTrades.length = 0;
       currentYearLlmCost = 0;
+      currentYearTradesCount = 0;
     }
     currentYear = tradeYear;
 
@@ -221,7 +225,7 @@ export const processTradesLoop = async (
       price: rawTradeData.entry_price as number,
       timestamp: entryTimestamp,
       type: 'entry',
-      direction: entryPattern.direction as 'long' | 'short',
+      direction: mergedConfig.direction as 'long' | 'short',
     };
 
     const {
@@ -254,16 +258,20 @@ export const processTradesLoop = async (
     }
     allReturns.push(rawTradeData.return_pct as number);
 
-    const tradeObj = mapRawDataToTrade(
+    const trade = mapRawDataToTrade(
       rawTradeData,
-      entryPattern.direction!,
-      currentSignal.chartPath
+      rawTradeData.direction as 'long' | 'short',
+      llmChartPath
     );
+    yearTrades.push(trade);
+    confirmedTrades.push(trade);
 
-    yearTrades.push(tradeObj);
-    confirmedTrades.push(tradeObj);
+    if (currentYearTradesCount === 0) {
+      printYearHeader(currentYear);
+    }
+    currentYearTradesCount++;
 
-    printTradeDetails(tradeObj, entryPattern.direction!);
+    printTradeDetails(trade);
   }
 
   if (yearTrades.length > 0 && currentYear !== '') {
@@ -289,8 +297,7 @@ export const finalizeAnalysis = async (
   printOverallSummary({
     ...totalStats,
     total_matches: confirmedTrades.length,
-    total_return_sum: meanReturn,
-    direction: entryPattern.direction!,
+    direction: mergedConfig.direction as 'long' | 'short',
     llmCost: totalStats.grandTotalLlmCost,
   });
 
@@ -366,7 +373,7 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
       mergedConfig.to,
       entryPattern.name,
       exitPattern.name,
-      entryPattern.direction!
+      mergedConfig.direction as 'long' | 'short'
     );
 
     const totalStats: TotalStats & { grandTotalLlmCost?: number } = {

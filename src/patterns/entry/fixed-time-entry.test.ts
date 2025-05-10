@@ -48,35 +48,41 @@ describe('Fixed Time Entry Pattern', () => {
     });
 
     it('should update SQL query when configuration is changed', () => {
-      const pattern1200 = fixedTimeEntryPattern.updateConfig({
-        time: '12:00',
-      }) as FixedTimeEntryPatternType;
-      const pattern1430 = fixedTimeEntryPattern.updateConfig({
-        time: '14:30',
-      }) as FixedTimeEntryPatternType;
+      const patternOriginal = fixedTimeEntryPattern;
+      const pattern1200 = patternOriginal.updateConfig({ time: '12:00' });
+      const pattern1430 = patternOriginal.updateConfig({ time: '14:30' });
 
       expect(pattern1200.sql).toContain("WHERE bar_time = '12:00'");
-      expect(pattern1200.sql).toContain("'long' as direction");
+      expect(pattern1200.sql).toContain("'{direction}' as direction");
       expect(pattern1430.sql).toContain("WHERE bar_time = '14:30'");
-      expect(pattern1430.sql).toContain("'long' as direction");
+      expect(pattern1430.sql).toContain("'{direction}' as direction");
     });
 
     it("should use pattern's direction for SQL query in updateConfig", () => {
-      // Create a pattern variant for testing with a different direction
-      const shortPatternInstance: FixedTimeEntryPatternType = {
-        ...fixedTimeEntryPattern, // Spread the original pattern
-        direction: 'short', // Override the direction
-        // updateConfig is inherited and will use `this.direction` which is now 'short'
+      const basePattern = fixedTimeEntryPattern;
+      // Default direction is long
+      const defaultDirPattern = basePattern.updateConfig({ time: '09:30' });
+      expect(defaultDirPattern.sql).toContain("'{direction}' as direction");
+
+      // Create a new pattern instance context for 'short' testing if pattern objects are mutable
+      // or assume updateConfig returns a new object if immutable
+      // const shortPatternConfig = { ...basePattern, direction: 'short' as 'long' | 'short' }; // Unused variable
+      const createShortPattern = (
+        config: Partial<FixedTimeEntryConfig>,
+        initialDirection: 'long' | 'short' = 'short'
+      ) => {
+        // Simulate how getEntryPattern might work: create a base with direction, then update
+        const patternWithDirection = {
+          ...fixedTimeEntryPattern, // from import
+          direction: initialDirection,
+        };
+        return patternWithDirection.updateConfig(config);
       };
 
-      const updatedShortPattern = shortPatternInstance.updateConfig({
-        time: '10:00',
-      }) as FixedTimeEntryPatternType;
-
-      expect(updatedShortPattern.config.time).toBe('10:00'); // Config time is updated
-      expect(updatedShortPattern.direction).toBe('short'); // Direction remains short
+      const updatedShortPattern = createShortPattern({ time: '10:00' }, 'short');
+      expect(updatedShortPattern.direction).toBe('short'); // Direction on pattern object
       expect(updatedShortPattern.sql).toContain("WHERE bar_time = '10:00'");
-      expect(updatedShortPattern.sql).toContain("'short' as direction");
+      expect(updatedShortPattern.sql).toContain("'{direction}' as direction");
     });
   });
 
@@ -155,7 +161,7 @@ describe('Fixed Time Entry Pattern', () => {
       const sql = createSqlQuery(config, 'long');
       expect(sql).toContain("strftime(column0, '%H:%M') as bar_time");
       expect(sql).toContain("WHERE bar_time = '12:30'");
-      expect(sql).toContain("'long' as direction");
+      expect(sql).toContain("'{direction}' as direction");
       expect(sql).toContain('close as entry_price');
     });
 
@@ -163,7 +169,7 @@ describe('Fixed Time Entry Pattern', () => {
       const config: FixedTimeEntryConfig = { time: '09:45' };
       const sql = createSqlQuery(config, 'short');
       expect(sql).toContain("WHERE bar_time = '09:45'");
-      expect(sql).toContain("'short' as direction");
+      expect(sql).toContain("'{direction}' as direction");
     });
   });
 });

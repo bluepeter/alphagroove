@@ -65,6 +65,7 @@ describe('output utilities', () => {
         exit_price: 567.19,
         rise_pct: 0.0036,
         return_pct: 0.0064,
+        direction: 'long',
       };
 
       printTradeDetails(trade);
@@ -96,6 +97,7 @@ describe('output utilities', () => {
         exit_price: 566.94,
         rise_pct: 0.0031,
         return_pct: -0.0032,
+        direction: 'long',
       };
 
       printTradeDetails(trade);
@@ -135,6 +137,7 @@ describe('output utilities', () => {
           median_return: 0.12,
           std_dev_return: 0.25,
           win_rate: 0.75,
+          avg_return: 0.12,
         },
       ];
 
@@ -169,6 +172,7 @@ describe('output utilities', () => {
         median_return: 0.04,
         std_dev_return: 0.34,
         win_rate: 0.6,
+        avg_return: 0.04,
       }));
 
       printYearSummary(2025, trades);
@@ -202,6 +206,7 @@ describe('output utilities', () => {
           median_return: 0.05,
           std_dev_return: 0.0,
           win_rate: 1.0,
+          avg_return: 0.05,
         },
       ];
 
@@ -240,14 +245,13 @@ describe('output utilities', () => {
     it('should print overall summary with correct statistics using real data', () => {
       const consoleLogSpy = vi.spyOn(console, 'log');
 
-      // Using real data summary example
       const stats = {
         total_trading_days: 252,
         total_matches: 1,
-        total_return_sum: 0.0064, // 0.64% avg
-        median_return: 0.12, // 0.12%
-        std_dev_return: 0.25, // 0.25%
-        win_rate: 0.75, // 75%
+        total_return_sum: 0.0064, // Stays as is, produces 0.6400%
+        median_return: 0.0012, // Changed from 0.12 to produce 0.1200%
+        std_dev_return: 0.0025, // Changed from 0.25 to produce 0.2500%
+        win_rate: 0.75,
         direction: 'long' as const,
       };
 
@@ -267,25 +271,24 @@ describe('output utilities', () => {
     it('should handle zero trades correctly', () => {
       const consoleLogSpy = vi.spyOn(console, 'log');
 
-      // Using real data summary example
       const stats = {
         total_trading_days: 252,
-        total_matches: 1,
-        total_return_sum: 0.0064, // 0.64% avg
-        median_return: 0.12, // 0.12%
-        std_dev_return: 0.25, // 0.25%
-        win_rate: 0.75, // 75%
+        total_matches: 0,
+        total_return_sum: 0,
+        median_return: 0,
+        std_dev_return: 0,
+        win_rate: 0,
         direction: 'long' as const,
       };
 
       printOverallSummary(stats);
 
       const logs = consoleLogSpy.mock.calls.map(call => call[0]);
-      expect(logs[1]).toContain('📈 Overall: 1 trades (0.4% of days)');
-      expect(logs[1]).toContain('Avg Return: 0.6400%');
-      expect(logs[1]).toContain('Median: 0.1200%');
-      expect(logs[1]).toContain('StdDev: 0.2500%');
-      expect(logs[1]).toContain('Win Rate: 75.0%');
+      expect(logs[1]).toContain('📈 Overall: 0 trades (0.0% of days)');
+      expect(logs[1]).toContain('Avg Return: 0.0000%');
+      expect(logs[1]).toContain('Median: 0.0000%');
+      expect(logs[1]).toContain('StdDev: 0.0000%');
+      expect(logs[1]).toContain('Win Rate: 0.0%');
       expect(logs[1]).toContain('Direction: Long ↗️');
 
       consoleLogSpy.mockRestore();
