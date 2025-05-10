@@ -1,10 +1,10 @@
 default:
   date:
-    from: '2025-04-01'
-    to: '2025-06-02'
+    from: '2024-06-01'
+    to: '2025-01-01'
   ticker: 'SPY'
   timeframe: '1min'
-  direction: 'long'
+  direction: 'short'
   patterns:
     entry: 'fixed-time-entry'
     exit: 'fixed-time'
