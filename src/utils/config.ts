@@ -21,10 +21,19 @@ const FixedTimeConfigSchema = z.object({
   'hold-minutes': z.number().default(10),
 });
 
+// Define schema for the Fixed Time Entry pattern configuration
+const FixedTimeEntryConfigSchema = z.object({
+  'entry-time': z
+    .string()
+    .regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Time must be in HH:MM format')
+    .default('12:00'),
+});
+
 // Define schema for entry pattern configurations
 const EntryPatternsConfigSchema = z.object({
   'quick-rise': QuickRiseConfigSchema.optional(),
   'quick-fall': QuickFallConfigSchema.optional(),
+  'fixed-time-entry': FixedTimeEntryConfigSchema.optional(),
 });
 
 // Define schema for exit pattern configurations
@@ -133,6 +142,9 @@ const DEFAULT_CONFIG: Config = {
         'fall-pct': 0.3,
         'within-minutes': 5,
       },
+      'fixed-time-entry': {
+        'entry-time': '12:00',
+      },
     },
     exit: {
       'fixed-time': {
@@ -215,6 +227,9 @@ export const createDefaultConfigFile = (): void => {
             'fall-pct': 0.3,
             'within-minutes': 5,
           },
+          'fixed-time-entry': {
+            'entry-time': '12:00',
+          },
         },
         exit: {
           'fixed-time': {
@@ -223,9 +238,9 @@ export const createDefaultConfigFile = (): void => {
         },
       },
       llmConfirmationScreen: {
-        ...LLMScreenConfigSchema.parse({}), // Get all other defaults from Zod
+        ...LLMScreenConfigSchema.parse({}),
         systemPrompt:
-          'You are an AI assistant that strictly follows user instructions for output format. You will be provided with a task and an example of the JSON output required. Respond ONLY with the valid JSON object described.', // Example default system prompt
+          'You are an AI assistant that strictly follows user instructions for output format. You will be provided with a task and an example of the JSON output required. Respond ONLY with the valid JSON object described.',
       },
     };
 
@@ -321,6 +336,9 @@ export const mergeConfigWithCliOptions = (
   }
   if (loadedConfig.patterns.entry['quick-fall']) {
     mergedConfig['quick-fall'] = { ...loadedConfig.patterns.entry['quick-fall'] };
+  }
+  if (loadedConfig.patterns.entry['fixed-time-entry']) {
+    mergedConfig['fixed-time-entry'] = { ...loadedConfig.patterns.entry['fixed-time-entry'] };
   }
   if (loadedConfig.patterns.exit['fixed-time']) {
     mergedConfig['fixed-time'] = { ...loadedConfig.patterns.exit['fixed-time'] };

@@ -4,7 +4,7 @@ default:
     to: '2025-06-02'
   ticker: 'SPY'
   timeframe: '1min'
-  direction: 'short'
+  direction: 'long'
   patterns:
     entry: 'fixed-time-entry'
     exit: 'fixed-time'
@@ -21,11 +21,11 @@ patterns:
       fall-pct: 0.3
       within-minutes: 5
     fixed-time-entry:
-      entry-time: '12:00'
+      entry-time: '13:00'
 
   exit:
     fixed-time:
-      hold-minutes: 10
+      hold-minutes: 30
 
 llmConfirmationScreen:
   enabled: true
