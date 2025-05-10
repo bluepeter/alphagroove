@@ -295,6 +295,73 @@ The image formats make it easy to:
 - Document market behavior around specific entry conditions
 - Compare patterns visually across multiple days
 
+### LLM Chart Confirmation Screen
+
+AlphaGroove includes an optional screening step that utilizes a Large Language Model (LLM) to
+provide an additional layer of confirmation for trading signals. When enabled, this screen sends the
+generated chart (the version truncated up to the entry signal) to a configured LLM provider for
+analysis.
+
+**How it Works:**
+
+- **Chart Analysis:** The LLM analyzes the provided chart image.
+- **Multiple Calls:** The system makes a configurable number of parallel calls to the LLM,
+  potentially with different temperature settings for varied responses.
+- **JSON Response:** The LLM is prompted to return its decision (long, short, or do_nothing) and a
+  rationalization in a structured JSON format.
+- **Consensus Logic:** A trade signal proceeds only if a configurable number of LLM responses agree
+  on the trade direction (matching the application's configured direction). Otherwise, the signal is
+  filtered out.
+- **Cost Tracking:** The cost of LLM calls is tracked and reported.
+
+**Configuration:**
+
+This feature is configured within the `alphagroove.config.yaml` file under the
+`llmConfirmationScreen` key. Key options include:
+
+- `enabled`: (boolean) Set to `true` to enable this screen. Default: `false`.
+- `llmProvider`: (string) The LLM provider to use (e.g., `'anthropic'`, `'openai'`). Default:
+  `'anthropic'`.
+- `modelName`: (string) The specific model to use (e.g., `'claude-3-7-sonnet-latest'`).
+- `apiKeyEnvVar`: (string) The name of the environment variable that holds the API key for the LLM
+  provider (e.g., `'ANTHROPIC_API_KEY'`).
+- `numCalls`: (number) The number of parallel calls to make to the LLM for each signal. Default:
+  `3`.
+- `agreementThreshold`: (number) The minimum number of LLM responses that must agree on an action
+  for the signal to proceed. Default: `2`.
+- `temperatures`: (array of numbers) An array of temperature settings, one for each LLM call. Length
+  should match `numCalls`. Default: `[0.2, 0.5, 0.8]`.
+- `prompts`: (string or array of strings) The prompt(s) to send to the LLM. If an array, its length
+  should match `numCalls`.
+- `commonPromptSuffixForJson`: (string, optional) A suffix appended to each prompt to instruct the
+  LLM on JSON output format.
+- `systemPrompt`: (string, optional) A system-level prompt for the LLM.
+- `maxOutputTokens`: (number) Maximum number of tokens the LLM should generate. Default: `150`.
+- `timeoutMs`: (number, optional) Timeout in milliseconds for LLM API calls.
+
+Example snippet for `alphagroove.config.yaml`:
+
+```yaml
+llmConfirmationScreen:
+  enabled: true
+  llmProvider: 'anthropic'
+  modelName: 'claude-3-haiku-20240307' # Or your preferred model
+  apiKeyEnvVar: 'ANTHROPIC_API_KEY'
+  numCalls: 3
+  agreementThreshold: 2
+  temperatures: [0.3, 0.6, 0.9]
+  prompts:
+    - 'Analyze this chart as a cautious trader. Action: long, short, or do_nothing? Rationale?'
+    - 'Analyze this chart as an aggressive trader. Action: long, short, or do_nothing? Rationale?'
+    - 'Analyze this chart as a neutral analyst. Action: long, short, or do_nothing? Rationale?'
+  commonPromptSuffixForJson:
+    'Respond in JSON: {"action": "<action>", "rationalization": "<one_sentence_rationale>"}'
+  maxOutputTokens: 100
+```
+
+Ensure the environment variable specified in `apiKeyEnvVar` is set in your environment (e.g., in an
+`.env.local` file that is gitignored) for the LLM service to function.
+
 ### Command Examples
 
 ```bash
