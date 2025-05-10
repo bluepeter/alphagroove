@@ -1,6 +1,8 @@
 import { quickFallPattern } from './entry/quick-fall.js';
 import { quickRisePattern } from './entry/quick-rise.js';
+import { fixedTimeEntryPattern } from './entry/fixed-time-entry.js';
 import { fixedTimeExitPattern } from './exit/fixed-time.js';
+import { Bar, Signal } from './types.js';
 
 export interface PatternDefinition {
   name: string;
@@ -8,6 +10,7 @@ export interface PatternDefinition {
   sql: string;
   direction?: 'long' | 'short';
   updateConfig?: (config: any) => PatternDefinition;
+  detect?: (bars: Bar[], config: any, direction: 'long' | 'short') => Signal | null;
 }
 
 // Define pattern options based on merged configuration
@@ -21,6 +24,7 @@ type PatternMap = {
 const entryPatterns: PatternMap = {
   'quick-rise': quickRisePattern,
   'quick-fall': quickFallPattern,
+  'fixed-time-entry': fixedTimeEntryPattern,
 };
 
 const exitPatterns: PatternMap = {
@@ -41,7 +45,6 @@ export const getEntryPattern = (name: string, mergedConfig: PatternOptions): Pat
     const quickRise = pattern as typeof quickRisePattern;
 
     return quickRise.updateConfig({
-      // Use new property names from config but map to internal format
       percentIncrease: quickRiseOptions['rise-pct'] ?? 0.3,
       maxBars: quickRiseOptions['within-minutes'] ?? 5,
       direction: mergedConfig.direction ?? 'long',
@@ -54,10 +57,19 @@ export const getEntryPattern = (name: string, mergedConfig: PatternOptions): Pat
     const quickFall = pattern as typeof quickFallPattern;
 
     return quickFall.updateConfig({
-      // Use new property names from config but map to internal format
       percentDecrease: quickFallOptions['fall-pct'] ?? 0.3,
       maxBars: quickFallOptions['within-minutes'] ?? 5,
       direction: mergedConfig.direction ?? 'short',
+    });
+  }
+
+  // Handle fixed-time-entry pattern configuration
+  if (name === 'fixed-time-entry') {
+    const fixedTimeOptions = mergedConfig['fixed-time-entry'] ?? {};
+    const fixedTime = pattern as typeof fixedTimeEntryPattern;
+
+    return fixedTime.updateConfig({
+      time: fixedTimeOptions['entry-time'] ?? '12:00',
     });
   }
 

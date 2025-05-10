@@ -4,9 +4,9 @@ default:
     to: '2025-06-02'
   ticker: 'SPY'
   timeframe: '1min'
-  direction: 'long'
+  direction: 'short'
   patterns:
-    entry: 'quick-fall'
+    entry: 'fixed-time-entry'
     exit: 'fixed-time'
   charts:
     generate: true
@@ -20,6 +20,8 @@ patterns:
     quick-fall:
       fall-pct: 0.3
       within-minutes: 5
+    fixed-time-entry:
+      entry-time: '12:00'
 
   exit:
     fixed-time:

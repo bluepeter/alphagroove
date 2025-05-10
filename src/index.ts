@@ -157,7 +157,8 @@ export const initializeAnalysis = (cliOptions: Record<string, any>) => {
 
   const entryPattern = getEntryPattern(mergedConfig.entryPattern, mergedConfig);
   const exitPattern = getExitPattern(mergedConfig.exitPattern, mergedConfig);
-  const query = buildAnalysisQuery(mergedConfig);
+
+  const query = buildAnalysisQuery(mergedConfig, entryPattern, exitPattern);
 
   if (cliOptions.debug || cliOptions.dryRun) {
     console.log('\nDEBUG - SQL Query:\n' + query);

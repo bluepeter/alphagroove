@@ -1,3 +1,5 @@
+import { PatternDefinition } from '../patterns/pattern-factory.js';
+
 export interface QueryOptions {
   ticker: string;
   timeframe: string;
@@ -13,81 +15,188 @@ export interface QueryOptions {
 // Config format used by the new configuration system
 export type MergedConfig = Record<string, any>;
 
-export const buildAnalysisQuery = (options: QueryOptions | MergedConfig): string => {
-  const {
-    ticker,
-    timeframe,
-    from,
-    to,
-    direction,
-    entryPattern,
-    exitPattern: _exitPattern,
-  } = options;
-  const isQuickFall = entryPattern === 'quick-fall';
-  const isShort = direction === 'short';
+export const buildAnalysisQuery = (
+  options: MergedConfig,
+  entryPatternDefinition: PatternDefinition,
+  _exitPatternDefinition: PatternDefinition
+): string => {
+  const { ticker, timeframe, from, to } = options;
 
-  // Set threshold based on pattern type (rise or fall)
-  let threshold = 0.3; // default value
+  const direction = entryPatternDefinition.direction || options.direction;
+  const entryPatternName = entryPatternDefinition.name;
 
-  if (isQuickFall) {
-    // Determine fall percentage
-    if ('quick-fall' in options && options['quick-fall'] && 'fall-pct' in options['quick-fall']) {
-      threshold = options['quick-fall']['fall-pct'];
-    } else if ('fallPct' in options && options.fallPct !== undefined) {
-      threshold = parseFloat(options.fallPct as string);
-    }
-  } else {
-    // Determine rise percentage
-    if ('quick-rise' in options && options['quick-rise'] && 'rise-pct' in options['quick-rise']) {
-      threshold = options['quick-rise']['rise-pct'];
-    } else if ('risePct' in options && options.risePct !== undefined) {
-      threshold = parseFloat(options.risePct as string);
-    }
-  }
-
-  // Convert to decimal representation
-  threshold = threshold / 100;
-
-  // Determine hold minutes for exit
+  // Determine hold minutes for exit (assuming fixed-time exit for now)
   let holdMinutes = 10; // default value
-  if ('fixed-time' in options && options['fixed-time'] && 'hold-minutes' in options['fixed-time']) {
+  if (options['fixed-time'] && options['fixed-time']['hold-minutes']) {
     holdMinutes = options['fixed-time']['hold-minutes'];
   }
 
-  // Define pattern condition based on pattern type
-  let patternCondition, patternPctCalc, entryPriceField;
+  // Interpolate common values into the entry pattern's SQL
+  const entrySql = entryPatternDefinition.sql
+    .replace(/{ticker}/g, ticker)
+    .replace(/{timeframe}/g, timeframe)
+    .replace(/{from}/g, from)
+    .replace(/{to}/g, to)
+    .replace(/{direction}/g, direction); // Ensure direction is part of the SQL if needed
 
-  if (isQuickFall) {
-    // For quick-fall, we look for a price decrease
-    patternCondition = `((market_open - five_min_low) / market_open) >= ${threshold}`;
-    patternPctCalc = `((market_open - five_min_low) / market_open) as rise_pct`; // Keep column name as rise_pct for compatibility
-    entryPriceField = 'five_min_low'; // For quick-fall, we enter at the low price
-  } else {
-    // For quick-rise, we look for a price increase
-    patternCondition = `((five_min_high - market_open) / market_open) >= ${threshold}`;
-    patternPctCalc = `((five_min_high - market_open) / market_open) as rise_pct`;
-    entryPriceField = 'five_min_high'; // For quick-rise, we enter at the high price
+  if (entryPatternName === 'Fixed Time Entry') {
+    // Logic for Fixed Time Entry
+    // It already produces entry_time, trade_date, year, entry_price, direction
+    // We need to calculate exit_time and join for exit_price
+
+    const returnPctCalc =
+      direction === 'short'
+        ? `((entry_price - exit_price) / entry_price) as return_pct`
+        : `((exit_price - entry_price) / entry_price) as return_pct`;
+
+    return `
+      WITH raw_data_for_exit AS (
+        SELECT 
+          column0::TIMESTAMP as timestamp,
+          column1::DOUBLE as open,
+          column2::DOUBLE as high,
+          column3::DOUBLE as low,
+          column4::DOUBLE as close,
+          column5::BIGINT as volume,
+          strftime(column0, '%Y-%m-%d') as trade_date,
+          strftime(column0, '%Y') as year
+        FROM read_csv_auto('tickers/${ticker}/${timeframe}.csv', header=false)
+        WHERE column0 >= '${from} 00:00:00' -- Broad range for exit lookup
+          AND column0 <= '${to} 23:59:59' -- Ensure exit is within the overall to_date
+      ),
+      entry_signals AS (
+        ${entrySql} -- This is the SQL from FixedTimeEntryPattern
+      ),
+      exit_times AS (
+        SELECT
+          es.*,
+          es.entry_time + INTERVAL '${holdMinutes} minutes' as calculated_exit_timestamp
+        FROM entry_signals es
+      ),
+      exit_prices AS (
+        SELECT 
+          et.*,
+          rd.close as exit_price,
+          rd.timestamp as exit_time
+        FROM exit_times et
+        JOIN raw_data_for_exit rd ON et.trade_date = rd.trade_date 
+          AND rd.timestamp = (
+            SELECT MIN(rde.timestamp) 
+            FROM raw_data_for_exit rde 
+            WHERE rde.trade_date = et.trade_date AND rde.timestamp >= et.calculated_exit_timestamp
+          ) -- Find first bar at or after calculated_exit_timestamp
+        WHERE rd.timestamp <= (et.entry_time + INTERVAL '1 day') -- Ensure exit is on same or next day if market closes
+      ),
+      individual_trades AS (
+        SELECT 
+          ep.trade_date,
+          ep.year,
+          ep.open_price_at_entry as market_open,
+          ep.entry_price,
+          ep.exit_price,
+          ep.entry_time,
+          ep.exit_time,
+          0.0 as rise_pct,
+          ${returnPctCalc},
+          ep.direction
+        FROM exit_prices ep
+      ),
+      trading_days AS (
+        SELECT 
+          year,
+          COUNT(DISTINCT trade_date) as total_trading_days
+        FROM raw_data_for_exit -- Use the broader raw_data for this count
+        WHERE strftime(timestamp, '%w') NOT IN ('0', '6') AND strftime(timestamp, '%H:%M') = '09:30' -- Count actual trading days
+        GROUP BY year
+      ),
+      total_trading_days AS (
+        SELECT SUM(total_trading_days) as total_trading_days FROM trading_days
+      ),
+      yearly_stats AS (
+        SELECT 
+          t.year,
+          COALESCE(td.total_trading_days, 0) as total_trading_days,
+          COALESCE(ttd.total_trading_days, 0) as all_trading_days,
+          COUNT(*) as match_count,
+          MIN(t.rise_pct * 100) as min_rise_pct, -- Will be 0
+          MAX(t.rise_pct * 100) as max_rise_pct, -- Will be 0
+          AVG(t.rise_pct * 100) as avg_rise_pct, -- Will be 0
+          MIN(t.return_pct * 100) as min_return,
+          MAX(t.return_pct * 100) as max_return,
+          AVG(t.return_pct * 100) as avg_return,
+          MEDIAN(t.return_pct * 100) as median_return,
+          CASE WHEN COUNT(*) > 1 THEN STDDEV(t.return_pct * 100) ELSE 0 END as std_dev_return,
+          SUM(CASE WHEN t.return_pct >= 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT as win_rate
+        FROM individual_trades t
+        LEFT JOIN trading_days td ON t.year = td.year
+        CROSS JOIN total_trading_days ttd -- Might need a fallback if no trading_days
+        GROUP BY t.year, td.total_trading_days, ttd.total_trading_days
+      )
+      SELECT 
+        t.*,
+        COALESCE(y.total_trading_days, (SELECT total_trading_days FROM total_trading_days LIMIT 1), 0) as total_trading_days, -- Fallback for total_trading_days
+        COALESCE(y.all_trading_days, (SELECT total_trading_days FROM total_trading_days LIMIT 1), 0) as all_trading_days,   -- Fallback for all_trading_days
+        y.match_count,
+        y.min_rise_pct,
+        y.max_rise_pct,
+        y.avg_rise_pct,
+        y.min_return,
+        y.max_return,
+        y.avg_return,
+        y.median_return,
+        y.std_dev_return,
+        y.win_rate
+      FROM individual_trades t
+      LEFT JOIN yearly_stats y ON t.year = y.year
+      ORDER BY t.trade_date, t.entry_time;
+    `;
   }
 
-  // Calculate exit time based on entry time (09:35) + hold minutes
+  // --- Existing QuickRise/QuickFall Logic (slightly adapted) ---
+  const isQuickFall = entryPatternName === 'Quick Fall'; // Adjusted to use name
+
+  let threshold = 0.3;
+  if (isQuickFall) {
+    if (options['quick-fall'] && options['quick-fall']['fall-pct']) {
+      threshold = options['quick-fall']['fall-pct'];
+    } else if (options.fallPct !== undefined) {
+      threshold = parseFloat(options.fallPct as string);
+    }
+  } else {
+    // Assuming Quick Rise or other future patterns that might use rise-pct
+    if (options['quick-rise'] && options['quick-rise']['rise-pct']) {
+      threshold = options['quick-rise']['rise-pct'];
+    } else if (options.risePct !== undefined) {
+      threshold = parseFloat(options.risePct as string);
+    }
+  }
+  threshold = threshold / 100;
+
+  let patternCondition, patternPctCalc, entryPriceField;
+  if (isQuickFall) {
+    patternCondition = `((market_open - five_min_low) / market_open) >= ${threshold}`;
+    patternPctCalc = `((market_open - five_min_low) / market_open) as rise_pct`;
+    entryPriceField = 'five_min_low';
+  } else {
+    patternCondition = `((five_min_high - market_open) / market_open) >= ${threshold}`;
+    patternPctCalc = `((five_min_high - market_open) / market_open) as rise_pct`;
+    entryPriceField = 'five_min_high';
+  }
+
   const entryHour = 9;
   const entryMinute = 35;
   let exitHour = entryHour;
   let exitMinute = entryMinute + parseInt(String(holdMinutes), 10);
-
-  // Handle minute overflow
   if (exitMinute >= 60) {
     exitHour += Math.floor(exitMinute / 60);
     exitMinute = exitMinute % 60;
   }
-
-  // Format the time as HH:MM
   const exitTimeString = `${exitHour.toString().padStart(2, '0')}:${exitMinute.toString().padStart(2, '0')}`;
 
-  // Return calculation differs by direction
-  const returnPctCalc = isShort
-    ? `((entry_price - exit_price) / entry_price) as return_pct` // For shorts, price decrease = profit
-    : `((exit_price - entry_price) / entry_price) as return_pct`; // For longs, price increase = profit
+  const returnPctCalc =
+    direction === 'short'
+      ? `((entry_price - exit_price) / entry_price) as return_pct`
+      : `((exit_price - entry_price) / entry_price) as return_pct`;
 
   return `
     WITH raw_data AS (
@@ -109,8 +218,8 @@ export const buildAnalysisQuery = (options: QueryOptions | MergedConfig): string
         year,
         COUNT(DISTINCT trade_date) as total_trading_days
       FROM raw_data
-      WHERE strftime(timestamp, '%H:%M') = '09:30'  -- Only count days with market open
-        AND strftime(timestamp, '%w') NOT IN ('0', '6')  -- Exclude weekends
+      WHERE strftime(timestamp, '%H:%M') = '09:30'
+        AND strftime(timestamp, '%w') NOT IN ('0', '6')
       GROUP BY year
     ),
     total_trading_days AS (
@@ -150,7 +259,7 @@ export const buildAnalysisQuery = (options: QueryOptions | MergedConfig): string
         r.timestamp as exit_time
       FROM five_min_prices f
       JOIN raw_data r ON f.trade_date = r.trade_date
-      WHERE strftime(r.timestamp, '%H:%M') = '${exitTimeString}'  -- Exit based on hold-minutes
+      WHERE strftime(r.timestamp, '%H:%M') = '${exitTimeString}'
     ),
     individual_trades AS (
       SELECT 
@@ -180,11 +289,7 @@ export const buildAnalysisQuery = (options: QueryOptions | MergedConfig): string
         AVG(t.return_pct * 100) as avg_return,
         MEDIAN(t.return_pct * 100) as median_return,
         CASE WHEN COUNT(*) > 1 THEN STDDEV(t.return_pct * 100) ELSE 0 END as std_dev_return,
-        ${
-          isShort
-            ? 'SUM(CASE WHEN t.return_pct > 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT as win_rate'
-            : 'SUM(CASE WHEN t.return_pct >= 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT as win_rate'
-        }
+        SUM(CASE WHEN t.return_pct >= 0 THEN 1 ELSE 0 END)::FLOAT / COUNT(*)::FLOAT as win_rate
       FROM individual_trades t
       JOIN trading_days d ON t.year = d.year
       CROSS JOIN total_trading_days ttd
