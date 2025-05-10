@@ -334,13 +334,9 @@ describe('LlmConfirmationScreen', () => {
     const signalToTest = getBaseSignal();
     await screen.shouldSignalProceed(signalToTest, mockChartPath, screenConfig, appConfig);
 
-    expect(consoleLogSpy).toHaveBeenCalledWith('   LLM 1: long — "Looks good." (Cost: $0.001050)');
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      '   LLM 2: long — "Strong signal." (Cost: $0.001230)'
-    );
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      '   LLM 3: do_nothing — "Not sure." (Cost: $0.000870)'
-    );
+    expect(consoleLogSpy).toHaveBeenCalledWith('   LLM 1: 🔼 — "Looks good." (Cost: $0.001050)');
+    expect(consoleLogSpy).toHaveBeenCalledWith('   LLM 2: 🔼 — "Strong signal." (Cost: $0.001230)');
+    expect(consoleLogSpy).toHaveBeenCalledWith('   LLM 3: ⏸️ — "Not sure." (Cost: $0.000870)');
     expect(consoleLogSpy).toHaveBeenCalledWith(
       `  LLM consensus to GO LONG, matching configured direction. Signal proceeds. (Total Cost: $0.003150)`
     );
@@ -361,11 +357,9 @@ describe('LlmConfirmationScreen', () => {
 
     await screen.shouldSignalProceed(signalToTest, mockChartPath, screenConfig, appConfig);
 
-    expect(consoleLogSpy).toHaveBeenCalledWith('   LLM 1: long — "Looks good." (Cost: $0.001050)');
-    expect(consoleLogSpy).toHaveBeenCalledWith('   LLM 2: long — "Still long." (Cost: $0.001230)');
-    expect(consoleLogSpy).toHaveBeenCalledWith(
-      '   LLM 3: do_nothing — "Not sure." (Cost: $0.000870)'
-    );
+    expect(consoleLogSpy).toHaveBeenCalledWith('   LLM 1: 🔼 — "Looks good." (Cost: $0.001050)');
+    expect(consoleLogSpy).toHaveBeenCalledWith('   LLM 2: 🔼 — "Still long." (Cost: $0.001230)');
+    expect(consoleLogSpy).toHaveBeenCalledWith('   LLM 3: ⏸️ — "Not sure." (Cost: $0.000870)');
     expect(consoleLogSpy).toHaveBeenCalledWith(
       `  LLM consensus (2 long, 0 short) does not meet threshold for configured direction 'short' for ${signalToTest.ticker} on ${signalToTest.trade_date}. Signal is filtered out. (Total Cost: $0.003150)`
     );

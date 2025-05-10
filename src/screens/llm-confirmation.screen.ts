@@ -39,11 +39,30 @@ export class LlmConfirmationScreen implements EntryScreen {
     let shortVotes = 0;
 
     responses.forEach((response, index) => {
-      const rationalizationLog = response.rationalization ? `\"${response.rationalization}\"` : '';
+      const rationalizationText = response.rationalization || '';
+      const truncatedRationalization =
+        rationalizationText.length > 150
+          ? `${rationalizationText.substring(0, 150)}...`
+          : rationalizationText;
+      const rationalizationLog = response.rationalization ? `\"${truncatedRationalization}\"` : '';
       const costString =
         typeof response.cost === 'number' ? ` (Cost: $${response.cost.toFixed(6)})` : '';
+
+      let actionEmoji = '';
+      switch (response.action) {
+        case 'long':
+          actionEmoji = '🔼';
+          break;
+        case 'short':
+          actionEmoji = '🔽';
+          break;
+        case 'do_nothing':
+          actionEmoji = '⏸️';
+          break;
+      }
+
       console.log(
-        `   LLM ${index + 1}: ${response.action} — ${response.error ? 'Error:' + response.error + ' — ' : ''}${rationalizationLog}${costString}`
+        `   LLM ${index + 1}: ${actionEmoji} — ${response.error ? 'Error:' + response.error + ' — ' : ''}${rationalizationLog}${costString}`
       );
       switch (response.action) {
         case 'long':

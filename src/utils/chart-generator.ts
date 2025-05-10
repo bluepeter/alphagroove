@@ -37,8 +37,10 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
   fs.mkdirSync(patternDir, { recursive: true });
 
   const baseFileName = `${ticker}_${entryPatternName}_${tradeDate.replace(/-/g, '')}`;
-  const svgOutputPath = path.join(patternDir, `${baseFileName}.svg`);
+  const svgOutputPathLlm = path.join(patternDir, `${baseFileName}_llm_temp.svg`); // Temp SVG for LLM
+  const svgOutputPathComplete = path.join(patternDir, `${baseFileName}_complete_temp.svg`); // Temp SVG for Complete
   const pngOutputPath = path.join(patternDir, `${baseFileName}.png`);
+  const completePngOutputPath = path.join(patternDir, `${baseFileName}_complete.png`);
 
   // Fetch data for the tradeDate and 1 prior actual trading day
   const data = await fetchMultiDayData(ticker, timeframe, tradeDate, 1);
@@ -47,22 +49,51 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
     console.warn(
       `No data returned by fetchMultiDayData for ${tradeDate} and prior day. Cannot generate chart.`
     );
-    // Potentially create a blank chart with a message or handle error differently
     return ''; // Or throw an error
   }
 
-  const svg = generateSvgChart(ticker, entryPatternName, data, entrySignal);
+  // Generate SVG for the LLM chart (filtered up to entry)
+  const svgLlm = generateSvgChart(ticker, entryPatternName, data, entrySignal, false);
+  // console.log(`[generateEntryChart DEBUG] Length of svgLlm (LLM chart): ${svgLlm.length}`);
+  fs.writeFileSync(svgOutputPathLlm, svgLlm, 'utf-8');
 
-  fs.writeFileSync(svgOutputPath, svg, 'utf-8');
+  // Generate SVG for the "complete" 2-day chart (full days)
+  const svgComplete = generateSvgChart(ticker, entryPatternName, data, entrySignal, true);
+  // console.log(
+  //   `[generateEntryChart DEBUG] Length of svgComplete (Complete chart): ${svgComplete.length}`
+  // );
+  fs.writeFileSync(svgOutputPathComplete, svgComplete, 'utf-8');
 
   try {
-    await sharp(svgOutputPath, { density: 300 })
+    // Generate the original chart for LLM
+    await sharp(svgOutputPathLlm, { density: 300 })
       .flatten({ background: '#FFFFFF' })
       .png()
       .toFile(pngOutputPath);
 
-    fs.unlinkSync(svgOutputPath);
-    return pngOutputPath;
+    // Generate the "complete" 2-day chart for analysis
+    await sharp(svgOutputPathComplete, { density: 300 })
+      .flatten({ background: '#FFFFFF' })
+      .png()
+      .toFile(completePngOutputPath);
+
+    // Log file sizes for definitive comparison -  No longer needed
+    // try {
+    //   const statsLlmPng = fs.statSync(pngOutputPath);
+    //   console.log(
+    //     `[generateEntryChart DEBUG] Size of LLM PNG (${path.basename(pngOutputPath)}): ${statsLlmPng.size} bytes`
+    //   );
+    //   const statsCompletePng = fs.statSync(completePngOutputPath);
+    //   console.log(
+    //     `[generateEntryChart DEBUG] Size of Complete PNG (${path.basename(completePngOutputPath)}): ${statsCompletePng.size} bytes`
+    //   );
+    // } catch (statError) {
+    //   console.error('[generateEntryChart DEBUG] Error stating PNG files:', statError);
+    // }
+
+    fs.unlinkSync(svgOutputPathLlm); // Re-enable deletion of temp SVG
+    fs.unlinkSync(svgOutputPathComplete); // Re-enable deletion of temp SVG
+    return pngOutputPath; // Return path of the original chart
   } catch (err) {
     console.error(`Error generating PNG from SVG for ${baseFileName}:`, err);
     throw err;
@@ -174,8 +205,37 @@ const generateSvgChart = (
   ticker: string,
   patternName: string,
   allDataInput: Bar[],
-  entrySignal: Signal
+  entrySignal: Signal,
+  showFullDayData?: boolean
 ): string => {
+  // Explicit console logs for debugging timestamp matching - REMOVE/COMMENT OUT
+  if (!showFullDayData) {
+    // console.log(
+    //   `[generateSvgChart DEBUG FOR LLM CHART] entrySignal.timestamp: >>>${entrySignal.timestamp}<<<`
+    // );
+    // if (allDataInput.length > 0) {
+    //   // console.log(
+    //   //   `[generateSvgChart DEBUG FOR LLM CHART] Sample allDataInput[0].timestamp: >>>${allDataInput[0].timestamp}<<<`
+    //   // );
+    //   // // Log first 5 timestamps from allDataInput for comparison
+    //   // for (let i = 0; i < Math.min(5, allDataInput.length); i++) {
+    //   //   console.log(
+    //   //     `[generateSvgChart DEBUG FOR LLM CHART] allDataInput[${i}].timestamp: >>>${allDataInput[i].timestamp}<<<`
+    //   //   );
+    //   // }
+    //   const found = allDataInput.find(b => b.timestamp === entrySignal.timestamp); // This find can be removed as findIndex is primary
+    //   if (!found) {
+    //     // console.error( // This can be removed
+    //     //   `[generateSvgChart DEBUG FOR LLM CHART] CRITICAL: entrySignal.timestamp was NOT found in allDataInput. Formats MUST match.`
+    //     // );
+    //   }
+    // } else {
+    //   // console.warn( // This specific warning can be removed if the main one for findIndex covers it
+    //   //   `[generateSvgChart DEBUG FOR LLM CHART] allDataInput is empty, cannot compare timestamps.`
+    //   // );
+    // }
+  }
+
   const width = 1200;
   const height = 800;
   const marginTop = 70;
@@ -205,12 +265,29 @@ const generateSvgChart = (
   const displayDayStrings = allUniqueInputDayStrings.slice(-(numPriorDaysToDisplay + 1));
 
   // 2. Now, filter the data that will actually be plotted:
-  const entryIndexOverall = allDataInput.findIndex(d => d.timestamp === entrySignal.timestamp);
-  const dataUpToEntry = allDataInput.slice(0, entryIndexOverall + 1);
+  let finalDataForChart: Bar[];
 
-  const finalData = dataUpToEntry.filter(d => displayDayStrings.includes(d.trade_date));
+  if (showFullDayData) {
+    finalDataForChart = allDataInput.filter(d => displayDayStrings.includes(d.trade_date));
+    // console.log(`[generateSvgChart DEBUG] COMPLETE CHART: allDataInput.length: ${allDataInput.length}, displayDayStrings: ${displayDayStrings.join(', ')}, finalDataForChart.length: ${finalDataForChart.length}`);
+  } else {
+    const entryIndexInAllData = allDataInput.findIndex(d => d.timestamp === entrySignal.timestamp);
 
-  if (finalData.length === 0) {
+    if (entryIndexInAllData === -1) {
+      console.warn(
+        // KEEP THIS OPERATIONAL WARNING
+        `[generateSvgChart] LLM Chart Warning: Entry signal timestamp '${entrySignal.timestamp}' ` +
+          `not found in fetched 2-day data. LLM chart will show full 2-day data instead of data up to entry.`
+      );
+      finalDataForChart = allDataInput.filter(d => displayDayStrings.includes(d.trade_date));
+    } else {
+      const dataUpToEntrySignal = allDataInput.slice(0, entryIndexInAllData + 1);
+      finalDataForChart = dataUpToEntrySignal.filter(d => displayDayStrings.includes(d.trade_date));
+    }
+    // console.log(`[generateSvgChart DEBUG] LLM CHART: allDataInput.length: ${allDataInput.length}, entryIndexInAllData: ${entryIndexInAllData}, displayDayStrings: ${displayDayStrings.join(', ')}, finalDataForChart.length: ${finalDataForChart.length}`);
+  }
+
+  if (finalDataForChart.length === 0) {
     console.warn('No data to display after filtering for entry signal and selected days.');
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
       <text x="${width / 2}" y="${height / 2}" text-anchor="middle" font-size="18">No data available</text>
@@ -218,7 +295,7 @@ const generateSvgChart = (
   }
 
   // This grouping is for creating day-specific labels/boundaries from the final, filtered data
-  const tradingDaysForLabels = finalData.reduce(
+  const tradingDaysForLabels = finalDataForChart.reduce(
     (days, bar) => {
       const date = bar.trade_date;
       if (!days[date]) {
@@ -230,18 +307,18 @@ const generateSvgChart = (
     {} as Record<string, Bar[]>
   );
 
-  const minPrice = Math.min(...finalData.map(d => d.low)) * 0.995;
-  const maxPrice = Math.max(...finalData.map(d => d.high)) * 1.005;
+  const minPrice = Math.min(...finalDataForChart.map(d => d.low)) * 0.995;
+  const maxPrice = Math.max(...finalDataForChart.map(d => d.high)) * 1.005;
   const priceRange = maxPrice - minPrice;
-  const maxVolume = Math.max(...finalData.map(d => d.volume));
+  const maxVolume = Math.max(...finalDataForChart.map(d => d.volume));
 
   const priceToY = (price: number) =>
     marginTop + chartHeight - ((price - minPrice) / priceRange) * chartHeight;
   const volumeToHeight = (volume: number) => (volume / maxVolume) * volumeHeight;
 
   const getXPosition = (index: number) => {
-    if (finalData.length <= 1) return marginLeft + chartWidth / 2;
-    return marginLeft + (index / (finalData.length - 1)) * chartWidth;
+    if (finalDataForChart.length <= 1) return marginLeft + chartWidth / 2;
+    return marginLeft + (index / (finalDataForChart.length - 1)) * chartWidth;
   };
 
   interface ChartLabel {
@@ -266,7 +343,9 @@ const generateSvgChart = (
       return;
     }
 
-    const firstBarOfDayIndex = finalData.findIndex(b => b.timestamp === dayData[0].timestamp);
+    const firstBarOfDayIndex = finalDataForChart.findIndex(
+      b => b.timestamp === dayData[0].timestamp
+    );
     const xDayStart = getXPosition(firstBarOfDayIndex);
 
     dateLabelsForChartArea.push({
@@ -279,7 +358,7 @@ const generateSvgChart = (
     });
 
     if (dayIdx > 0) {
-      const boundaryX = xDayStart - chartWidth / finalData.length / 20;
+      const boundaryX = xDayStart - chartWidth / finalDataForChart.length / 20;
       dayBoundaryLines.push({ x: Math.max(marginLeft, boundaryX) });
     }
   });
@@ -322,7 +401,7 @@ const generateSvgChart = (
       }
 
       if (closestBar) {
-        const barIndex = finalData.findIndex(b => b.timestamp === closestBar!.timestamp);
+        const barIndex = finalDataForChart.findIndex(b => b.timestamp === closestBar!.timestamp);
         if (barIndex !== -1) {
           const actualTime = new Date(closestBar.timestamp);
           const xPos = getXPosition(barIndex);
@@ -423,10 +502,10 @@ const generateSvgChart = (
   }).join('\n  ')}
   
   {/* Candlestick drawing logic START */}
-  ${finalData
+  ${finalDataForChart
     .map((d, i) => {
       const x = getXPosition(i);
-      const candleWidth = Math.max(2, (chartWidth / finalData.length) * 0.7);
+      const candleWidth = Math.max(2, (chartWidth / finalDataForChart.length) * 0.7);
       const yOpen = priceToY(d.open);
       const yClose = priceToY(d.close);
       const yHigh = priceToY(d.high);
@@ -452,10 +531,10 @@ const generateSvgChart = (
     )
     .join('\n')}
     
-  ${finalData
+  ${finalDataForChart
     .map((bar, i) => {
       const x = getXPosition(i);
-      const barWidth = Math.max(1, Math.min(15, (chartWidth / finalData.length) * 0.6));
+      const barWidth = Math.max(1, Math.min(15, (chartWidth / finalDataForChart.length) * 0.6));
       const h = volumeToHeight(bar.volume);
       const y = volumeTop + volumeHeight - h;
       const color = bar.close >= bar.open ? 'rgba(0, 128, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)';
