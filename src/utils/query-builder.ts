@@ -22,7 +22,11 @@ export const buildAnalysisQuery = (
 ): string => {
   const { ticker, timeframe, from, to } = options;
 
-  const direction = options.direction as 'long' | 'short';
+  // Determine the base direction for SQL query calculations.
+  // If 'llm_decides', SQL will calculate as if for 'long', and JS will adjust if LLM chooses 'short'.
+  const sqlQueryBaseDirection: 'long' | 'short' =
+    options.direction === 'llm_decides' ? 'long' : options.direction;
+
   const entryPatternName = entryPatternDefinition.name;
 
   // Determine hold minutes for exit (assuming fixed-time exit for now)
@@ -37,7 +41,7 @@ export const buildAnalysisQuery = (
     .replace(/{timeframe}/g, timeframe)
     .replace(/{from}/g, from)
     .replace(/{to}/g, to)
-    .replace(/{direction}/g, direction); // This will now use the global direction
+    .replace(/{direction}/g, sqlQueryBaseDirection); // Use sqlQueryBaseDirection
 
   if (entryPatternName === 'Fixed Time Entry') {
     // Logic for Fixed Time Entry
@@ -45,7 +49,7 @@ export const buildAnalysisQuery = (
     // We need to calculate exit_time and join for exit_price
 
     const returnPctCalc =
-      direction === 'short'
+      sqlQueryBaseDirection === 'short'
         ? `((entry_price - exit_price) / entry_price) as return_pct`
         : `((exit_price - entry_price) / entry_price) as return_pct`;
 
@@ -194,7 +198,7 @@ export const buildAnalysisQuery = (
   const exitTimeString = `${exitHour.toString().padStart(2, '0')}:${exitMinute.toString().padStart(2, '0')}`;
 
   const returnPctCalc =
-    direction === 'short'
+    sqlQueryBaseDirection === 'short'
       ? `((entry_price - exit_price) / entry_price) as return_pct`
       : `((exit_price - entry_price) / entry_price) as return_pct`;
 

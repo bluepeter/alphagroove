@@ -6,7 +6,6 @@ import {
   formatDollar,
   formatPercent,
   calculateTradePercentage,
-  calculateAvgRise,
   calculateWinningTrades,
   calculateWinRate,
   isWinningTrade,
@@ -39,15 +38,28 @@ export interface Trade {
   chartPath?: string; // Path to the chart generated for LLM screening
 }
 
-export interface TotalStats {
-  total_trading_days: number;
-  total_matches: number;
-  total_return_sum: number; // This is used for Overall Avg Return calculation (sum of individual trade.return_pct)
-  median_return: number; // This is calculated median of all individual trade.return_pct
-  std_dev_return: number; // This is calculated std_dev of all individual trade.return_pct
-  win_rate: number; // This is calculated win_rate of all individual trades
+// New Statistics Interfaces
+export interface DirectionalTradeStats {
+  trades: Trade[];
   winning_trades: number;
+  total_return_sum: number;
+  all_returns: number[];
+  // Metrics to be calculated from all_returns and counts:
+  // win_rate: number;
+  // mean_return: number;
+  // median_return: number;
+  // std_dev_return: number;
 }
+
+export interface OverallTradeStats {
+  long_stats: DirectionalTradeStats;
+  short_stats: DirectionalTradeStats;
+  total_trading_days: number;
+  total_raw_matches: number; // From initial query, before LLM screening
+  total_llm_confirmed_trades: number; // Trades that passed LLM screen (sum of long and short trades.length)
+  grandTotalLlmCost: number;
+}
+// End New Statistics Interfaces
 
 export const printHeader = (
   ticker: string,
@@ -55,12 +67,16 @@ export const printHeader = (
   toDate: string,
   entryPatternName: string,
   exitPatternName: string,
-  direction: 'long' | 'short' = 'long'
+  direction: 'long' | 'short' | 'llm_decides'
 ) => {
   console.log(chalk.bold(`\n${ticker} Analysis (${fromDate} to ${toDate}):`));
   console.log(chalk.bold(`Entry Pattern: ${entryPatternName}`));
   console.log(chalk.bold(`Exit Pattern: ${exitPatternName}`));
-  console.log(chalk.bold(`Direction: ${direction === 'long' ? 'Long ↗️' : 'Short ↘️'}`));
+  let directionDisplay = 'Unknown';
+  if (direction === 'long') directionDisplay = 'Long ↗️';
+  else if (direction === 'short') directionDisplay = 'Short ↘️';
+  else if (direction === 'llm_decides') directionDisplay = 'LLM Decides 🧠';
+  console.log(chalk.bold(`Direction Strategy: ${directionDisplay}`));
   console.log('');
   console.log(
     chalk.gray('═══════════════════════════════════════════════════════════════════════')
@@ -99,19 +115,27 @@ export const printTradeDetails = (trade: Trade) => {
   );
 };
 
-export const printYearSummary = (year: number, trades: Trade[], llmCost?: number) => {
-  const totalTrades = trades.length;
-  const yearSpecificTradingDays = trades[0]?.total_trading_days || 252;
-  const tradePercentage = calculateTradePercentage(totalTrades, yearSpecificTradingDays);
+// Helper function for printing directional summary (used by year and overall)
+const printDirectionalSummary = (
+  statsTitle: string, // e.g., "Long Trades", "Short Trades", "2023 Long Trades"
+  trades: Trade[],
+  totalTradingDaysInPeriod: number // For calculating trade percentage
+) => {
+  if (trades.length === 0) {
+    // console.log(chalk.gray(`No ${statsTitle.toLowerCase()} to summarize.`));
+    return; // Do not print anything if no trades for this direction
+  }
 
-  const rises = trades.map(t => t.rise_pct).filter(r => r !== null) as number[];
-  const avgRise = calculateAvgRise(rises);
+  const totalTrades = trades.length;
+  // Use totalTradingDaysInPeriod passed to the function for consistency
+  const tradePercentage = calculateTradePercentage(totalTrades, totalTradingDaysInPeriod);
 
   const returns = trades.map(t => t.return_pct);
-  const minReturn = returns.length > 0 ? Math.min(...returns) : 0;
-  const maxReturn = returns.length > 0 ? Math.max(...returns) : 0;
+  const minReturn = Math.min(...returns);
+  const maxReturn = Math.max(...returns);
 
-  const isShort = trades.length > 0 ? trades[0]?.direction === 'short' : false;
+  // All trades in this bucket have the same direction, take from first trade.
+  const isShort = trades[0].direction === 'short';
   const winningTrades = calculateWinningTrades(trades, isShort);
   const winRateValue = calculateWinRate(winningTrades, totalTrades);
 
@@ -124,72 +148,91 @@ export const printYearSummary = (year: number, trades: Trade[], llmCost?: number
   const winRateColor = winRateValue >= 50 ? chalk.green : chalk.red;
   const returnRangeColor = maxReturn >= 0 ? (minReturn >= 0 ? chalk.green : chalk.gray) : chalk.red;
 
-  const llmCostString =
-    typeof llmCost === 'number' && llmCost > 0 ? ` | LLM Cost: $${llmCost.toFixed(4)}` : '';
-
-  let summaryString = `📊 ${year} Summary: ${totalTrades} trades (${tradePercentage}% of days) | `;
-  if (rises.length > 0) {
-    summaryString += `Avg Rise: ${formatPercent(avgRise)} | `;
-  }
+  let summaryString = `📊 ${statsTitle}: ${totalTrades} trades (${tradePercentage}% of days) | `;
   summaryString += `Return Range: ${returnRangeColor(
     `${formatPercent(minReturn)} to ${formatPercent(maxReturn)}`
   )} | `;
   summaryString += `Mean: ${meanColor(formatPercent(meanReturn))} | Median: ${medianColor(formatPercent(medianReturn))} | StdDev: ${chalk.gray(formatPercent(stdDevReturn))} | Win Rate: ${winRateColor(
     `${winRateValue.toFixed(1)}%`
-  )}${llmCostString}`;
+  )}`;
 
-  console.log('');
   console.log(chalk.cyan(summaryString));
-  console.log('');
 };
 
-export const printOverallSummary = (stats: {
-  total_trading_days: number;
-  total_matches: number;
-  total_return_sum: number; // Sum of fractional returns for calculating overall average
-  median_return: number; // Calculated median of fractional returns
-  std_dev_return: number; // Calculated std_dev of fractional returns
-  win_rate: number; // Calculated overall win_rate (fraction)
-  direction?: 'long' | 'short';
-  llmCost?: number;
-}) => {
+export const printYearSummary = (
+  year: number,
+  longTrades: Trade[],
+  shortTrades: Trade[],
+  llmCostForYear?: number
+) => {
+  // Estimate yearSpecificTradingDays. This is an approximation.
+  // A more accurate value would be the distinct trading days within that year from the dataset.
+  // For simplicity, use the total_trading_days from the first trade if available, or default to 252.
+  const yearSpecificTradingDays =
+    longTrades[0]?.total_trading_days || shortTrades[0]?.total_trading_days || 252;
+
+  console.log(''); // Add a space before year summary section
+
+  if (longTrades.length > 0) {
+    printDirectionalSummary(`${year} Long Trades ↗️`, longTrades, yearSpecificTradingDays);
+  }
+  if (shortTrades.length > 0) {
+    printDirectionalSummary(`${year} Short Trades ↘️`, shortTrades, yearSpecificTradingDays);
+  }
+
+  if (longTrades.length === 0 && shortTrades.length === 0) {
+    console.log(chalk.gray(`No trades for ${year} to summarize.`));
+  }
+
+  if (typeof llmCostForYear === 'number' && llmCostForYear > 0) {
+    console.log(chalk.cyan(`  ${year} LLM Cost: $${llmCostForYear.toFixed(4)}`));
+  }
+  console.log(''); // Add a space after year summary section
+};
+
+export const printOverallSummary = (stats: OverallTradeStats) => {
   const {
+    long_stats,
+    short_stats,
     total_trading_days,
-    total_matches,
-    total_return_sum, // This is now the sum of fractional returns
-    median_return, // This is fractional median
-    std_dev_return, // This is fractional std dev
-    win_rate, // This is fractional win rate
-    direction,
-    llmCost,
+    total_raw_matches,
+    total_llm_confirmed_trades,
+    grandTotalLlmCost,
   } = stats;
 
-  const avgMatchesPct = total_trading_days > 0 ? (total_matches / total_trading_days) * 100 : 0;
-  const isShort = direction === 'short';
-
-  // Calculate overall average return from the sum and total matches
-  const overallAvgReturn = total_matches > 0 ? total_return_sum / total_matches : 0;
-
-  const avgReturnColor = overallAvgReturn >= 0 ? chalk.green : chalk.red;
-  const medianReturnColor = median_return >= 0 ? chalk.green : chalk.red;
-  const winRateColor = win_rate * 100 >= 50 ? chalk.green : chalk.red;
-
-  const llmCostString =
-    typeof llmCost === 'number' && llmCost > 0 ? ` | Total LLM Cost: $${llmCost.toFixed(4)}` : '';
-
   console.log('');
+  console.log(chalk.bold('📈 Overall Performance Summary:'));
+
+  const avgRawMatchesPct =
+    total_trading_days > 0 ? (total_raw_matches / total_trading_days) * 100 : 0;
   console.log(
-    chalk.bold(
-      `📈 Overall: ${total_matches} trades (${avgMatchesPct.toFixed(1)}% of days) | ` +
-        `Avg Return: ${avgReturnColor(`${(overallAvgReturn * 100).toFixed(4)}%`)} | Median: ${medianReturnColor(
-          `${(median_return * 100).toFixed(4)}%`
-        )} | ` +
-        `StdDev: ${chalk.gray(`${(std_dev_return * 100).toFixed(4)}%`)} | Win Rate: ${winRateColor(
-          (win_rate * 100).toFixed(1) + '%'
-        )} | ` +
-        `Direction: ${isShort ? 'Short ↘️' : 'Long ↗️'}${llmCostString}`
+    chalk.gray(
+      `  Initial signals (pre-LLM): ${total_raw_matches} (${avgRawMatchesPct.toFixed(1)}% of trading days)`
     )
   );
+
+  const llmConfirmationRate =
+    total_raw_matches > 0 ? (total_llm_confirmed_trades / total_raw_matches) * 100 : 0;
+  console.log(
+    chalk.gray(
+      `  LLM Confirmed Trades: ${total_llm_confirmed_trades} (${llmConfirmationRate.toFixed(1)}% of initial signals)`
+    )
+  );
+
+  if (long_stats.trades.length > 0) {
+    printDirectionalSummary('Overall Long Trades ↗️', long_stats.trades, total_trading_days);
+  }
+  if (short_stats.trades.length > 0) {
+    printDirectionalSummary('Overall Short Trades ↘️', short_stats.trades, total_trading_days);
+  }
+
+  if (total_llm_confirmed_trades === 0) {
+    console.log(chalk.gray('  No LLM-confirmed trades to summarize for overall performance.'));
+  }
+
+  if (typeof grandTotalLlmCost === 'number' && grandTotalLlmCost > 0) {
+    console.log(chalk.bold(`  Total LLM Cost: $${grandTotalLlmCost.toFixed(4)}`));
+  }
   console.log('');
 };
 

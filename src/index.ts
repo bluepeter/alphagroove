@@ -11,11 +11,7 @@ import {
 import { type Signal } from './patterns/types';
 import { LlmConfirmationScreen } from './screens/llm-confirmation.screen';
 import { type EnrichedSignal, type LLMScreenConfig as ScreenLLMConfig } from './screens/types';
-import {
-  calculateMeanReturn,
-  calculateMedianReturn,
-  calculateStdDevReturn,
-} from './utils/calculations.js';
+import { isWinningTrade } from './utils/calculations.js';
 import {
   generateEntryChart,
   generateEntryCharts as generateBulkEntryCharts,
@@ -36,18 +32,10 @@ import {
   printFooter,
   type Trade,
   printYearHeader,
+  type OverallTradeStats,
+  type DirectionalTradeStats,
 } from './utils/output.js';
 import { buildAnalysisQuery } from './utils/query-builder.js';
-
-interface TotalStats {
-  total_trading_days: number;
-  total_matches: number;
-  total_return_sum: number;
-  median_return: number;
-  std_dev_return: number;
-  win_rate: number;
-  winning_trades: number;
-}
 
 const generateChartForLLMDecision = async (
   signalData: EnrichedSignal,
@@ -98,9 +86,14 @@ export const handleLlmTradeScreeningInternal = async (
   screenSpecificLLMConfig: ScreenLLMConfig | undefined,
   mergedConfig: MergedConfig,
   rawConfig: any // Consider typing this better if possible
-): Promise<{ proceed: boolean; chartPath?: string; cost: number }> => {
+): Promise<{
+  proceed: boolean;
+  direction?: 'long' | 'short';
+  chartPath?: string;
+  cost: number;
+}> => {
   if (!llmScreenInstance || !screenSpecificLLMConfig?.enabled) {
-    return { proceed: true, cost: 0 };
+    return { proceed: true, cost: 0 }; // No direction needed if LLM screen not active
   }
   const chartPathForLLM = await generateChartForLLMDecision(
     currentSignal,
@@ -111,35 +104,14 @@ export const handleLlmTradeScreeningInternal = async (
     currentSignal,
     chartPathForLLM,
     screenSpecificLLMConfig,
-    rawConfig
+    rawConfig // Pass the rawConfig which LlmConfirmationScreen expects as AppConfig
   );
-  if (!screenDecision.proceed) {
-    return { proceed: false, cost: screenDecision.cost ?? 0 };
-  } else {
-    return { proceed: true, chartPath: chartPathForLLM, cost: screenDecision.cost ?? 0 };
-  }
-};
 
-// Export for testing
-export const handleYearlyUpdatesInternal = (
-  tradeData: Record<string, any>,
-  statsContext: {
-    currentYear: string;
-    yearTrades: Trade[];
-    seenYears: Set<string>;
-    totalStats: TotalStats;
-  }
-): void => {
-  if (tradeData.year !== statsContext.currentYear) {
-    if (statsContext.yearTrades.length > 0) {
-      printYearSummary(Number(statsContext.currentYear), [...statsContext.yearTrades]);
-    }
-    statsContext.currentYear = tradeData.year as string;
-    statsContext.yearTrades.length = 0;
-    if (!statsContext.seenYears.has(tradeData.year)) {
-      statsContext.seenYears.add(tradeData.year);
-      statsContext.totalStats.total_matches += tradeData.match_count as number;
-    }
+  // screenDecision already includes proceed, cost, and optional direction
+  if (!screenDecision.proceed) {
+    return { ...screenDecision, chartPath: undefined, cost: screenDecision.cost ?? 0 }; // Ensure chartPath is not set and cost is number
+  } else {
+    return { ...screenDecision, chartPath: chartPathForLLM, cost: screenDecision.cost ?? 0 }; // Ensure cost is number
   }
 };
 
@@ -180,58 +152,63 @@ export const initializeAnalysis = (cliOptions: Record<string, any>) => {
 export const processTradesLoop = async (
   tradesFromQuery: any[],
   mergedConfig: MergedConfig,
-  entryPattern: any, // Consider using a more specific type
+  entryPattern: any,
   llmScreenInstance: LlmConfirmationScreen | null,
   screenSpecificLLMConfig: ScreenLLMConfig | undefined,
   rawConfig: any,
-  totalStats: TotalStats & { grandTotalLlmCost?: number },
-  allReturns: number[]
+  totalStats: OverallTradeStats
 ) => {
   let currentYear = '';
-  let yearTrades: Trade[] = [];
+  let yearLongTrades: Trade[] = [];
+  let yearShortTrades: Trade[] = [];
   const seenYears = new Set<string>();
-  const confirmedTrades: Trade[] = [];
   let currentYearLlmCost = 0;
-  let currentYearTradesCount = 0;
 
-  if (totalStats.grandTotalLlmCost === undefined) {
-    totalStats.grandTotalLlmCost = 0;
-  }
+  const initialGlobalDirection = mergedConfig.direction;
 
   for (const rawTradeData of tradesFromQuery) {
     const tradeYear = rawTradeData.year as string;
 
-    if (tradeYear !== currentYear && currentYear !== '') {
-      if (yearTrades.length > 0) {
-        printYearSummary(Number(currentYear), [...yearTrades], currentYearLlmCost);
+    if (tradeYear !== currentYear) {
+      if (currentYear !== '') {
+        if (yearLongTrades.length > 0 || yearShortTrades.length > 0) {
+          printYearSummary(
+            Number(currentYear),
+            yearLongTrades,
+            yearShortTrades,
+            currentYearLlmCost
+          );
+        }
       }
-      yearTrades.length = 0;
+      currentYear = tradeYear;
+      printYearHeader(currentYear);
+      yearLongTrades = [];
+      yearShortTrades = [];
       currentYearLlmCost = 0;
-      currentYearTradesCount = 0;
-    }
-    currentYear = tradeYear;
 
-    if (!seenYears.has(tradeYear)) {
-      seenYears.add(tradeYear);
-      if (rawTradeData.match_count) {
-        totalStats.total_matches += rawTradeData.match_count as number;
+      if (!seenYears.has(tradeYear)) {
+        seenYears.add(tradeYear);
       }
     }
 
     const entryTimestamp = rawTradeData.entry_time as string;
+    const signalDirectionForLlm: 'long' | 'short' =
+      initialGlobalDirection === 'llm_decides' ? 'long' : initialGlobalDirection;
+
     const currentSignal: EnrichedSignal = {
       ticker: mergedConfig.ticker,
       trade_date: rawTradeData.trade_date as string,
       price: rawTradeData.entry_price as number,
       timestamp: entryTimestamp,
       type: 'entry',
-      direction: mergedConfig.direction as 'long' | 'short',
+      direction: signalDirectionForLlm,
     };
 
     const {
       proceed: proceedFromLlm,
       chartPath: llmChartPath,
       cost: screeningCost,
+      direction: llmConfirmationDirection,
     } = await handleLlmTradeScreeningInternal(
       currentSignal,
       entryPattern.name,
@@ -248,60 +225,84 @@ export const processTradesLoop = async (
       continue;
     }
 
-    if (llmChartPath) {
-      currentSignal.chartPath = llmChartPath;
+    let actualTradeDirection: 'long' | 'short';
+
+    if (llmConfirmationDirection) {
+      // LLM screen was active and decided/confirmed a direction
+      actualTradeDirection = llmConfirmationDirection;
+    } else if (!llmScreenInstance || !screenSpecificLLMConfig?.enabled) {
+      // LLM screen not active / specified no direction
+      // This implies LLM screen was bypassed or returned proceed:true without a direction (which it shouldn't for active screens)
+      if (initialGlobalDirection === 'llm_decides') {
+        // This case should ideally be prevented by config validation (llm_decides requires LLM enabled)
+        // or LlmConfirmationScreen should always return a direction if it proceeds and strategy is llm_decides.
+        console.warn(
+          "[processTradesLoop] LLM screen did not provide direction for 'llm_decides' strategy, or was disabled. Defaulting to 'long'. Trade on " +
+            rawTradeData.trade_date
+        );
+        actualTradeDirection = 'long';
+      } else {
+        actualTradeDirection = initialGlobalDirection; // Use the fixed global direction
+      }
+    } else {
+      // LLM screen was active, said proceed, but provided no direction. This is an error state for an active LLM screen.
+      console.warn(
+        `[processTradesLoop] LLM proceeded but no direction confirmed by active LLM screen. Skipping trade for ${rawTradeData.trade_date}.`
+      );
+      continue;
     }
 
-    totalStats.total_return_sum += rawTradeData.return_pct as number;
-    if ((rawTradeData.return_pct as number) >= 0) {
-      totalStats.winning_trades++;
-    }
-    allReturns.push(rawTradeData.return_pct as number);
+    const sqlQueryDirection = rawTradeData.direction as 'long' | 'short';
 
+    let adjustedReturnPct = rawTradeData.return_pct as number;
+    if (sqlQueryDirection && sqlQueryDirection !== actualTradeDirection) {
+      adjustedReturnPct *= -1;
+    }
+
+    // Moved trade object creation earlier
     const trade = mapRawDataToTrade(
-      rawTradeData,
-      rawTradeData.direction as 'long' | 'short',
+      { ...rawTradeData, return_pct: adjustedReturnPct },
+      actualTradeDirection,
       llmChartPath
     );
-    yearTrades.push(trade);
-    confirmedTrades.push(trade);
 
-    if (currentYearTradesCount === 0) {
-      printYearHeader(currentYear);
+    const statsBucket =
+      actualTradeDirection === 'long' ? totalStats.long_stats : totalStats.short_stats;
+    statsBucket.trades.push(trade);
+    statsBucket.all_returns.push(adjustedReturnPct);
+    statsBucket.total_return_sum += adjustedReturnPct;
+    if (isWinningTrade(adjustedReturnPct, actualTradeDirection === 'short')) {
+      statsBucket.winning_trades++;
     }
-    currentYearTradesCount++;
+
+    if (actualTradeDirection === 'long') {
+      yearLongTrades.push(trade);
+    } else {
+      yearShortTrades.push(trade);
+    }
 
     printTradeDetails(trade);
   }
 
-  if (yearTrades.length > 0 && currentYear !== '') {
-    printYearSummary(Number(currentYear), yearTrades, currentYearLlmCost);
+  if (currentYear !== '' && (yearLongTrades.length > 0 || yearShortTrades.length > 0)) {
+    printYearSummary(Number(currentYear), yearLongTrades, yearShortTrades, currentYearLlmCost);
   }
-  return { confirmedTrades, currentYear, yearTrades };
+  const confirmedTrades = [...totalStats.long_stats.trades, ...totalStats.short_stats.trades];
+  return { confirmedTradesCount: confirmedTrades.length };
 };
 
 // Export for testing
 export const finalizeAnalysis = async (
-  totalStats: TotalStats & { grandTotalLlmCost?: number },
-  allReturns: number[],
+  totalStats: OverallTradeStats,
   entryPattern: any,
-  mergedConfig: MergedConfig,
-  confirmedTrades: Trade[]
+  mergedConfig: MergedConfig
 ) => {
-  totalStats.win_rate =
-    confirmedTrades.length > 0 ? totalStats.winning_trades / confirmedTrades.length : 0;
-  const meanReturn = calculateMeanReturn(allReturns);
-  totalStats.median_return = calculateMedianReturn(allReturns);
-  totalStats.std_dev_return = calculateStdDevReturn(allReturns, meanReturn);
+  const confirmedTrades = [...totalStats.long_stats.trades, ...totalStats.short_stats.trades];
+  totalStats.total_llm_confirmed_trades = confirmedTrades.length;
 
-  printOverallSummary({
-    ...totalStats,
-    total_matches: confirmedTrades.length,
-    direction: mergedConfig.direction as 'long' | 'short',
-    llmCost: totalStats.grandTotalLlmCost,
-  });
+  printOverallSummary(totalStats);
 
-  if (mergedConfig.generateCharts && confirmedTrades.length > 0) {
+  if (mergedConfig.generateCharts && totalStats.total_llm_confirmed_trades > 0) {
     const llmScreenEnabled = mergedConfig.llmConfirmationScreen?.enabled;
 
     if (llmScreenEnabled) {
@@ -376,34 +377,37 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
       mergedConfig.direction as 'long' | 'short'
     );
 
-    const totalStats: TotalStats & { grandTotalLlmCost?: number } = {
-      total_trading_days: 0,
-      total_matches: 0,
-      total_return_sum: 0,
-      median_return: 0,
-      std_dev_return: 0,
-      win_rate: 0,
+    // Ensure distinct arrays for long_stats and short_stats
+    const initialDirectionalStatsTemplate: Omit<DirectionalTradeStats, 'trades' | 'all_returns'> = {
       winning_trades: 0,
+      total_return_sum: 0,
+    };
+
+    const totalStats: OverallTradeStats = {
+      long_stats: { ...initialDirectionalStatsTemplate, trades: [], all_returns: [] },
+      short_stats: { ...initialDirectionalStatsTemplate, trades: [], all_returns: [] },
+      total_trading_days: 0,
+      total_raw_matches: 0, // Will be set from tradesFromQuery.length or specific aggregate
+      total_llm_confirmed_trades: 0, // Will be calculated in finalizeAnalysis
       grandTotalLlmCost: 0,
     };
-    const allReturns: number[] = [];
 
     if (tradesFromQuery.length > 0 && tradesFromQuery[0].all_trading_days) {
       totalStats.total_trading_days = tradesFromQuery[0].all_trading_days as number;
     }
+    totalStats.total_raw_matches = tradesFromQuery.length;
 
-    const { confirmedTrades } = await processTradesLoop(
+    await processTradesLoop(
       tradesFromQuery,
       mergedConfig,
       entryPattern,
       llmScreenInstance,
       screenSpecificLLMConfig,
       rawConfig,
-      totalStats,
-      allReturns
+      totalStats
     );
 
-    await finalizeAnalysis(totalStats, allReturns, entryPattern, mergedConfig, confirmedTrades);
+    await finalizeAnalysis(totalStats, entryPattern, mergedConfig);
   } catch (error) {
     console.error('Error running analysis:', error);
     process.exit(1);

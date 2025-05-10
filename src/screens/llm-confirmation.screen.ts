@@ -1,3 +1,4 @@
+import chalk from 'chalk';
 import { LlmApiService, type LLMResponse } from '../services/llm-api.service';
 import { type Config as AppConfig } from '../utils/config';
 
@@ -62,7 +63,9 @@ export class LlmConfirmationScreen implements EntryScreen {
       }
 
       console.log(
-        `   LLM ${index + 1}: ${actionEmoji} — ${response.error ? 'Error:' + response.error + ' — ' : ''}${rationalizationLog}${costString}`
+        chalk.dim(
+          `   LLM ${index + 1}: ${actionEmoji} — ${response.error ? 'Error:' + response.error + ' — ' : ''}${rationalizationLog}${costString}`
+        )
       );
       switch (response.action) {
         case 'long':
@@ -80,23 +83,45 @@ export class LlmConfirmationScreen implements EntryScreen {
     const configuredDirection = appConfig.default.direction;
     const totalCostString = ` (Total Cost: $${totalCost.toFixed(6)})`;
 
-    if (configuredDirection === 'long' && longVotes >= screenConfig.agreementThreshold) {
-      console.log(
-        `  LLM consensus to GO LONG, matching configured direction. Signal proceeds.${totalCostString}`
-      );
-      return { proceed: true, cost: totalCost };
-    }
+    let decision: ScreenDecision = { proceed: false, cost: totalCost };
+    let logMessage = '';
 
-    if (configuredDirection === 'short' && shortVotes >= screenConfig.agreementThreshold) {
-      console.log(
-        `  LLM consensus to GO SHORT, matching configured direction. Signal proceeds.${totalCostString}`
-      );
-      return { proceed: true, cost: totalCost };
-    }
+    if (configuredDirection === 'llm_decides') {
+      const meetsLongThreshold = longVotes >= screenConfig.agreementThreshold;
+      const meetsShortThreshold = shortVotes >= screenConfig.agreementThreshold;
 
-    console.log(
-      `  LLM consensus (${longVotes} long, ${shortVotes} short) does not meet threshold for configured direction '${configuredDirection}' for ${signal.ticker} on ${signal.trade_date}. Signal is filtered out.${totalCostString}`
-    );
-    return { proceed: false, cost: totalCost };
+      if (meetsLongThreshold && longVotes > shortVotes) {
+        decision = { proceed: true, direction: 'long', cost: totalCost };
+        logMessage = `  LLM consensus to GO LONG (${longVotes} long vs ${shortVotes} short). Signal proceeds as LONG.`;
+      } else if (meetsShortThreshold && shortVotes > longVotes) {
+        decision = { proceed: true, direction: 'short', cost: totalCost };
+        logMessage = `  LLM consensus to GO SHORT (${shortVotes} short vs ${longVotes} long). Signal proceeds as SHORT.`;
+      } else {
+        let detailReason = `LLM consensus (${longVotes} long, ${shortVotes} short) not decisive for 'llm_decides' strategy (threshold: ${screenConfig.agreementThreshold}).`;
+        if (meetsLongThreshold && meetsShortThreshold && longVotes === shortVotes) {
+          detailReason = `LLM consensus TIED (${longVotes} long, ${shortVotes} short) with both meeting threshold. No trade under 'llm_decides'.`;
+        } else if (meetsLongThreshold && !(longVotes > shortVotes)) {
+          detailReason = `LLM met LONG threshold but did not decisively win vs SHORT votes (${longVotes} long, ${shortVotes} short). No trade under 'llm_decides'.`;
+        } else if (meetsShortThreshold && !(shortVotes > longVotes)) {
+          detailReason = `LLM met SHORT threshold but did not decisively win vs LONG votes (${longVotes} long, ${shortVotes} short). No trade under 'llm_decides'.`;
+        } else if (!meetsLongThreshold && !meetsShortThreshold) {
+          detailReason = `LLM consensus (${longVotes} long, ${shortVotes} short) does not meet threshold (${screenConfig.agreementThreshold}) for either direction.`;
+        }
+        logMessage = `${detailReason} Signal is filtered out.`;
+        decision = { proceed: false, cost: totalCost };
+      }
+    } else {
+      if (configuredDirection === 'long' && longVotes >= screenConfig.agreementThreshold) {
+        decision = { proceed: true, cost: totalCost, direction: 'long' };
+        logMessage = `  LLM consensus to GO LONG, matching configured direction. Signal proceeds.`;
+      } else if (configuredDirection === 'short' && shortVotes >= screenConfig.agreementThreshold) {
+        decision = { proceed: true, cost: totalCost, direction: 'short' };
+        logMessage = `  LLM consensus to GO SHORT, matching configured direction. Signal proceeds.`;
+      } else {
+        logMessage = `  LLM consensus (${longVotes} long, ${shortVotes} short) does not meet threshold for configured direction '${configuredDirection}' for ${signal.ticker} on ${signal.trade_date}. Signal is filtered out.`;
+      }
+    }
+    console.log(chalk.dim(logMessage + totalCostString));
+    return decision;
   }
 }

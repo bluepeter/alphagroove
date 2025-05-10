@@ -21,6 +21,7 @@ export interface LLMScreenConfig {
 
 export interface ScreenDecision {
   proceed: boolean;
+  direction?: 'long' | 'short'; // Added for LLM to specify trade direction
   rationale?: string; // Added optional rationale field
   cost?: number; // Optional cost, as not all screens will have it
 }

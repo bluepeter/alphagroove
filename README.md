@@ -231,18 +231,42 @@ Common timeframes include:
 
 ### Trading Direction
 
-The `--direction` parameter doesn't change what patterns are detected, but rather how they are
-interpreted:
+The `--direction` parameter (and its corresponding `default.direction` in `alphagroove.config.yaml`)
+can be set to `long`, `short`, or the new `llm_decides` option.
 
-- Both directions identify the same market setups (like a quick rise in price)
-- The difference is how positions are taken:
-  - `--direction long`: Takes buy positions, profiting from price increases
-  - `--direction short`: Takes sell positions, profiting from price decreases
-- Return calculations change based on direction:
-  - For long positions, price increases are profitable
-  - For short positions, price decreases are profitable
+- **`long` or `short`**:
 
-This approach lets you analyze the same market conditions but test both long and short strategies.
+  - The system identifies market setups (like a quick rise in price).
+  - If `direction: long`, it takes buy positions, profiting from price increases.
+  - If `direction: short`, it takes sell positions, profiting from price decreases.
+  - Return calculations are based on this fixed direction.
+  - If the `llmConfirmationScreen` is enabled, it acts as a go/no-go filter for this pre-set
+    direction.
+
+- **`llm_decides`**:
+  - This mode requires `llmConfirmationScreen.enabled` to be `true`.
+  - When an entry pattern triggers, the chart is sent to the LLM.
+  - The LLM's consensus (based on `numCalls` and `agreementThreshold`) determines the actual trade
+    direction (long or short).
+  - If the LLM consensus is to "do_nothing" or doesn't meet the threshold for a directional call, no
+    trade is executed.
+  - This allows the LLM to dynamically decide whether to go long or short on a pattern that might
+    otherwise have a fixed interpretation.
+  - The initial SQL query for fetching trade data will assume a base direction (e.g., 'long') for
+    calculating `return_pct`. If the LLM chooses the opposite direction, this `return_pct` is
+    automatically inverted by the system to reflect the correct profit/loss for the LLM-chosen
+    direction.
+
+**Metrics Reporting with Dynamic Direction:**
+
+When using fixed `long`/`short` directions, or when `llm_decides` results in trades, the output
+summaries (both yearly and overall) will now be split into:
+
+- **Long Trades Summary**: Metrics for all trades executed as long positions.
+- **Short Trades Summary**: Metrics for all trades executed as short positions.
+
+This provides a clear view of performance for each actual executed direction, regardless of the
+initial `direction` setting.
 
 ### Chart Generation
 
@@ -309,9 +333,14 @@ analysis.
   potentially with different temperature settings for varied responses.
 - **JSON Response:** The LLM is prompted to return its decision (long, short, or do_nothing) and a
   rationalization in a structured JSON format.
-- **Consensus Logic:** A trade signal proceeds only if a configurable number of LLM responses agree
-  on the trade direction (matching the application's configured direction). Otherwise, the signal is
-  filtered out.
+- **Consensus Logic:**
+  - If `default.direction` in `alphagroove.config.yaml` is set to `long` or `short`: A trade signal
+    proceeds only if a configurable number of LLM responses agree on that specific pre-configured
+    trade direction. Otherwise, the signal is filtered out.
+  - If `default.direction` is `llm_decides`: The LLM's consensus determines the actual trade
+    direction. If a sufficient number of LLMs (`agreementThreshold`) vote for `long` (and more than
+    `short`), a long trade is initiated. Similarly for `short`. If there's no clear consensus or
+    "do_nothing" is favored, no trade occurs.
 - **Cost Tracking:** The cost of LLM calls is tracked and reported.
 
 **Configuration:**

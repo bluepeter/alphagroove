@@ -99,18 +99,32 @@ const LLMScreenConfigSchema = z
 export type LLMScreenConfig = z.infer<typeof LLMScreenConfigSchema>;
 
 // Define the root config schema
-const ConfigSchema = z.object({
-  default: z.object({
-    date: DateRangeSchema.optional(),
-    ticker: z.string().default('SPY'),
-    timeframe: z.string().default('1min'),
-    direction: z.enum(['long', 'short']).default('long'),
-    patterns: DefaultPatternsSchema.optional(),
-    charts: ChartOptionsSchema.optional(),
-  }),
-  patterns: PatternsConfigSchema,
-  llmConfirmationScreen: LLMScreenConfigSchema.optional(),
-});
+const ConfigSchema = z
+  .object({
+    default: z.object({
+      date: DateRangeSchema.optional(),
+      ticker: z.string().default('SPY'),
+      timeframe: z.string().default('1min'),
+      direction: z.enum(['long', 'short', 'llm_decides']).default('long'),
+      patterns: DefaultPatternsSchema.optional(),
+      charts: ChartOptionsSchema.optional(),
+    }),
+    patterns: PatternsConfigSchema,
+    llmConfirmationScreen: LLMScreenConfigSchema.optional(),
+  })
+  .refine(
+    data => {
+      if (data.default.direction === 'llm_decides') {
+        return data.llmConfirmationScreen?.enabled === true;
+      }
+      return true;
+    },
+    {
+      message:
+        "If default.direction is 'llm_decides', then llmConfirmationScreen.enabled must be true",
+      path: ['default', 'direction'], // Path to report error on
+    }
+  );
 
 // Type for the validated config
 export type Config = z.infer<typeof ConfigSchema>;
@@ -261,7 +275,7 @@ export const createDefaultConfigFile = (): void => {
 export interface MergedConfig {
   ticker: string;
   timeframe: string;
-  direction: string;
+  direction: 'long' | 'short' | 'llm_decides';
   from: string;
   to: string;
   entryPattern: string;
