@@ -306,7 +306,6 @@ export const finalizeAnalysis = async (
     const llmScreenEnabled = mergedConfig.llmConfirmationScreen?.enabled;
 
     if (llmScreenEnabled) {
-      console.log('\nLLM-confirmed charts were generated during screening:');
       const chartPaths: string[] = [];
       confirmedTrades.forEach(trade => {
         if (trade.chartPath) {
@@ -314,9 +313,8 @@ export const finalizeAnalysis = async (
         }
       });
       if (chartPaths.length > 0) {
-        console.log(
-          `\nFound ${chartPaths.length} charts in ${mergedConfig.chartsDir || './charts'}/${entryPattern.name}/ (from LLM screening).`
-        );
+        // Optionally, you might want a more subtle confirmation or no confirmation at all.
+        // For now, removing the specific lines as requested.
       } else {
         console.log(
           '\nLLM screening was enabled, but no chart paths were found for confirmed trades.'
