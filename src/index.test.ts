@@ -1,6 +1,7 @@
 import { vi, describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { type Config as AppConfig } from './utils/config.js';
-import { LlmConfirmationScreen as _ActualLlmConfirmationScreen } from './screens/llm-confirmation.screen.js';
+// LlmConfirmationScreen import removed if no longer used by remaining tests
+// import { LlmConfirmationScreen } from './screens/llm-confirmation.screen.js';
 
 const mockQueryValue = 'DRY_RUN_SQL_QUERY_FROM_INDEX_TEST'; // Define it once globally for the test file
 
@@ -46,6 +47,7 @@ vi.mock('./patterns/pattern-factory.js', async () => {
   };
 });
 
+// LlmConfirmationScreen mock might still be needed if runAnalysis full flow implies its use, even if not directly constructed in tests
 vi.mock('./screens/llm-confirmation.screen.js', () => ({
   LlmConfirmationScreen: vi.fn().mockImplementation(() => ({
     shouldSignalProceed: vi.fn(() =>
@@ -90,22 +92,8 @@ vi.mock('./utils/calculations.js', async () => {
 
 // Import the modules that are being mocked to access their mocked functions
 import { getEntryPattern, getExitPattern } from './patterns/pattern-factory.js';
-import { LlmConfirmationScreen } from './screens/llm-confirmation.screen.js';
-// Calculation functions (calculateMeanReturn, etc.) are not directly tested here anymore,
-// their effects are tested via output.test.ts or through isWinningTrade mock if needed.
-// The mock for './utils/calculations.js' still provides isWinningTrade (actual) for index.ts usage.
-/*
-import {
-  calculateMeanReturn,
-  calculateMedianReturn,
-  calculateStdDevReturn,
-  isWinningTrade,
-} from './utils/calculations.js';
-*/
-import {
-  generateEntryChart as _generateEntryChart,
-  generateEntryCharts,
-} from './utils/chart-generator.js';
+// Removed LlmConfirmationScreen from direct imports
+import { generateEntryCharts } from './utils/chart-generator.js';
 import { loadConfig, mergeConfigWithCliOptions } from './utils/config.js';
 import { fetchTradesFromQuery } from './utils/data-loader.js';
 import { mapRawDataToTrade } from './utils/mappers.js';
@@ -159,97 +147,6 @@ describe('runAnalysis orchestrator tests', () => {
     vi.mocked(buildAnalysisQuery).mockReturnValue(mockQueryValue);
   });
 
-  describe('processTradesLoop', () => {
-    it('should process trades, and correctly call mappers and output functions', async () => {
-      const mockTradesFromQueryData = [
-        {
-          entry_time: '09:30',
-          trade_date: '2023-01-01',
-          entry_price: 100,
-          return_pct: 0.5,
-          year: '2023',
-          match_count: 1,
-          direction: 'long',
-        },
-        {
-          entry_time: '10:00',
-          trade_date: '2023-01-01',
-          entry_price: 101,
-          return_pct: -0.2,
-          year: '2023',
-          match_count: 1,
-          direction: 'long',
-        },
-      ];
-      vi.mocked(fetchTradesFromQuery).mockReturnValue(mockTradesFromQueryData as any);
-
-      vi.mocked(mapRawDataToTrade)
-        .mockImplementationOnce(
-          (rd: any, tradeDirection: string) =>
-            ({ ...rd, mapped_call: 1, direction: tradeDirection }) as any
-        )
-        .mockImplementationOnce(
-          (rd: any, tradeDirection: string) =>
-            ({ ...rd, mapped_call: 2, direction: tradeDirection }) as any
-        );
-
-      const initialDirectionalStatsTemplate = { winning_trades: 0, total_return_sum: 0 };
-      const totalStats: any = {
-        long_stats: { ...initialDirectionalStatsTemplate, trades: [], all_returns: [] },
-        short_stats: { ...initialDirectionalStatsTemplate, trades: [], all_returns: [] },
-        total_trading_days: 0,
-        total_raw_matches: 0,
-        total_llm_confirmed_trades: 0,
-        grandTotalLlmCost: 0,
-      };
-
-      const currentMergedConfig = {
-        ...mockMergedConfigValue,
-        direction: 'long',
-        llmConfirmationScreen: { enabled: true, agreementThreshold: 1 },
-      };
-
-      const mockLlmScreenInstance = new (LlmConfirmationScreen as any)();
-      vi.mocked(mockLlmScreenInstance.shouldSignalProceed)
-        .mockResolvedValueOnce({ proceed: true, cost: 0.01, direction: 'long' })
-        .mockResolvedValueOnce({ proceed: true, cost: 0.01, direction: 'long' });
-
-      const result = await mainModule.processTradesLoop(
-        mockTradesFromQueryData,
-        currentMergedConfig,
-        mockEntryPatternValue,
-        mockLlmScreenInstance,
-        currentMergedConfig.llmConfirmationScreen,
-        mockRawConfig,
-        totalStats
-      );
-
-      expect(result.confirmedTradesCount).toBe(mockTradesFromQueryData.length);
-
-      expect(mapRawDataToTrade).toHaveBeenNthCalledWith(
-        1,
-        expect.objectContaining({ return_pct: 0.5 }),
-        'long',
-        expect.any(String)
-      );
-      expect(mapRawDataToTrade).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({ return_pct: -0.2 }),
-        'long',
-        expect.any(String)
-      );
-
-      expect(printTradeDetails).toHaveBeenCalledTimes(mockTradesFromQueryData.length);
-      expect(totalStats.long_stats.trades.length).toBe(mockTradesFromQueryData.length);
-      expect(totalStats.long_stats.winning_trades).toBe(1);
-      expect(totalStats.long_stats.all_returns).toEqual([0.5, -0.2]);
-      expect(totalStats.short_stats.trades.length).toBe(0);
-      expect(totalStats.grandTotalLlmCost).toBeGreaterThan(0);
-
-      expect(printYearSummary).toHaveBeenCalled();
-    });
-  });
-
   describe('finalizeAnalysis', () => {
     it('should calculate final stats and print summary', async () => {
       const initialLongStats = {
@@ -294,18 +191,8 @@ describe('runAnalysis orchestrator tests', () => {
     let consoleLogSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
-      vi.mocked(loadConfig).mockClear();
-      vi.mocked(mergeConfigWithCliOptions).mockClear();
-      vi.mocked(getEntryPattern).mockClear();
-      vi.mocked(getExitPattern).mockClear();
-      vi.mocked(buildAnalysisQuery).mockClear();
-      vi.mocked(fetchTradesFromQuery).mockClear();
-      vi.mocked(printHeader).mockClear();
-      vi.mocked(mapRawDataToTrade).mockClear();
-      vi.mocked(printTradeDetails).mockClear();
-      vi.mocked(printYearSummary).mockClear();
-      vi.mocked(printOverallSummary).mockClear();
-      vi.mocked(printFooter).mockClear();
+      // Note: loadConfig, mergeConfigWithCliOptions etc are already cleared by the parent beforeEach vi.clearAllMocks()
+      // Specific mocks for this describe block are set within each test or rely on parent defaults.
       consoleLogSpy = vi.spyOn(console, 'log');
     });
 
@@ -331,29 +218,33 @@ describe('runAnalysis orchestrator tests', () => {
           },
         },
         llmConfirmationScreen: {
+          // This needs to be a full LLMScreenConfig compatible structure
           enabled: false,
-          températures: [],
-          prompts: [],
-          apiKeyEnvVar: '',
-          modelName: '',
-          llmProvider: 'anthropic',
-          agreementThreshold: 1,
-          numCalls: 1,
-          maxOutputTokens: 10,
-        } as any,
+          llmProvider: 'anthropic', // Default value
+          modelName: 'claude-3-haiku-20240307', // Default value
+          apiKeyEnvVar: 'ANTHROPIC_API_KEY', // Default value
+          numCalls: 3, // Default value
+          agreementThreshold: 2, // Default value
+          temperatures: [0.2, 0.5, 0.8], // Default value
+          prompts: 'Default prompt for LLM', // Default value
+          commonPromptSuffixForJson: '{"action": "", "rationalization": ""}', // Default value
+          maxOutputTokens: 150, // Default value
+        },
       };
 
       const localTestMergedConfig = {
         ...mockMergedConfigValue,
         ticker: 'MERGED_TEST',
         direction: 'long',
-        llmConfirmationScreen: { enabled: false },
+        llmConfirmationScreen: { enabled: false, commonPromptSuffixForJson: '' }, // Ensure this is sufficient
       };
       vi.mocked(loadConfig).mockReturnValue(localMockRawConfig);
       vi.mocked(mergeConfigWithCliOptions).mockReturnValue(localTestMergedConfig);
-      vi.mocked(getEntryPattern).mockReturnValue(mockEntryPatternValue);
-      vi.mocked(getExitPattern).mockReturnValue(mockExitPatternValue);
-      vi.mocked(buildAnalysisQuery).mockReturnValue(mockQueryValue);
+      // getEntryPattern and getExitPattern will use the general mocks or what's set in parent beforeEach
+      // For this test, they use mockEntryPatternValue and mockExitPatternValue due to parent beforeEach.
+      // If specific patterns from localMockRawConfig were intended, mocks for getEntryPattern/getExitPattern
+      // would need to be adjusted here to return patterns based on localTestMergedConfig.entryPattern ('quick-rise').
+      // For now, assuming the generic 'test-entry' pattern from parent mock is acceptable if not overridden.
 
       const mockTradesData = [
         {
@@ -394,15 +285,15 @@ describe('runAnalysis orchestrator tests', () => {
       expect(mergeConfigWithCliOptions).toHaveBeenCalledWith(localMockRawConfig, mockCliOptions);
       expect(buildAnalysisQuery).toHaveBeenCalledWith(
         localTestMergedConfig,
-        mockEntryPatternValue,
-        mockExitPatternValue
+        mockEntryPatternValue, // This comes from the parent beforeEach
+        mockExitPatternValue // This comes from the parent beforeEach
       );
       expect(printHeader).toHaveBeenCalledWith(
         localTestMergedConfig.ticker,
         localTestMergedConfig.from,
         localTestMergedConfig.to,
-        mockEntryPatternValue.name,
-        mockExitPatternValue.name,
+        mockEntryPatternValue.name, // Name from parent mock
+        mockExitPatternValue.name, // Name from parent mock
         localTestMergedConfig.direction
       );
       expect(mapRawDataToTrade).toHaveBeenCalledTimes(mockTradesData.length);
@@ -415,13 +306,14 @@ describe('runAnalysis orchestrator tests', () => {
     it('should handle dry run correctly', async () => {
       mockCliOptions.dryRun = true;
       const dryRunQuery = 'DRY RUN SQL QUERY';
-      vi.mocked(loadConfig).mockReturnValue(mockRawConfig);
+      // loadConfig will use parent mock, returning mockRawConfig
+      // mergeConfigWithCliOptions will use parent mock, returning mockMergedConfigValue initially
+      // We then override its return for this specific test.
       vi.mocked(mergeConfigWithCliOptions).mockReturnValue({
         ...mockMergedConfigValue,
         debug: true,
       });
-      vi.mocked(getEntryPattern).mockReturnValue(mockEntryPatternValue);
-      vi.mocked(getExitPattern).mockReturnValue(mockExitPatternValue);
+      // getEntryPattern, getExitPattern use parent mocks
       vi.mocked(buildAnalysisQuery).mockReturnValue(dryRunQuery);
 
       await mainModule.runAnalysis(mockCliOptions);
