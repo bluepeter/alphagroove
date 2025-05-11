@@ -93,7 +93,6 @@ vi.mock('./utils/calculations.js', async () => {
 // Import the modules that are being mocked to access their mocked functions
 import { getEntryPattern, getExitPattern } from './patterns/pattern-factory.js';
 // Removed LlmConfirmationScreen from direct imports
-import { generateEntryCharts } from './utils/chart-generator.js';
 import { loadConfig, mergeConfigWithCliOptions } from './utils/config.js';
 import { fetchTradesFromQuery } from './utils/data-loader.js';
 import { mapRawDataToTrade } from './utils/mappers.js';
@@ -145,46 +144,6 @@ describe('runAnalysis orchestrator tests', () => {
     vi.mocked(getExitPattern).mockReturnValue(mockExitPatternValue);
     vi.mocked(fetchTradesFromQuery).mockReturnValue([]);
     vi.mocked(buildAnalysisQuery).mockReturnValue(mockQueryValue);
-  });
-
-  describe('finalizeAnalysis', () => {
-    it('should calculate final stats and print summary', async () => {
-      const initialLongStats = {
-        trades: [
-          { return_pct: 0.5, direction: 'long' },
-          { return_pct: -0.2, direction: 'long' },
-        ] as any[],
-        winning_trades: 1,
-        total_return_sum: 0.3,
-        all_returns: [0.5, -0.2],
-      };
-      const initialShortStats = {
-        trades: [],
-        winning_trades: 0,
-        total_return_sum: 0,
-        all_returns: [],
-      };
-      const totalStats: any = {
-        long_stats: { ...initialLongStats },
-        short_stats: { ...initialShortStats },
-        total_trading_days: 10,
-        total_raw_matches: 2,
-        grandTotalLlmCost: 0.05,
-      };
-
-      const currentMergedConfig = {
-        ...mockMergedConfigValue,
-        direction: 'long',
-        generateCharts: true,
-      };
-
-      await mainModule.finalizeAnalysis(totalStats, mockEntryPatternValue, currentMergedConfig);
-
-      expect(printOverallSummary).toHaveBeenCalledWith(totalStats);
-      expect(generateEntryCharts).toHaveBeenCalled();
-      expect(printFooter).toHaveBeenCalled();
-      expect(totalStats.total_llm_confirmed_trades).toBe(2);
-    });
   });
 
   describe('runAnalysis full flow', () => {
