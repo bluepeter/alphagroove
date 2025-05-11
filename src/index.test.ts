@@ -1,58 +1,8 @@
-import { Command } from 'commander';
 import { vi, describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { type Config as AppConfig } from './utils/config.js';
 import { LlmConfirmationScreen as _ActualLlmConfirmationScreen } from './screens/llm-confirmation.screen.js';
 
 const mockQueryValue = 'DRY_RUN_SQL_QUERY_FROM_INDEX_TEST'; // Define it once globally for the test file
-
-describe('AlphaGroove CLI', () => {
-  it('should have required command line options', () => {
-    const program = new Command();
-
-    // Add the same options as in index.ts
-    program
-      .requiredOption('--from <date>', 'Start date (YYYY-MM-DD)')
-      .requiredOption('--to <date>', 'End date (YYYY-MM-DD)')
-      .option(
-        '--entry-pattern <pattern>',
-        'Entry pattern to use (default: quick-rise)',
-        'quick-rise'
-      )
-      .option('--exit-pattern <pattern>', 'Exit pattern to use (default: fixed-time)', 'fixed-time')
-      .option('--ticker <symbol>', 'Ticker to analyze (default: SPY)', 'SPY')
-      .option('--timeframe <period>', 'Data resolution (default: 1min)', '1min');
-
-    // Test that options are properly configured
-    expect(program.options).toHaveLength(6);
-    expect(program.options[0].required).toBe(true);
-    expect(program.options[1].required).toBe(true);
-  });
-
-  it('should use default values for optional parameters', () => {
-    const program = new Command();
-
-    program
-      .requiredOption('--from <date>', 'Start date (YYYY-MM-DD)')
-      .requiredOption('--to <date>', 'End date (YYYY-MM-DD)')
-      .option(
-        '--entry-pattern <pattern>',
-        'Entry pattern to use (default: quick-rise)',
-        'quick-rise'
-      )
-      .option('--exit-pattern <pattern>', 'Exit pattern to use (default: fixed-time)', 'fixed-time')
-      .option('--ticker <symbol>', 'Ticker to analyze (default: SPY)', 'SPY')
-      .option('--timeframe <period>', 'Data resolution (default: 1min)', '1min');
-
-    // Parse with only required options
-    program.parse(['node', 'index.js', '--from', '2025-05-02', '--to', '2025-05-05']);
-
-    // Check default values
-    expect(program.opts().entryPattern).toBe('quick-rise');
-    expect(program.opts().exitPattern).toBe('fixed-time');
-    expect(program.opts().ticker).toBe('SPY');
-    expect(program.opts().timeframe).toBe('1min');
-  });
-});
 
 // Mock external dependencies
 vi.mock('./utils/config.js', async () => {
@@ -174,7 +124,7 @@ beforeAll(async () => {
   mainModule = await import('./index.js');
 });
 
-describe('runAnalysis refactored components', () => {
+describe('runAnalysis orchestrator tests', () => {
   let mockCliOptions: any;
   let mockRawConfig: any;
   let mockMergedConfigValue: any;
