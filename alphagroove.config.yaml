@@ -1,7 +1,7 @@
 default:
   date:
-    from: '2024-05-01'
-    to: '2024-06-01'
+    from: '2024-01-01'
+    to: '2024-12-31'
   ticker: 'SPY'
   timeframe: '1min'
   # direction can be 'long', 'short', or 'llm_decides'.
@@ -9,7 +9,6 @@ default:
   direction: 'llm_decides'
   patterns:
     entry: 'fixed-time-entry'
-    exit: 'fixed-time'
   charts:
     generate: true
     outputDir: './charts'
@@ -25,18 +24,14 @@ patterns:
     fixed-time-entry:
       entry-time: '13:00'
 
-  exit:
-    fixed-time:
-      hold-minutes: 60
-
 llmConfirmationScreen:
   enabled: true
   llmProvider: 'anthropic'
-  modelName: 'claude-3-7-sonnet-latest'
+  modelName: 'claude-3-haiku-20240307'
   apiKeyEnvVar: 'ANTHROPIC_API_KEY'
-  numCalls: 2
-  agreementThreshold: 2
-  temperatures: [0.1, 1.0]
+  numCalls: 3
+  agreementThreshold: 3
+  temperatures: [0.1, 0.5, 1.0]
   systemPrompt: >-
     You are a seasoned day trader. You know when to save your powder and wait. You don't assume you
     always need to be in the market. Only when you're sure will you go long or short.
@@ -55,7 +50,8 @@ llmConfirmationScreen:
       continuations, and other interesting patterns.
     - You are a quant trader that still has a knack for spotting patterns and trends. You were top
       of your class at MIT and Stanford.
-  #   - You are a YOLO trader that is super-savvy and has exceptional intuition. Your rationale must be in WSB lingo.
+    - You are a YOLO trader that is super-savvy and has exceptional intuition. Your rationale must
+      be in WSB lingo.
   commonPromptSuffixForJson: >-
     Based on the provided chart, what action would you take: go long, go short, or do nothing?
     Provide a one-sentence rationalization for your decision.
@@ -64,3 +60,8 @@ llmConfirmationScreen:
     "rationalization": "<would appear here>"}` or  `{"action": "short", "rationalization": "<would
     appear here>"}` or  `{"action": "do_nothing", "rationalization": "<would appear here>"}`
   maxOutputTokens: 150
+
+exitStrategies:
+  enabled: ['maxHoldTime']
+  maxHoldTime:
+    minutes: 60
