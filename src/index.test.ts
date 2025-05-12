@@ -2,7 +2,6 @@ import { vi, describe, it, expect, beforeAll, beforeEach, afterEach } from 'vite
 
 const mockQueryValue = 'DRY_RUN_SQL_QUERY_FROM_INDEX_TEST';
 
-// Mock external dependencies
 vi.mock('./utils/config.js', async () => {
   const actual = await vi.importActual('./utils/config.js');
   return {
@@ -86,19 +85,7 @@ vi.mock('./utils/calculations.js', async () => {
   };
 });
 
-// Import the modules that are being mocked to access their mocked functions
 import { getEntryPattern, getExitPattern } from './patterns/pattern-factory.js';
-// Calculation functions (calculateMeanReturn, etc.) are not directly tested here anymore,
-// their effects are tested via output.test.ts or through isWinningTrade mock if needed.
-// The mock for './utils/calculations.js' still provides isWinningTrade (actual) for index.ts usage.
-/*
-import {
-  calculateMeanReturn,
-  calculateMedianReturn,
-  calculateStdDevReturn,
-  isWinningTrade,
-} from './utils/calculations.js';
-*/
 import {
   generateEntryChart as _generateEntryChart,
   generateEntryCharts,
