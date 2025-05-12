@@ -384,7 +384,10 @@ for each signal:
 
 1.  **Standard Chart (e.g., `TICKER_PATTERN_DATE.png`):** This chart displays data up to the entry
     signal's timestamp on the signal day, plus the full prior trading day. This version is typically
-    used for LLM analysis.
+    used for LLM analysis. To prevent data leakage to the LLM, this chart image has its content
+    anonymized: the ticker symbol is replaced with "XXX", the date in the header is replaced with
+    "XXX", and the X-axis date labels are changed to generic day identifiers (e.g., "Prior Day",
+    "Signal Day").
 2.  **Complete Two-Day Chart (e.g., `TICKER_PATTERN_DATE_complete.png`):** This chart displays the
     _entirety_ of the signal day and the _entirety_ of the prior trading day. This version is
     intended for more comprehensive manual review and analysis.
@@ -426,7 +429,9 @@ analysis.
 
 **How it Works:**
 
-- **Chart Analysis:** The LLM analyzes the provided chart image.
+- **Chart Analysis:** The LLM analyzes the provided chart image. The content of this chart image is
+  anonymized (ticker, header date, and X-axis date labels are masked or made generic) to prevent
+  data leakage. The filename of the image sent to the LLM is also randomized.
 - **Multiple Calls:** The system makes a configurable number of parallel calls to the LLM,
   potentially with different temperature settings for varied responses.
 - **JSON Response:** The LLM is prompted to return its decision (long, short, or do_nothing) and a

@@ -3,14 +3,14 @@ import { type Config as AppConfig } from '../utils/config'; // Corrected and ali
 
 export interface LLMScreenConfig {
   enabled: boolean;
-  llmProvider: 'anthropic' | 'openai' | string; // Allow other strings for future flexibility
+  llmProvider: 'anthropic' | 'openai'; // Made stricter to match Zod schema
   modelName: string;
   apiKeyEnvVar: string;
   numCalls: number;
   agreementThreshold: number;
   temperatures: number[];
   prompts: string | string[];
-  commonPromptSuffixForJson?: string;
+  commonPromptSuffixForJson: string;
   systemPrompt?: string;
   maxOutputTokens: number;
   timeoutMs?: number;

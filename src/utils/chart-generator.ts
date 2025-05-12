@@ -53,12 +53,12 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
   }
 
   // Generate SVG for the LLM chart (filtered up to entry)
-  const svgLlm = generateSvgChart(ticker, entryPatternName, data, entrySignal, false);
+  const svgLlm = generateSvgChart(ticker, entryPatternName, data, entrySignal, false, true);
   // console.log(`[generateEntryChart DEBUG] Length of svgLlm (LLM chart): ${svgLlm.length}`);
   fs.writeFileSync(svgOutputPathLlm, svgLlm, 'utf-8');
 
   // Generate SVG for the "complete" 2-day chart (full days)
-  const svgComplete = generateSvgChart(ticker, entryPatternName, data, entrySignal, true);
+  const svgComplete = generateSvgChart(ticker, entryPatternName, data, entrySignal, true, false);
   // console.log(
   //   `[generateEntryChart DEBUG] Length of svgComplete (Complete chart): ${svgComplete.length}`
   // );
@@ -206,7 +206,8 @@ const generateSvgChart = (
   patternName: string,
   allDataInput: Bar[],
   entrySignal: Signal,
-  showFullDayData?: boolean
+  showFullDayData?: boolean,
+  anonymize?: boolean
 ): string => {
   // Explicit console logs for debugging timestamp matching - REMOVE/COMMENT OUT
   if (!showFullDayData) {
@@ -348,11 +349,21 @@ const generateSvgChart = (
     );
     const xDayStart = getXPosition(firstBarOfDayIndex);
 
+    let dateLabelText = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
+
+    if (anonymize) {
+      if (displayDayStrings.length > 1) {
+        dateLabelText = dayIdx === 0 ? 'Prior Day' : 'Signal Day';
+      } else {
+        dateLabelText = 'Signal Day';
+      }
+    }
+
     dateLabelsForChartArea.push({
-      text: new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      }),
+      text: dateLabelText,
       x: xDayStart + 5,
       isDate: true,
     });
@@ -462,11 +473,14 @@ const generateSvgChart = (
     minute: '2-digit',
   });
 
+  const chartTitle = anonymize ? `XXX - ${patternName}` : `${ticker} - ${patternName}`;
+  const headerDateText = anonymize ? 'XXX' : entryDateFormatted;
+
   return `
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-  <text x="${width / 2}" y="25" text-anchor="middle" font-size="18" font-weight="bold">${ticker} - ${patternName}</text>
+  <text x="${width / 2}" y="25" text-anchor="middle" font-size="18" font-weight="bold">${chartTitle}</text>
   <text x="${width / 2}" y="50" text-anchor="middle" font-size="14">
-    Date: ${entryDateFormatted}, Time: ${entryTime}, Current Price: $${entrySignal.price.toFixed(2)}
+    Date: ${headerDateText}, Time: ${entryTime}, Current Price: $${entrySignal.price.toFixed(2)}
   </text>
   
   <rect x="${marginLeft}" y="${marginTop}" width="${chartWidth}" height="${chartHeight}" fill="none" stroke="none" />

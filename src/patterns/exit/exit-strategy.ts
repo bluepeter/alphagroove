@@ -30,7 +30,7 @@ export interface ExitStrategy {
     bars: Bar[],
     isLong: boolean,
     atr?: number,
-    testMode?: boolean
+    _testMode?: boolean
   ) => ExitSignal | null;
 }
 
@@ -70,11 +70,11 @@ export class StopLossStrategy implements ExitStrategy {
     bars: Bar[],
     isLong: boolean,
     atr?: number,
-    testMode?: boolean
+    _testMode?: boolean
   ): ExitSignal | null {
     // Skip entry bar and filter for regular market hours
     const allTradingBars = bars.filter(bar => bar.timestamp > entryTime);
-    const tradingBars = testMode ? allTradingBars : filterRegularMarketHours(allTradingBars);
+    const tradingBars = _testMode ? allTradingBars : filterRegularMarketHours(allTradingBars);
 
     if (tradingBars.length === 0) return null;
 
@@ -95,7 +95,7 @@ export class StopLossStrategy implements ExitStrategy {
       if (isLong) {
         // For long trades, check if price went below stop level
         if (bar.low <= stopLevel) {
-          if (testMode) {
+          if (_testMode) {
             // For tests, use the exact stop level and trigger timestamp
             return {
               timestamp: bar.timestamp,
@@ -117,7 +117,7 @@ export class StopLossStrategy implements ExitStrategy {
       } else {
         // For short trades, check if price went above stop level
         if (bar.high >= stopLevel) {
-          if (testMode) {
+          if (_testMode) {
             // For tests, use the exact stop level and trigger timestamp
             return {
               timestamp: bar.timestamp,
@@ -160,11 +160,11 @@ export class ProfitTargetStrategy implements ExitStrategy {
     bars: Bar[],
     isLong: boolean,
     atr?: number,
-    testMode?: boolean
+    _testMode?: boolean
   ): ExitSignal | null {
     // Skip entry bar and filter for regular market hours
     const allTradingBars = bars.filter(bar => bar.timestamp > entryTime);
-    const tradingBars = testMode ? allTradingBars : filterRegularMarketHours(allTradingBars);
+    const tradingBars = _testMode ? allTradingBars : filterRegularMarketHours(allTradingBars);
 
     if (tradingBars.length === 0) return null;
 
@@ -186,7 +186,7 @@ export class ProfitTargetStrategy implements ExitStrategy {
       if (isLong) {
         // For long trades, check if price went above target level
         if (bar.high >= targetLevel) {
-          if (testMode) {
+          if (_testMode) {
             // For tests, use the exact target level and trigger timestamp
             return {
               timestamp: bar.timestamp,
@@ -208,7 +208,7 @@ export class ProfitTargetStrategy implements ExitStrategy {
       } else {
         // For short trades, check if price went below target level
         if (bar.low <= targetLevel) {
-          if (testMode) {
+          if (_testMode) {
             // For tests, use the exact target level and trigger timestamp
             return {
               timestamp: bar.timestamp,
@@ -251,11 +251,11 @@ export class TrailingStopStrategy implements ExitStrategy {
     bars: Bar[],
     isLong: boolean,
     _atr?: number,
-    testMode?: boolean
+    _testMode?: boolean
   ): ExitSignal | null {
     // Skip entry bar and filter for regular market hours
     const allTradingBars = bars.filter(bar => bar.timestamp > entryTime);
-    const tradingBars = testMode ? allTradingBars : filterRegularMarketHours(allTradingBars);
+    const tradingBars = _testMode ? allTradingBars : filterRegularMarketHours(allTradingBars);
 
     if (tradingBars.length === 0) return null;
 
@@ -291,7 +291,7 @@ export class TrailingStopStrategy implements ExitStrategy {
 
           // Check if price hits trailing stop
           if (bar.low <= trailingStopLevel) {
-            if (testMode) {
+            if (_testMode) {
               // For tests, use the exact trailing stop level and trigger timestamp
               return {
                 timestamp: bar.timestamp,
@@ -328,7 +328,7 @@ export class TrailingStopStrategy implements ExitStrategy {
 
           // Check if price hits trailing stop
           if (bar.high >= trailingStopLevel) {
-            if (testMode) {
+            if (_testMode) {
               // For tests, use the exact trailing stop level and trigger timestamp
               return {
                 timestamp: bar.timestamp,
@@ -373,11 +373,11 @@ export class MaxHoldTimeStrategy implements ExitStrategy {
     bars: Bar[],
     _isLong: boolean,
     _atr?: number,
-    testMode?: boolean
+    _testMode?: boolean
   ): ExitSignal | null {
     // Skip entry bar and filter for regular market hours
     const allTradingBars = bars.filter(bar => bar.timestamp > entryTime);
-    const tradingBars = testMode ? allTradingBars : filterRegularMarketHours(allTradingBars);
+    const tradingBars = _testMode ? allTradingBars : filterRegularMarketHours(allTradingBars);
 
     if (tradingBars.length === 0) return null;
 
@@ -421,7 +421,7 @@ export class EndOfDayStrategy implements ExitStrategy {
     bars: Bar[],
     _isLong: boolean,
     _atr?: number,
-    testMode?: boolean
+    _testMode?: boolean
   ): ExitSignal | null {
     // Skip entry bar - DON'T filter by market hours for EndOfDay
     const tradingBars = bars.filter(bar => bar.timestamp > entryTime);
