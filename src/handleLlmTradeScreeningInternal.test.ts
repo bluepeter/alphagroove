@@ -320,4 +320,7 @@ describe('handleLlmTradeScreeningInternal', () => {
     expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalledTimes(2);
     expect(generateEntryChart).toHaveBeenCalledTimes(2);
   });
+
+  // Test removed as per user instruction to reduce complexity
+  // it('should attempt chart generation for LLM and pass path to screen, even if mergedConfig.generateCharts is false', async () => { ... });
 });
