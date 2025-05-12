@@ -10,6 +10,7 @@ import {
   type Trade,
   type DirectionalTradeStats,
   type OverallTradeStats,
+  calculatePortfolioGrowth,
 } from './output';
 
 // Mock chalk to prevent styling in tests
@@ -277,5 +278,79 @@ describe('output utilities', () => {
 
       consoleLogSpy.mockRestore();
     });
+  });
+});
+
+describe('calculatePortfolioGrowth', () => {
+  const initialCapital = 10000;
+
+  it('should return initial capital if no trades are made', () => {
+    const result = calculatePortfolioGrowth([], initialCapital);
+    expect(result.finalCapital).toBe(initialCapital);
+    expect(result.totalDollarReturn).toBe(0);
+    expect(result.percentageGrowth).toBe(0);
+  });
+
+  it('should calculate growth for a single positive return', () => {
+    // 0.02 means 2%
+    const result = calculatePortfolioGrowth([0.02], initialCapital);
+    expect(result.finalCapital).toBeCloseTo(10200);
+    expect(result.totalDollarReturn).toBeCloseTo(200);
+    expect(result.percentageGrowth).toBeCloseTo(2);
+  });
+
+  it('should calculate growth for a single negative return', () => {
+    // -0.01 means -1%
+    const result = calculatePortfolioGrowth([-0.01], initialCapital);
+    expect(result.finalCapital).toBeCloseTo(9900);
+    expect(result.totalDollarReturn).toBeCloseTo(-100);
+    expect(result.percentageGrowth).toBeCloseTo(-1);
+  });
+
+  it('should compound multiple positive returns', () => {
+    // 10% then 10% on the new capital
+    const returns = [0.1, 0.1]; // 10%, 10%
+    const result = calculatePortfolioGrowth(returns, initialCapital);
+    expect(result.finalCapital).toBeCloseTo(12100);
+    expect(result.totalDollarReturn).toBeCloseTo(2100);
+    expect(result.percentageGrowth).toBeCloseTo(21);
+  });
+
+  it('should compound multiple negative returns', () => {
+    // -10% then -10% on the new capital
+    const returns = [-0.1, -0.1]; // -10%, -10%
+    const result = calculatePortfolioGrowth(returns, initialCapital);
+    expect(result.finalCapital).toBeCloseTo(8100);
+    expect(result.totalDollarReturn).toBeCloseTo(-1900);
+    expect(result.percentageGrowth).toBeCloseTo(-19);
+  });
+
+  it('should compound mixed positive and negative returns', () => {
+    const returns = [0.1, -0.05, 0.02]; // +10%, -5%, +2%
+    const result = calculatePortfolioGrowth(returns, initialCapital);
+    expect(result.finalCapital).toBeCloseTo(10659);
+    expect(result.totalDollarReturn).toBeCloseTo(659);
+    expect(result.percentageGrowth).toBeCloseTo(6.59);
+  });
+
+  it('should handle the specific sequence from user data correctly', () => {
+    // Returns from user: -0.10%, +0.46%, +0.42%, +0.49%, -0.20%
+    // These are decimals: -0.0010, 0.0046, 0.0042, 0.0049, -0.0020
+    const returns = [-0.001, 0.0046, 0.0042, 0.0049, -0.002];
+    const result = calculatePortfolioGrowth(returns, initialCapital);
+    // Actual result for finalCapital with these inputs is approx 10107.232745890653
+    // Actual result for totalDollarReturn is approx 107.232745890653
+    // Actual result for percentageGrowth is approx 1.07232745890653
+    expect(result.finalCapital).toBeCloseTo(10107.2327459, 7);
+    expect(result.totalDollarReturn).toBeCloseTo(107.2327459, 7);
+    expect(result.percentageGrowth).toBeCloseTo(1.0723275, 7);
+  });
+
+  it('should work with a different initial capital', () => {
+    const returns = [0.05]; // 5%
+    const result = calculatePortfolioGrowth(returns, 50000);
+    expect(result.finalCapital).toBeCloseTo(52500);
+    expect(result.totalDollarReturn).toBeCloseTo(2500);
+    expect(result.percentageGrowth).toBeCloseTo(5);
   });
 });

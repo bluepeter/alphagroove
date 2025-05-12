@@ -1,7 +1,7 @@
 default:
   date:
-    from: '2023-01-01'
-    to: '2023-06-01'
+    from: '2022-01-01'
+    to: '2022-01-15'
   ticker: 'SPY'
   timeframe: '1min'
   # direction can be 'long', 'short', or 'llm_decides'.
@@ -14,7 +14,7 @@ default:
     outputDir: './charts'
   exitStrategies:
     enabled:
-      - stopLoss
+      # - stopLoss
       - profitTarget
       - trailingStop
       - maxHoldTime
@@ -24,10 +24,10 @@ default:
     stopLoss:
       percentFromEntry: 0.5
     profitTarget:
-      percentFromEntry: 1.0
+      percentFromEntry: 0.5
     trailingStop:
-      activationPercent: 0.5
-      trailPercent: 0.1
+      activationPercent: 0
+      trailPercent: 0.3
     endOfDay:
       time: '16:00'
     slippage:

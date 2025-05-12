@@ -162,19 +162,35 @@ const printDirectionalSummary = (
   console.log(chalk.cyan(summaryString));
 };
 
+// New helper function to calculate portfolio growth
+export const calculatePortfolioGrowth = (returns: number[], initialCapital: number = 10000) => {
+  let compoundedCapital = initialCapital;
+  for (const returnPct of returns) {
+    // Assume returnPct is already a decimal e.g., 0.0042 for 0.42%
+    compoundedCapital *= 1 + returnPct;
+  }
+
+  const compoundedGrowthPct = (compoundedCapital / initialCapital - 1) * 100;
+  const totalDollarReturn = initialCapital * (compoundedGrowthPct / 100);
+
+  return {
+    initialCapital,
+    finalCapital: compoundedCapital,
+    totalDollarReturn,
+    percentageGrowth: compoundedGrowthPct,
+  };
+};
+
 export const printYearSummary = (
   year: number,
   longTrades: Trade[],
   shortTrades: Trade[],
   llmCostForYear?: number
 ) => {
-  // Estimate yearSpecificTradingDays. This is an approximation.
-  // A more accurate value would be the distinct trading days within that year from the dataset.
-  // For simplicity, use the total_trading_days from the first trade if available, or default to 252.
   const yearSpecificTradingDays =
     longTrades[0]?.total_trading_days || shortTrades[0]?.total_trading_days || 252;
 
-  console.log(''); // Add a space before year summary section
+  console.log('');
 
   if (longTrades.length > 0) {
     printDirectionalSummary(`${year} Long Trades ↗️`, longTrades, yearSpecificTradingDays);
@@ -185,40 +201,47 @@ export const printYearSummary = (
 
   const combinedYearTrades = [...longTrades, ...shortTrades];
   if (combinedYearTrades.length > 0) {
-    if (longTrades.length > 0 && shortTrades.length > 0) {
-      // Only print if there were both, or if specifically requested for single-sided years
-      // Calculate combined stats for the year
-      const combinedReturns = combinedYearTrades.map(t => t.return_pct);
-      const combinedWinningTrades = combinedYearTrades.filter(t => t.return_pct > 0).length;
-      const combinedWinRateValue = calculateWinRate(
-        combinedWinningTrades,
-        combinedYearTrades.length
-      );
-      const combinedMeanReturn = calculateMeanReturn(combinedReturns);
-      const combinedMedianReturn = calculateMedianReturn(combinedReturns);
-      const combinedStdDevReturn = calculateStdDevReturn(combinedReturns, combinedMeanReturn);
-      const combinedMinReturn = Math.min(...combinedReturns);
-      const combinedMaxReturn = Math.max(...combinedReturns);
-      const combinedTradePercentage = calculateTradePercentage(
-        combinedYearTrades.length,
-        yearSpecificTradingDays
-      );
+    const combinedReturns = combinedYearTrades.map(t => t.return_pct);
+    const combinedWinningTrades = combinedYearTrades.filter(t => t.return_pct > 0).length;
+    const combinedWinRateValue = calculateWinRate(combinedWinningTrades, combinedYearTrades.length);
+    const combinedMeanReturn = calculateMeanReturn(combinedReturns);
+    const combinedMedianReturn = calculateMedianReturn(combinedReturns);
+    const combinedStdDevReturn = calculateStdDevReturn(combinedReturns, combinedMeanReturn);
+    const combinedMinReturn = Math.min(...combinedReturns);
+    const combinedMaxReturn = Math.max(...combinedReturns);
+    const combinedTradePercentage = calculateTradePercentage(
+      combinedYearTrades.length,
+      yearSpecificTradingDays
+    );
 
-      const meanColor = combinedMeanReturn >= 0 ? chalk.green : chalk.red;
-      const medianColor = combinedMedianReturn >= 0 ? chalk.green : chalk.red;
-      const winRateColor = combinedWinRateValue >= 50 ? chalk.green : chalk.red;
-      const returnRangeColor =
-        combinedMaxReturn >= 0 ? (combinedMinReturn >= 0 ? chalk.green : chalk.gray) : chalk.red;
+    const meanColor = combinedMeanReturn >= 0 ? chalk.green : chalk.red;
+    const medianColor = combinedMedianReturn >= 0 ? chalk.green : chalk.red;
+    const winRateColor = combinedWinRateValue >= 50 ? chalk.green : chalk.red;
+    const returnRangeColor =
+      combinedMaxReturn >= 0 ? (combinedMinReturn >= 0 ? chalk.green : chalk.gray) : chalk.red;
 
-      let summaryString = `📊 ${year} Combined: ${combinedYearTrades.length} trades (${combinedTradePercentage}% of days) | `;
-      summaryString += `Return Range: ${returnRangeColor(
-        `${formatPercent(combinedMinReturn)} to ${formatPercent(combinedMaxReturn)}`
-      )} | `;
-      summaryString += `Mean: ${meanColor(formatPercent(combinedMeanReturn))} | Median: ${medianColor(formatPercent(combinedMedianReturn))} | StdDev: ${chalk.gray(formatPercent(combinedStdDevReturn))} | Win Rate: ${winRateColor(
-        `${combinedWinRateValue.toFixed(1)}%`
-      )}`;
-      console.log(chalk.cyan(summaryString));
-    }
+    let summaryString = `📊 ${year} Combined: ${combinedYearTrades.length} trades (${combinedTradePercentage}% of days) | `;
+    summaryString += `Return Range: ${returnRangeColor(
+      `${formatPercent(combinedMinReturn)} to ${formatPercent(combinedMaxReturn)}`
+    )} | `;
+    summaryString += `Mean: ${meanColor(formatPercent(combinedMeanReturn))} | Median: ${medianColor(formatPercent(combinedMedianReturn))} | StdDev: ${chalk.gray(formatPercent(combinedStdDevReturn))} | Win Rate: ${winRateColor(
+      `${combinedWinRateValue.toFixed(1)}%`
+    )}`;
+    console.log(chalk.cyan(summaryString));
+
+    const sortedCombinedTrades = [...combinedYearTrades].sort(
+      (a, b) =>
+        new Date(a.trade_date + ' ' + a.entry_time).getTime() -
+        new Date(b.trade_date + ' ' + b.entry_time).getTime()
+    );
+    const sortedCombinedReturns = sortedCombinedTrades.map(t => t.return_pct);
+    const combinedPortfolioGrowth = calculatePortfolioGrowth(sortedCombinedReturns);
+
+    console.log(
+      chalk.cyan(
+        `  Compounded Growth ($10k Start): $${combinedPortfolioGrowth.totalDollarReturn.toFixed(2)} (${formatPercent(combinedPortfolioGrowth.percentageGrowth / 100)})` // DIVIDE BY 100 HERE
+      )
+    );
   } else {
     console.log(chalk.gray(`No trades for ${year} to summarize.`));
   }
@@ -226,7 +249,7 @@ export const printYearSummary = (
   if (typeof llmCostForYear === 'number' && llmCostForYear > 0) {
     console.log(chalk.cyan(`  ${year} LLM Cost: $${llmCostForYear.toFixed(4)}`));
   }
-  console.log(''); // Add a space after year summary section
+  console.log('');
 };
 
 export const printOverallSummary = (stats: OverallTradeStats) => {
@@ -267,42 +290,51 @@ export const printOverallSummary = (stats: OverallTradeStats) => {
 
   const combinedOverallTrades = [...long_stats.trades, ...short_stats.trades];
   if (combinedOverallTrades.length > 0) {
-    if (long_stats.trades.length > 0 && short_stats.trades.length > 0) {
-      // Only print if there were both directions executed overall
-      // Calculate combined stats for overall
-      const combinedReturns = combinedOverallTrades.map(t => t.return_pct);
-      const combinedWinningTrades = combinedOverallTrades.filter(t => t.return_pct > 0).length;
-      const combinedWinRateValue = calculateWinRate(
-        combinedWinningTrades,
-        combinedOverallTrades.length
-      );
-      const combinedMeanReturn = calculateMeanReturn(combinedReturns);
-      const combinedMedianReturn = calculateMedianReturn(combinedReturns);
-      const combinedStdDevReturn = calculateStdDevReturn(combinedReturns, combinedMeanReturn);
-      const combinedMinReturn = Math.min(...combinedReturns);
-      const combinedMaxReturn = Math.max(...combinedReturns);
-      const combinedTradePercentage = calculateTradePercentage(
-        combinedOverallTrades.length,
-        total_trading_days
-      );
+    const combinedReturns = combinedOverallTrades.map(t => t.return_pct);
+    const combinedWinningTrades = combinedOverallTrades.filter(t => t.return_pct > 0).length;
+    const combinedWinRateValue = calculateWinRate(
+      combinedWinningTrades,
+      combinedOverallTrades.length
+    );
+    const combinedMeanReturn = calculateMeanReturn(combinedReturns);
+    const combinedMedianReturn = calculateMedianReturn(combinedReturns);
+    const combinedStdDevReturn = calculateStdDevReturn(combinedReturns, combinedMeanReturn);
+    const combinedMinReturn = Math.min(...combinedReturns);
+    const combinedMaxReturn = Math.max(...combinedReturns);
+    const combinedTradePercentage = calculateTradePercentage(
+      combinedOverallTrades.length,
+      total_trading_days
+    );
 
-      const meanColor = combinedMeanReturn >= 0 ? chalk.green : chalk.red;
-      const medianColor = combinedMedianReturn >= 0 ? chalk.green : chalk.red;
-      const winRateColor = combinedWinRateValue >= 50 ? chalk.green : chalk.red;
-      const returnRangeColor =
-        combinedMaxReturn >= 0 ? (combinedMinReturn >= 0 ? chalk.green : chalk.gray) : chalk.red;
+    const meanColor = combinedMeanReturn >= 0 ? chalk.green : chalk.red;
+    const medianColor = combinedMedianReturn >= 0 ? chalk.green : chalk.red;
+    const winRateColor = combinedWinRateValue >= 50 ? chalk.green : chalk.red;
+    const returnRangeColor =
+      combinedMaxReturn >= 0 ? (combinedMinReturn >= 0 ? chalk.green : chalk.gray) : chalk.red;
 
-      let summaryString = `📊 Overall Combined: ${combinedOverallTrades.length} trades (${combinedTradePercentage}% of days) | `;
-      summaryString += `Return Range: ${returnRangeColor(
-        `${formatPercent(combinedMinReturn)} to ${formatPercent(combinedMaxReturn)}`
-      )} | `;
-      summaryString += `Mean: ${meanColor(formatPercent(combinedMeanReturn))} | Median: ${medianColor(formatPercent(combinedMedianReturn))} | StdDev: ${chalk.gray(formatPercent(combinedStdDevReturn))} | Win Rate: ${winRateColor(
-        `${combinedWinRateValue.toFixed(1)}%`
-      )}`;
-      console.log(chalk.bold(summaryString)); // Using bold for overall combined line
-    }
+    let summaryString = `📊 Overall Combined: ${combinedOverallTrades.length} trades (${combinedTradePercentage}% of days) | `;
+    summaryString += `Return Range: ${returnRangeColor(
+      `${formatPercent(combinedMinReturn)} to ${formatPercent(combinedMaxReturn)}`
+    )} | `;
+    summaryString += `Mean: ${meanColor(formatPercent(combinedMeanReturn))} | Median: ${medianColor(formatPercent(combinedMedianReturn))} | StdDev: ${chalk.gray(formatPercent(combinedStdDevReturn))} | Win Rate: ${winRateColor(
+      `${combinedWinRateValue.toFixed(1)}%`
+    )}`;
+    console.log(chalk.bold(summaryString));
+
+    const sortedCombinedTrades = [...combinedOverallTrades].sort(
+      (a, b) =>
+        new Date(a.trade_date + ' ' + a.entry_time).getTime() -
+        new Date(b.trade_date + ' ' + b.entry_time).getTime()
+    );
+    const sortedCombinedReturns = sortedCombinedTrades.map(t => t.return_pct);
+    const combinedPortfolioGrowth = calculatePortfolioGrowth(sortedCombinedReturns);
+
+    console.log(
+      chalk.bold(
+        `  Compounded Growth ($10k Start): $${combinedPortfolioGrowth.totalDollarReturn.toFixed(2)} (${formatPercent(combinedPortfolioGrowth.percentageGrowth / 100)})` // DIVIDE BY 100 HERE
+      )
+    );
   } else if (total_llm_confirmed_trades === 0) {
-    // This condition was here before for no trades
     console.log(chalk.gray('  No LLM-confirmed trades to summarize for overall performance.'));
   }
 

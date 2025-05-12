@@ -17,6 +17,7 @@ export class LlmConfirmationScreen implements EntryScreen {
     _context?: EntryScreenContext
   ): Promise<ScreenDecision> {
     let totalCost = 0;
+    const debug = false;
 
     if (!screenConfig.enabled) {
       console.log(
@@ -62,11 +63,13 @@ export class LlmConfirmationScreen implements EntryScreen {
           break;
       }
 
-      console.log(
-        chalk.dim(
-          `   LLM ${index + 1}: ${actionEmoji} — ${response.error ? 'Error:' + response.error + ' — ' : ''}${rationalizationLog}${costString}`
-        )
-      );
+      if (debug) {
+        console.log(
+          chalk.dim(
+            `   LLM ${index + 1}: ${actionEmoji} — ${response.error ? 'Error:' + response.error + ' — ' : ''}${rationalizationLog}${costString}`
+          )
+        );
+      }
       switch (response.action) {
         case 'long':
           longVotes++;
@@ -92,10 +95,10 @@ export class LlmConfirmationScreen implements EntryScreen {
 
       if (meetsLongThreshold && longVotes > shortVotes) {
         decision = { proceed: true, direction: 'long', cost: totalCost };
-        logMessage = `  LLM consensus to GO LONG (${longVotes} long vs ${shortVotes} short). Signal proceeds as LONG.`;
+        // logMessage = `  LLM consensus to GO LONG (${longVotes} long vs ${shortVotes} short). Signal proceeds as LONG.`;
       } else if (meetsShortThreshold && shortVotes > longVotes) {
         decision = { proceed: true, direction: 'short', cost: totalCost };
-        logMessage = `  LLM consensus to GO SHORT (${shortVotes} short vs ${longVotes} long). Signal proceeds as SHORT.`;
+        // logMessage = `  LLM consensus to GO SHORT (${shortVotes} short vs ${longVotes} long). Signal proceeds as SHORT.`;
       } else {
         let detailReason = `LLM consensus (${longVotes} long, ${shortVotes} short) not decisive for 'llm_decides' strategy (threshold: ${screenConfig.agreementThreshold}).`;
         if (meetsLongThreshold && meetsShortThreshold && longVotes === shortVotes) {
@@ -121,7 +124,9 @@ export class LlmConfirmationScreen implements EntryScreen {
         logMessage = `  LLM consensus (${longVotes} long, ${shortVotes} short) does not meet threshold for configured direction '${configuredDirection}' for ${signal.ticker} on ${signal.trade_date}. Signal is filtered out.`;
       }
     }
-    console.log(chalk.dim(logMessage + totalCostString));
+    if (debug) {
+      console.log(chalk.dim(logMessage + totalCostString));
+    }
     return decision;
   }
 }
