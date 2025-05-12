@@ -5,7 +5,9 @@ trades within AlphaGroove, moving beyond the current fixed-time exit.
 
 ## Current Status
 
-- **Phase 2 in Progress (Incremental Step 1: Implementing `maxHoldTime` via new config structure)**
+- **Phase 2 in Progress (INCREMENTAL STEP 1: COMPLETED - Implemented `maxHoldTime` via new
+  `exitStrategies` config structure)**
+- **Ready for Phase 2, INCREMENTAL STEP 2: Implement Advanced Exit Strategies & Bar-by-Bar Logic**
 
 ## Goals
 
@@ -68,57 +70,111 @@ if there are any implicit biases or unrealistic fill assumptions.
 
 **Objective:** Introduce a flexible system for multiple, configurable exit strategies.
 
-**INCREMENTAL STEP 1: Implement `maxHoldTime` Exit via New `exitStrategies` Config**
+### INCREMENTAL STEP 1: Implement `maxHoldTime` Exit via New `exitStrategies` Config
 
-**Current Task: Modify `src/utils/config.ts` to support the new `exitStrategies.maxHoldTime`
-configuration.**
+**Status: COMPLETED**
 
-1.  **Define Initial `exitStrategies` Configuration (`alphagroove.config.yaml` &
-    `src/utils/config.ts`):**
+#### Accomplishments
 
-    - **Done (YAML):** `alphagroove.config.yaml` updated to remove old exit configs and add
-      `exitStrategies: { enabled: ['maxHoldTime'], maxHoldTime: { minutes: N } }`.
-    - **To Do (Zod in `src/utils/config.ts`):**
-      - Define `MaxHoldTimeConfigSchema = z.object({ minutes: z.number().int().positive() });`.
-      - Define
-        `ExitStrategiesConfigSchema = z.object({ enabled: z.array(z.string()).default(['maxHoldTime']), maxHoldTime: MaxHoldTimeConfigSchema.optional().default({ minutes: 60 }) });`.
-      - Integrate `ExitStrategiesConfigSchema` into the main `ConfigSchema` (as
-        `exitStrategies: ExitStrategiesConfigSchema.optional().default({})`).
-      - Remove old exit fields/schemas from `ConfigSchema`, `DEFAULT_CONFIG`,
-        `createDefaultConfigFile`, `MergedConfig` type, and `mergeConfigWithCliOptions` function.
-      - Update `DEFAULT_CONFIG` and `createDefaultConfigFile` to reflect this minimal
-        `exitStrategies` setup (e.g., `maxHoldTime` enabled with a default like 60 minutes).
-    - **Next after Zod:** Update `src/utils/config.test.ts`.
+1.  **Defined New `exitStrategies` Configuration Structure:**
 
-2.  **Adapt `src/utils/query-builder.ts` (`buildAnalysisQuery`):**
+    - **Configuration schemas in `src/utils/config.ts`:**
+      - Created `MaxHoldTimeConfigSchema` with a `minutes` property that defaults to 60 minutes.
+      - Developed `ExitStrategiesConfigSchema` with an `enabled` array of strategy names and
+        optional strategy-specific configuration objects.
+      - Integrated these schemas into the main `ConfigSchema`, both at the root level and in the
+        `default` section.
+    - **Updated Configuration Examples:**
+      - Modified `alphagroove.config.yaml` to use the new `exitStrategies` configuration format:
+        ```yaml
+        exitStrategies:
+          enabled: ['maxHoldTime']
+          maxHoldTime:
+            minutes: 60
+        ```
+      - Ensured backward compatibility by maintaining reasonable defaults.
 
-    - **To Do:** Modify `buildAnalysisQuery` to source `holdMinutes` from
-      `options.exitStrategies?.maxHoldTime?.minutes` instead of the old
-      `options['fixed-time']['hold-minutes']`.
-    - The SQL logic for calculating the fixed-time exit can largely remain the same for this
-      increment, as it's still a fixed-time exit, just configured differently.
-    - The `_exitPatternDefinition` argument to `buildAnalysisQuery` becomes less relevant for exit
-      logic but might still be passed if `getExitPattern` is called.
+2.  **Modified Configuration Merging Logic:**
 
-3.  **Adapt `src/index.ts` (`initializeAnalysis` & `runAnalysis`):**
+    - **Enhanced `mergeConfigWithCliOptions` in `src/utils/config.ts`:**
+      - Implemented proper precedence order for configuration resolution: CLI options > root
+        config > default config > schema defaults.
+      - Added special handling for `exitStrategies.maxHoldTime.minutes` to ensure it's properly
+        merged.
+      - Fixed a bug in the date validation regex pattern (removed unnecessary escape characters).
 
-    - **To Do:** Review if `getExitPattern` call in `initializeAnalysis` is still needed or how its
-      result is used, given that `buildAnalysisQuery` will now directly use
-      `mergedConfig.exitStrategies`.
+3.  **Updated Pattern Factory for Exit Strategies:**
 
-4.  **Testing for this Increment:**
-    - **To Do:** Update `src/utils/config.test.ts` to verify loading of the new
-      `exitStrategies.maxHoldTime`.
-    - **To Do:** Ensure existing tests that rely on fixed-time exits still pass after
-      `query-builder.ts` is adapted (they should, as the exit _behavior_ isn't changing yet, only
-      its configuration source).
-    - **To Do:** Run `pnpm test` and `pnpm lint:fix`.
+    - **Improved `getExitPattern` in `src/patterns/pattern-factory.ts`:**
+      - Modified to accept an undefined pattern name and return a `DefaultExitStrategyPattern`.
+      - Added logging for unknown exit pattern names instead of throwing errors.
+      - Integrated with the new `exitStrategies` configuration approach.
 
----
+4.  **Refactored Query Builder for Exit Time Calculation:**
 
-**INCREMENTAL STEP 2 & BEYOND: Implement Advanced Exit Strategies & Bar-by-Bar Logic**
+    - **Enhanced `buildAnalysisQuery` in `src/utils/query-builder.ts`:**
+      - Updated to extract hold minutes from `exitStrategies.maxHoldTime.minutes`.
+      - Added default handling and warnings for misconfigured or missing maxHoldTime settings.
+      - Maintained the two separate SQL paths for Fixed Time Entry and Quick Rise/Fall patterns.
+      - Added better handling of trade direction in SQL generation.
 
-**(The following tasks will be undertaken after Increment 1 is complete and stable)**
+5.  **Updated Main Application Logic:**
+
+    - **Modified `index.ts`:**
+      - Updated `initializeAnalysis` to pass undefined to `getExitPattern`, which returns the
+        DefaultExitStrategyPattern.
+      - Updated header printing to show the exit strategy name based on enabled strategies in the
+        configuration.
+      - Added fallback for missing exit strategy configuration.
+
+6.  **Comprehensive Testing:**
+    - **Updated and added tests:**
+      - Added tests for the new configuration structure in `src/utils/config.test.ts`.
+      - Updated tests for query building in `src/utils/query-builder.test.ts`.
+      - Fixed pattern factory tests to match the new behavior in
+        `src/patterns/pattern-factory.test.ts`.
+      - Ran all 150 tests to ensure system-wide compatibility with the changes.
+
+#### Lessons Learned
+
+1. **Configuration Flexibility:**
+
+   - Using a Zod schema-based approach for configuration validation provides strong type safety, but
+     requires careful handling of default values.
+   - Storing available exit strategies in an `enabled` array provides a clean way to select which
+     strategies to apply.
+   - Multi-level configuration merging (root vs default section) requires clear precedence rules.
+
+2. **Pattern Factory Design:**
+
+   - The pattern factory works well for entry patterns where implementations differ significantly.
+   - For exit strategies, a more flexible approach with a default fallback pattern helps maintain
+     backward compatibility.
+   - Logging warnings instead of throwing errors for unknown patterns improves resilience.
+
+3. **Query Building Complexity:**
+
+   - The SQL generation logic for different entry patterns needs careful maintenance to ensure
+     consistency.
+   - The same exit logic (adding minutes to an entry time) is duplicated in two places, suggesting
+     potential for further refactoring.
+
+4. **Testing Importance:**
+
+   - Small changes to configuration structures can have wide-ranging impacts across the system.
+   - Having comprehensive tests that exercise the full application flow was essential for catching
+     integration issues.
+   - The pattern factory tests required adjustments to accommodate the new behavior of not checking
+     SQL string equality.
+
+5. **Future-Proofing:**
+   - The new configuration structure is designed to be extensible for future exit strategies.
+   - Using an array of strategy names in `enabled` will allow for future support of multiple exit
+     conditions and prioritization.
+
+### INCREMENTAL STEP 2 & BEYOND: Implement Advanced Exit Strategies & Bar-by-Bar Logic
+
+**(The following tasks will be undertaken next)**
 
 1.  **Define Full `exitStrategies` Configuration (YAML & Zod in `src/utils/config.ts`):**
 
@@ -129,10 +185,30 @@ configuration.**
     - **To Do:** Update `DEFAULT_CONFIG` and `createDefaultConfigFile` with examples/defaults for
       these new strategies (likely disabled by default initially, except perhaps `endOfDay`).
     - **To Do:** Update `src/utils/config.test.ts` to cover these new configurations.
+    - **Planned Structure:**
+      ```yaml
+      exitStrategies:
+        enabled: ['stopLoss', 'profitTarget', 'trailingStop', 'maxHoldTime', 'endOfDay']
+        stopLoss:
+          percentFromEntry: 1.0 # Or atrMultiplier: 1.5
+        profitTarget:
+          percentFromEntry: 2.0 # Or atrMultiplier: 3.0
+        trailingStop:
+          activationPercent: 1.0
+          trailPercent: 0.5
+        maxHoldTime:
+          minutes: 60
+        endOfDay:
+          time: '16:00' # Close positions by this time
+        slippage:
+          model: 'percent' # or 'fixed'
+          value: 0.05 # 0.05% slippage or $0.05 depending on model
+      ```
 
 2.  **Implement Calculation of Indicators (e.g., ATR in `src/utils/calculations.ts`):**
 
     - **To Do:** Add function to calculate ATR based on a series of `Bar` data.
+    - **To Do:** Add unit tests for indicator calculations.
 
 3.  **Refactor `processTradesLoop` for Bar-by-Bar Exit Logic (`src/index.ts`):**
 
@@ -197,5 +273,9 @@ configuration.**
 - **Performance:** Bar-by-bar processing in JS will be slower than pre-calculated SQL exits. For
   very large datasets or many years, this might become a concern, but for typical research runs, it
   should be acceptable.
+- **Trade Execution Realism:** Consider adding constraints on when trades can be exited (e.g.,
+  market hours only, not on weekends/holidays) to improve realism.
+- **Configuration Validation:** Add more sophisticated validation for the exitStrategies
+  configuration to prevent incompatible combinations of settings.
 
 This plan provides a roadmap. Details will be refined as each phase is approached.
