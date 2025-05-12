@@ -1,10 +1,12 @@
 import { vi, describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { type Config as AppConfig } from './utils/config.js';
-import { LlmConfirmationScreen as _ActualLlmConfirmationScreen } from './screens/llm-confirmation.screen.js';
+import {
+  LlmConfirmationScreen as _ActualLlmConfirmationScreen,
+  LlmConfirmationScreen,
+} from './screens/llm-confirmation.screen.js';
 
-const mockQueryValue = 'DRY_RUN_SQL_QUERY_FROM_INDEX_TEST'; // Referenced by buildAnalysisQuery mock
+const mockQueryValue = 'DRY_RUN_SQL_QUERY_FROM_INDEX_TEST';
 
-// Mock external dependencies (copied from original index.test.ts for consistent mainModule loading)
 vi.mock('./utils/config.js', async () => {
   const actual = await vi.importActual('./utils/config.js');
   return {
@@ -71,7 +73,7 @@ vi.mock('./utils/mappers.js', () => ({
 }));
 
 vi.mock('./utils/chart-generator.js', () => ({
-  generateEntryChart: vi.fn(() => Promise.resolve('path/to/chart.png')), // Used by the tests
+  generateEntryChart: vi.fn(() => Promise.resolve('path/to/chart.png')),
   generateEntryCharts: vi.fn(() => Promise.resolve([])),
 }));
 
@@ -88,21 +90,7 @@ vi.mock('./utils/calculations.js', async () => {
   };
 });
 
-// Import the modules that are being mocked to access their mocked functions
-import { getEntryPattern, getExitPattern } from './patterns/pattern-factory.js';
-import { LlmConfirmationScreen } from './screens/llm-confirmation.screen.js';
-import { loadConfig, mergeConfigWithCliOptions } from './utils/config.js';
-import { fetchTradesFromQuery } from './utils/data-loader.js';
-import { mapRawDataToTrade } from './utils/mappers.js';
-import {
-  printHeader,
-  printTradeDetails,
-  printYearSummary,
-  printOverallSummary,
-  printFooter,
-} from './utils/output.js';
-import { buildAnalysisQuery } from './utils/query-builder.js';
-// import { generateEntryChart } from './utils/chart-generator.js'; // Mock is used, direct import not strictly needed for these tests
+import { mergeConfigWithCliOptions } from './utils/config.js';
 
 let mainModule: any;
 
@@ -111,17 +99,10 @@ beforeAll(async () => {
 });
 
 describe('LLM Trade Screening Tests', () => {
-  let mockCliOptions: any; // For mergeConfigWithCliOptions
-  let mockRawConfig: any; // For mergeConfigWithCliOptions
-  let mockMergedConfigValue: any; // Used directly in tests
-  // mockEntryPatternValue and mockExitPatternValue are not directly used by handleLlmTradeScreeningInternal tests
+  let mockMergedConfigValue: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCliOptions = { config: 'path/to/config.yaml' }; // Simplified, as only used by merge mock
-    mockRawConfig = { someBaseOpt: 'value' }; // Simplified
-
-    // This is the key config object used by the function under test
     mockMergedConfigValue = {
       ticker: 'TEST',
       from: '2023-01-01',
@@ -130,19 +111,12 @@ describe('LLM Trade Screening Tests', () => {
       exitPattern: 'test-exit',
       timeframe: '1min',
       direction: 'long',
-      llmConfirmationScreen: { enabled: false }, // This will be overridden in tests
-      generateCharts: false, // This will be overridden in tests
+      llmConfirmationScreen: { enabled: false },
+      generateCharts: false,
       someBaseOpt: 'value',
       config: 'path/to/config.yaml',
     };
-
-    // Mock the parts of the broader setup that initializeAnalysis would do,
-    // focusing on what mergeConfigWithCliOptions provides.
     vi.mocked(mergeConfigWithCliOptions).mockReturnValue(mockMergedConfigValue);
-    // Other mocks like loadConfig, getEntryPattern etc. are present for full mainModule import,
-    // but their return values are not critical for this specific test suite's beforeEach,
-    // unless mergeConfigWithCliOptions itself depends on them in a way not shown by its direct mock.
-    // For simplicity, we ensure mergeConfigWithCliOptions returns the needed mockMergedConfigValue.
   });
 
   describe('handleLlmTradeScreeningInternal', () => {
@@ -155,12 +129,9 @@ describe('LLM Trade Screening Tests', () => {
       direction: 'long' as 'long' | 'short',
     };
     const mockChartName = 'test-chart';
-    // _mockLocalRawConfig is not used from original, can be omitted or kept if there was a subtle use.
-    // For clarity, it was an empty object {} so we can define AppConfig directly.
     const getMockAppConfig = (): AppConfig => ({
       default: { direction: 'long', ticker: 'SPY', timeframe: '1min' },
       patterns: { entry: {}, exit: {} },
-      // Add other AppConfig properties if they become necessary for the tests
     });
 
     it('should return { proceed: true, cost: 0 } if LLM screen is not enabled or instance is null', async () => {
@@ -168,19 +139,19 @@ describe('LLM Trade Screening Tests', () => {
       const resultNullInstance = await mainModule.handleLlmTradeScreeningInternal(
         mockSignal,
         mockChartName,
-        null, // llmScreenInstance is null
-        { enabled: true }, // screenSpecificLLMConfig (but instance is null)
+        null,
+        { enabled: true },
         mockMergedConfigValue,
         currentAppConfig
       );
       expect(resultNullInstance).toEqual({ proceed: true, cost: 0 });
 
-      const screenConfigDisabled = { enabled: false }; // LLM screen explicitly disabled
+      const screenConfigDisabled = { enabled: false };
       const resultDisabled = await mainModule.handleLlmTradeScreeningInternal(
         mockSignal,
         mockChartName,
-        new (LlmConfirmationScreen as any)(), // Instance exists
-        screenConfigDisabled, // But config says disabled
+        new (LlmConfirmationScreen as any)(),
+        screenConfigDisabled,
         mockMergedConfigValue,
         currentAppConfig
       );
@@ -189,13 +160,13 @@ describe('LLM Trade Screening Tests', () => {
 
     it('should call LLM screen if enabled and return its decision with cost', async () => {
       const localMockLlmInstance = new (LlmConfirmationScreen as any)();
-      const expectedChartPath = 'path/to/chart.png'; // From chartGenerator mock
+      const expectedChartPath = 'path/to/chart.png';
       const mockScreenCost = 0.005;
       const screenConfigEnabled = { enabled: true };
       const currentAppConfig = getMockAppConfig();
       const currentMergedConfig = {
         ...mockMergedConfigValue,
-        generateCharts: true, // Ensure chart generation is on for path to be used
+        generateCharts: true,
       };
 
       vi.mocked(localMockLlmInstance.shouldSignalProceed).mockResolvedValueOnce({
@@ -208,7 +179,7 @@ describe('LLM Trade Screening Tests', () => {
         mockChartName,
         localMockLlmInstance,
         screenConfigEnabled,
-        currentMergedConfig, // Use config that has generateCharts: true
+        currentMergedConfig,
         currentAppConfig
       );
       expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalledWith(
@@ -223,7 +194,6 @@ describe('LLM Trade Screening Tests', () => {
       vi.mocked(localMockLlmInstance.shouldSignalProceed).mockResolvedValueOnce({
         proceed: true,
         cost: secondMockCost,
-        // Direction might also be returned by shouldSignalProceed in some cases
       });
 
       const resultTrue = await mainModule.handleLlmTradeScreeningInternal(
@@ -236,7 +206,7 @@ describe('LLM Trade Screening Tests', () => {
       );
       expect(resultTrue).toEqual({
         proceed: true,
-        chartPath: expectedChartPath, // Chart path should be included when proceed is true
+        chartPath: expectedChartPath,
         cost: secondMockCost,
       });
       expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalledTimes(2);

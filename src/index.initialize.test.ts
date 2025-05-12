@@ -58,8 +58,8 @@ vi.mock('./utils/output.js', async () => {
   const actual = await vi.importActual('./utils/output.js');
   return {
     ...actual,
-    printHeader: vi.fn(), // Potentially called by mainModule if not split perfectly
-    printFooter: vi.fn(), // Potentially called by mainModule if not split perfectly
+    printHeader: vi.fn(),
+    printFooter: vi.fn(),
   };
 });
 
@@ -75,7 +75,6 @@ vi.mock('./utils/chart-generator.js', () => ({
 vi.mock('./utils/calculations.js', async () => {
   const actualCalculations = (await vi.importActual('./utils/calculations.js')) as any;
   return {
-    // Mock specific functions as needed, or return actuals if they don't have side effects
     isWinningTrade: actualCalculations.isWinningTrade,
   };
 });
@@ -122,8 +121,6 @@ describe('initializeAnalysis', () => {
     vi.mocked(mergeConfigWithCliOptions).mockReturnValue(mockMergedConfigValue);
     vi.mocked(getEntryPattern).mockReturnValue(mockEntryPatternValue);
     vi.mocked(getExitPattern).mockReturnValue(mockExitPatternValue);
-    // No need to mock fetchTradesFromQuery or buildAnalysisQuery here if not directly called by initializeAnalysis
-    // However, buildAnalysisQuery *is* called, so its mock is needed.
     vi.mocked(buildAnalysisQuery).mockReturnValue(mockQueryValue);
   });
 
