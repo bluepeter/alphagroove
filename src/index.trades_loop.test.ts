@@ -1,8 +1,8 @@
-import { vi, describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
+import { vi, describe, it, expect, beforeAll, beforeEach } from 'vitest';
+import { LlmConfirmationScreen } from './screens/llm-confirmation.screen.js';
 
 const mockQueryValue = 'DRY_RUN_SQL_QUERY_FROM_INDEX_TEST';
 
-// Mock external dependencies
 vi.mock('./utils/config.js', async () => {
   const actual = await vi.importActual('./utils/config.js');
   return {
@@ -86,33 +86,11 @@ vi.mock('./utils/calculations.js', async () => {
   };
 });
 
-// Import the modules that are being mocked to access their mocked functions
 import { getEntryPattern, getExitPattern } from './patterns/pattern-factory.js';
-// Calculation functions (calculateMeanReturn, etc.) are not directly tested here anymore,
-// their effects are tested via output.test.ts or through isWinningTrade mock if needed.
-// The mock for './utils/calculations.js' still provides isWinningTrade (actual) for index.ts usage.
-/*
-import {
-  calculateMeanReturn,
-  calculateMedianReturn,
-  calculateStdDevReturn,
-  isWinningTrade,
-} from './utils/calculations.js';
-*/
-import {
-  generateEntryChart as _generateEntryChart,
-  generateEntryCharts,
-} from './utils/chart-generator.js';
 import { loadConfig, mergeConfigWithCliOptions } from './utils/config.js';
 import { fetchTradesFromQuery } from './utils/data-loader.js';
 import { mapRawDataToTrade } from './utils/mappers.js';
-import {
-  printHeader,
-  printTradeDetails,
-  printYearSummary,
-  printOverallSummary,
-  printFooter,
-} from './utils/output.js';
+import { printTradeDetails, printYearSummary } from './utils/output.js';
 import { buildAnalysisQuery } from './utils/query-builder.js';
 
 let mainModule: any;
@@ -121,8 +99,7 @@ beforeAll(async () => {
   mainModule = await import('./index.js');
 });
 
-describe('runAnalysis refactored components', () => {
-  let mockCliOptions: any;
+describe('Process Trades Loop Tests', () => {
   let mockRawConfig: any;
   let mockMergedConfigValue: any;
   let mockEntryPatternValue: any;
@@ -130,7 +107,6 @@ describe('runAnalysis refactored components', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCliOptions = { config: 'path/to/config.yaml' };
     mockRawConfig = { someBaseOpt: 'value' };
     mockMergedConfigValue = {
       ticker: 'TEST',
@@ -156,93 +132,96 @@ describe('runAnalysis refactored components', () => {
     vi.mocked(buildAnalysisQuery).mockReturnValue(mockQueryValue);
   });
 
-  describe('finalizeAnalysis', () => {
-    it('should calculate final stats and print summary', async () => {
-      const initialLongStats = {
-        trades: [
-          { return_pct: 0.5, direction: 'long' },
-          { return_pct: -0.2, direction: 'long' },
-        ] as any[],
-        winning_trades: 1,
-        total_return_sum: 0.3,
-        all_returns: [0.5, -0.2],
-      };
-      const initialShortStats = {
-        trades: [],
-        winning_trades: 0,
-        total_return_sum: 0,
-        all_returns: [],
-      };
+  describe('processTradesLoop', () => {
+    it('should process trades, and correctly call mappers and output functions', async () => {
+      const mockTradesFromQueryData = [
+        {
+          entry_time: '09:30',
+          trade_date: '2023-01-01',
+          entry_price: 100,
+          return_pct: 0.5,
+          year: '2023',
+          match_count: 1,
+          direction: 'long',
+        },
+        {
+          entry_time: '10:00',
+          trade_date: '2023-01-01',
+          entry_price: 101,
+          return_pct: -0.2,
+          year: '2023',
+          match_count: 1,
+          direction: 'long',
+        },
+      ];
+      vi.mocked(fetchTradesFromQuery).mockReturnValue(mockTradesFromQueryData as any);
+
+      vi.mocked(mapRawDataToTrade)
+        .mockImplementationOnce(
+          (rd: any, tradeDirection: string) =>
+            ({ ...rd, mapped_call: 1, direction: tradeDirection }) as any
+        )
+        .mockImplementationOnce(
+          (rd: any, tradeDirection: string) =>
+            ({ ...rd, mapped_call: 2, direction: tradeDirection }) as any
+        );
+
+      const initialDirectionalStatsTemplate = { winning_trades: 0, total_return_sum: 0 };
       const totalStats: any = {
-        long_stats: { ...initialLongStats },
-        short_stats: { ...initialShortStats },
-        total_trading_days: 10,
-        total_raw_matches: 2,
-        grandTotalLlmCost: 0.05,
+        long_stats: { ...initialDirectionalStatsTemplate, trades: [], all_returns: [] },
+        short_stats: { ...initialDirectionalStatsTemplate, trades: [], all_returns: [] },
+        total_trading_days: 0,
+        total_raw_matches: 0,
+        total_llm_confirmed_trades: 0,
+        grandTotalLlmCost: 0,
       };
 
       const currentMergedConfig = {
         ...mockMergedConfigValue,
         direction: 'long',
-        generateCharts: true,
+        llmConfirmationScreen: { enabled: true, agreementThreshold: 1 },
       };
 
-      await mainModule.finalizeAnalysis(totalStats, mockEntryPatternValue, currentMergedConfig);
-
-      expect(printOverallSummary).toHaveBeenCalledWith(totalStats);
-      expect(generateEntryCharts).toHaveBeenCalled();
-      expect(printFooter).toHaveBeenCalled();
-      expect(totalStats.total_llm_confirmed_trades).toBe(2);
-    });
-  });
-
-  describe('runAnalysis full flow', () => {
-    let consoleLogSpy: ReturnType<typeof vi.spyOn>;
-
-    beforeEach(() => {
-      vi.mocked(loadConfig).mockClear();
-      vi.mocked(mergeConfigWithCliOptions).mockClear();
-      vi.mocked(getEntryPattern).mockClear();
-      vi.mocked(getExitPattern).mockClear();
-      vi.mocked(buildAnalysisQuery).mockClear();
-      vi.mocked(fetchTradesFromQuery).mockClear();
-      vi.mocked(printHeader).mockClear();
-      vi.mocked(mapRawDataToTrade).mockClear();
-      vi.mocked(printTradeDetails).mockClear();
-      vi.mocked(printYearSummary).mockClear();
-      vi.mocked(printOverallSummary).mockClear();
-      vi.mocked(printFooter).mockClear();
-      consoleLogSpy = vi.spyOn(console, 'log');
-    });
-
-    afterEach(() => {
-      consoleLogSpy.mockRestore();
-    });
-
-    it('should handle dry run correctly', async () => {
-      mockCliOptions.dryRun = true;
-      const dryRunQuery = 'DRY RUN SQL QUERY';
-      vi.mocked(loadConfig).mockReturnValue(mockRawConfig);
-      vi.mocked(mergeConfigWithCliOptions).mockReturnValue({
-        ...mockMergedConfigValue,
-        debug: true,
+      const mockLlmScreenInstance = new (LlmConfirmationScreen as any)();
+      vi.mocked(mockLlmScreenInstance.shouldSignalProceed).mockResolvedValue({
+        proceed: true,
+        cost: 0.01,
+        direction: 'long',
       });
-      vi.mocked(getEntryPattern).mockReturnValue(mockEntryPatternValue);
-      vi.mocked(getExitPattern).mockReturnValue(mockExitPatternValue);
-      vi.mocked(buildAnalysisQuery).mockReturnValue(dryRunQuery);
 
-      await mainModule.runAnalysis(mockCliOptions);
-
-      expect(buildAnalysisQuery).toHaveBeenCalled();
-      expect(consoleLogSpy).toHaveBeenCalledWith(`\nDEBUG - SQL Query:\n${dryRunQuery}`);
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '\nDry run requested. Exiting without executing query.'
+      const result = await mainModule.processTradesLoop(
+        mockTradesFromQueryData,
+        currentMergedConfig,
+        mockEntryPatternValue,
+        mockLlmScreenInstance,
+        currentMergedConfig.llmConfirmationScreen,
+        mockRawConfig,
+        totalStats
       );
-      expect(fetchTradesFromQuery).not.toHaveBeenCalled();
-      expect(printFooter).toHaveBeenCalledTimes(1);
-      expect(printHeader).not.toHaveBeenCalled();
-      expect(mapRawDataToTrade).not.toHaveBeenCalled();
-      expect(printOverallSummary).not.toHaveBeenCalled();
+
+      expect(result.confirmedTradesCount).toBe(mockTradesFromQueryData.length);
+
+      expect(mapRawDataToTrade).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ return_pct: 0.5 }),
+        'long',
+        expect.any(String)
+      );
+      expect(mapRawDataToTrade).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ return_pct: -0.2 }),
+        'long',
+        expect.any(String)
+      );
+
+      expect(printTradeDetails).toHaveBeenCalledTimes(mockTradesFromQueryData.length);
+      expect(totalStats.long_stats.trades.length).toBe(mockTradesFromQueryData.length);
+      expect(totalStats.long_stats.winning_trades).toBe(1);
+      expect(totalStats.long_stats.all_returns).toEqual([0.5, -0.2]);
+      expect(totalStats.short_stats.trades.length).toBe(0);
+      expect(totalStats.grandTotalLlmCost).toBe(mockTradesFromQueryData.length * 0.01);
+
+      expect(printYearSummary).toHaveBeenCalled();
     });
   });
 });

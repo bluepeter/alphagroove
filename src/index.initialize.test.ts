@@ -3,7 +3,6 @@ import { LlmConfirmationScreen as _ActualLlmConfirmationScreen } from './screens
 
 const mockQueryValue = 'DRY_RUN_SQL_QUERY_FROM_INDEX_TEST';
 
-// Mock external dependencies
 vi.mock('./utils/config.js', async () => {
   const actual = await vi.importActual('./utils/config.js');
   return {
