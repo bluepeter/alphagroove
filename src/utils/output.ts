@@ -36,6 +36,7 @@ export interface Trade {
   match_count?: number;
   direction?: 'long' | 'short';
   chartPath?: string; // Path to the chart generated for LLM screening
+  exit_reason?: string; // Reason for exit (stopLoss, profitTarget, trailingStop, maxHoldTime, endOfDay)
 }
 
 // New Statistics Interfaces
@@ -110,8 +111,10 @@ export const printTradeDetails = (trade: Trade) => {
   const isWin = isWinningTrade(trade.return_pct, isShort);
   const returnEmoji = isWin ? '✅' : '❌';
 
+  const exitReasonText = trade.exit_reason ? `[${trade.exit_reason}]` : '';
+
   console.log(
-    `${emoji} ${date} ⏰ ${entryTime} → ${exitTime} Open: ${open} Entry: ${entry} Exit: ${exit} ${changeText ? changeText + ' ' : ''}${returnEmoji} Return: ${isWin ? chalk.green(returnPctStr) : chalk.red(returnPctStr)}`
+    `${emoji} ${date} ⏰ ${entryTime} → ${exitTime} Open: ${open} Entry: ${entry} Exit: ${exit} ${changeText ? changeText + ' ' : ''}${returnEmoji} Return: ${isWin ? chalk.green(returnPctStr) : chalk.red(returnPctStr)} ${exitReasonText}`
   );
 };
 

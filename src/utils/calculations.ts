@@ -1,5 +1,15 @@
 import { Trade } from './output';
 
+// Define a Bar type for calculations
+export interface Bar {
+  timestamp: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume?: number;
+}
+
 // Helper formatting functions
 export const formatDate = (dateString: string): string => {
   return dateString;
@@ -81,5 +91,79 @@ export const isWinningTrade = (returnPct: number, isShort: boolean): boolean => 
   } else {
     // For longs, a non-negative return means a winning trade
     return returnPct >= 0;
+  }
+};
+
+/**
+ * Calculate True Range value for a single bar
+ * @param currentBar Current price bar
+ * @param previousBar Previous price bar (if available)
+ * @returns True Range value
+ */
+export const calculateTrueRange = (currentBar: Bar, previousBar?: Bar): number => {
+  // If no previous bar is available, use high - low as the true range
+  if (!previousBar) {
+    return currentBar.high - currentBar.low;
+  }
+
+  // True Range is the greatest of:
+  // 1. Current High - Current Low
+  // 2. |Current High - Previous Close|
+  // 3. |Current Low - Previous Close|
+  const highLow = currentBar.high - currentBar.low;
+  const highPrevClose = Math.abs(currentBar.high - previousBar.close);
+  const lowPrevClose = Math.abs(currentBar.low - previousBar.close);
+
+  return Math.max(highLow, highPrevClose, lowPrevClose);
+};
+
+/**
+ * Calculate Average True Range (ATR) for a series of bars
+ * @param bars Array of price bars
+ * @param periods Number of periods for the ATR calculation (default: 14)
+ * @returns ATR value or undefined if not enough data
+ */
+export const calculateATR = (bars: Bar[], periods: number = 14): number | undefined => {
+  if (bars.length < periods + 1) {
+    return undefined; // Not enough data
+  }
+
+  const trValues: number[] = [];
+
+  // Calculate TR values for each bar
+  for (let i = 1; i < bars.length; i++) {
+    trValues.push(calculateTrueRange(bars[i], bars[i - 1]));
+  }
+
+  // If we have fewer TR values than the ATR period, return undefined
+  if (trValues.length < periods) {
+    return undefined;
+  }
+
+  // Calculate simple average of the last 'periods' TR values
+  const sum = trValues.slice(-periods).reduce((acc, val) => acc + val, 0);
+  return sum / periods;
+};
+
+/**
+ * Calculate ATR-based stop loss price
+ * @param entryPrice Entry price
+ * @param atr ATR value
+ * @param multiplier ATR multiplier
+ * @param isLong Whether this is a long trade (true) or short trade (false)
+ * @returns Stop loss price
+ */
+export const calculateATRStopLoss = (
+  entryPrice: number,
+  atr: number,
+  multiplier: number,
+  isLong: boolean
+): number => {
+  if (isLong) {
+    // For long trades, stop is below entry price
+    return entryPrice - atr * multiplier;
+  } else {
+    // For short trades, stop is above entry price
+    return entryPrice + atr * multiplier;
   }
 };

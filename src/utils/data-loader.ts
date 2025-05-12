@@ -1,6 +1,7 @@
 import { execSync } from 'child_process';
 import { writeFileSync, unlinkSync, existsSync } from 'fs';
 import { join } from 'path';
+import { Bar } from './calculations';
 
 export const fetchTradesFromQuery = (query: string): Array<Record<string, string | number>> => {
   const tempFile = join(process.cwd(), 'temp_query.sql');
@@ -51,4 +52,110 @@ export const fetchTradesFromQuery = (query: string): Array<Record<string, string
       unlinkSync(tempFile);
     }
   }
+};
+
+/**
+ * Fetch all bars for a specific trading day after entry time
+ * @param ticker Stock ticker symbol
+ * @param timeframe Bar timeframe (e.g., '1min')
+ * @param tradeDate Trading date (YYYY-MM-DD)
+ * @param entryTime Entry time (HH:MM:SS)
+ * @returns Array of bars for the trading day after entry time
+ */
+export const fetchBarsForTradingDay = (
+  ticker: string,
+  timeframe: string,
+  tradeDate: string,
+  entryTime: string
+): Bar[] => {
+  const query = `
+    WITH raw_data AS (
+      SELECT 
+        column0::TIMESTAMP as timestamp,
+        column1::DOUBLE as open,
+        column2::DOUBLE as high,
+        column3::DOUBLE as low,
+        column4::DOUBLE as close,
+        column5::BIGINT as volume
+      FROM read_csv_auto('tickers/${ticker}/${timeframe}.csv', header=false)
+      WHERE column0 >= '${tradeDate} 00:00:00' 
+        AND column0 <= '${tradeDate} 23:59:59'
+    )
+    SELECT 
+      timestamp,
+      open,
+      high,
+      low,
+      close,
+      volume
+    FROM raw_data
+    WHERE timestamp >= TIMESTAMP '${tradeDate} ${entryTime}'
+    ORDER BY timestamp ASC
+  `;
+
+  const rawBars = fetchTradesFromQuery(query);
+
+  return rawBars.map(bar => ({
+    timestamp: bar.timestamp as string,
+    open: bar.open as number,
+    high: bar.high as number,
+    low: bar.low as number,
+    close: bar.close as number,
+    volume: bar.volume as number | undefined,
+  }));
+};
+
+/**
+ * Fetch bars before entry for ATR calculation
+ * @param ticker Stock ticker symbol
+ * @param timeframe Bar timeframe (e.g., '1min')
+ * @param tradeDate Trading date (YYYY-MM-DD)
+ * @param entryTime Entry time (HH:MM:SS)
+ * @param periods Number of bars needed for ATR calculation
+ * @returns Array of bars for ATR calculation
+ */
+export const fetchBarsForATR = (
+  ticker: string,
+  timeframe: string,
+  tradeDate: string,
+  entryTime: string,
+  periods: number = 14
+): Bar[] => {
+  const query = `
+    WITH raw_data AS (
+      SELECT 
+        column0::TIMESTAMP as timestamp,
+        column1::DOUBLE as open,
+        column2::DOUBLE as high,
+        column3::DOUBLE as low,
+        column4::DOUBLE as close,
+        column5::BIGINT as volume
+      FROM read_csv_auto('tickers/${ticker}/${timeframe}.csv', header=false)
+    )
+    SELECT 
+      timestamp,
+      open,
+      high,
+      low,
+      close,
+      volume
+    FROM raw_data
+    WHERE timestamp <= TIMESTAMP '${tradeDate} ${entryTime}'
+    ORDER BY timestamp DESC
+    LIMIT ${periods + 1}
+  `;
+
+  const rawBars = fetchTradesFromQuery(query);
+
+  // Sort bars in ascending order for calculation
+  return rawBars
+    .map(bar => ({
+      timestamp: bar.timestamp as string,
+      open: bar.open as number,
+      high: bar.high as number,
+      low: bar.low as number,
+      close: bar.close as number,
+      volume: bar.volume as number | undefined,
+    }))
+    .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 };

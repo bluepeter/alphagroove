@@ -31,5 +31,6 @@ export const mapRawDataToTrade = (
     direction: entryPatternDirection,
     chartPath,
     avg_return: rawTradeData.avg_return as number | undefined,
+    exit_reason: rawTradeData.exit_reason as string | undefined,
   };
 };

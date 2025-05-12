@@ -1,159 +1,137 @@
-import { vi, describe, it, expect, beforeAll, beforeEach } from 'vitest';
-import { LlmConfirmationScreen as _ActualLlmConfirmationScreen } from './screens/llm-confirmation.screen.js';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
+import type { Config, MergedConfig, LLMScreenConfig } from './utils/config';
 
-const mockQueryValue = 'DRY_RUN_SQL_QUERY_FROM_INDEX_TEST';
+// Mock the modules
+vi.mock('./utils/config.js', () => ({
+  loadConfig: vi.fn(),
+  mergeConfigWithCliOptions: vi.fn(),
+}));
 
-vi.mock('./utils/config.js', async () => {
-  const actual = await vi.importActual('./utils/config.js');
-  return {
-    ...actual,
-    loadConfig: vi.fn(() => ({})),
-    mergeConfigWithCliOptions: vi.fn((_baseConfig: any, _cliOpts: any) => ({
-      ..._baseConfig,
-      ..._cliOpts,
-      ticker: 'TEST',
-      from: '2023-01-01',
-      to: '2023-01-02',
-      entryPattern: 'test-entry',
-      exitPattern: 'test-exit',
-      timeframe: '1min',
-      llmConfirmationScreen: { enabled: false },
-      generateCharts: false,
-    })),
-  };
-});
+vi.mock('./patterns/pattern-factory.js', () => ({
+  getEntryPattern: vi.fn(),
+}));
 
-vi.mock('./utils/data-loader.js', () => ({
-  fetchTradesFromQuery: vi.fn(() => []),
+vi.mock('./patterns/exit/exit-strategy.js', () => ({
+  createExitStrategies: vi.fn(),
 }));
 
 vi.mock('./utils/query-builder.js', () => ({
-  buildAnalysisQuery: vi.fn(() => mockQueryValue),
+  buildAnalysisQuery: vi.fn(),
 }));
-
-vi.mock('./patterns/pattern-factory.js', async () => {
-  const actual = await vi.importActual('./patterns/pattern-factory.js');
-  return {
-    ...actual,
-    getEntryPattern: vi.fn(() => ({
-      name: 'test-entry',
-      direction: 'long',
-      apply: vi.fn(),
-    })),
-    getExitPattern: vi.fn(() => ({ name: 'test-exit', apply: vi.fn() })),
-  };
-});
 
 vi.mock('./screens/llm-confirmation.screen.js', () => ({
-  LlmConfirmationScreen: vi.fn().mockImplementation(() => ({
-    shouldSignalProceed: vi.fn(() =>
-      Promise.resolve({ proceed: true, cost: 0, direction: 'long' })
-    ),
-  })),
+  LlmConfirmationScreen: vi.fn(),
 }));
 
-// Only mock parts of output that are used or to prevent console noise if not tested here
-vi.mock('./utils/output.js', async () => {
-  const actual = await vi.importActual('./utils/output.js');
-  return {
-    ...actual,
-    printHeader: vi.fn(),
-    printFooter: vi.fn(),
-  };
-});
-
-vi.mock('./utils/mappers.js', () => ({
-  mapRawDataToTrade: vi.fn(data => ({ ...data, mapped: true }) as any),
-}));
-
-vi.mock('./utils/chart-generator.js', () => ({
-  generateEntryChart: vi.fn(() => Promise.resolve('path/to/chart.png')),
-  generateEntryCharts: vi.fn(() => Promise.resolve([])),
-}));
-
-vi.mock('./utils/calculations.js', async () => {
-  const actualCalculations = (await vi.importActual('./utils/calculations.js')) as any;
-  return {
-    isWinningTrade: actualCalculations.isWinningTrade,
-  };
-});
-
-import { getEntryPattern, getExitPattern } from './patterns/pattern-factory.js';
-import { LlmConfirmationScreen } from './screens/llm-confirmation.screen.js';
+// Import after mocks
+import { initializeAnalysis } from './index.js';
 import { loadConfig, mergeConfigWithCliOptions } from './utils/config.js';
+import { getEntryPattern } from './patterns/pattern-factory.js';
+import { createExitStrategies } from './patterns/exit/exit-strategy.js';
 import { buildAnalysisQuery } from './utils/query-builder.js';
-
-let mainModule: any;
-
-beforeAll(async () => {
-  mainModule = await import('./index.js');
-});
+import { LlmConfirmationScreen } from './screens/llm-confirmation.screen.js';
 
 describe('initializeAnalysis', () => {
-  let mockCliOptions: any;
-  let mockRawConfig: any;
-  let mockMergedConfigValue: any;
-  let mockEntryPatternValue: any;
-  let mockExitPatternValue: any;
+  const mockLlmScreenConfig: LLMScreenConfig = {
+    enabled: false,
+    llmProvider: 'anthropic',
+    modelName: 'claude-3-7-sonnet-latest',
+    apiKeyEnvVar: 'ANTHROPIC_API_KEY',
+    numCalls: 3,
+    agreementThreshold: 2,
+    temperatures: [0.2, 0.5, 0.8],
+    prompts: 'Test prompt',
+    commonPromptSuffixForJson: '{}',
+    maxOutputTokens: 150,
+  };
+
+  const mockRawConfigValue: Config = {
+    default: {
+      ticker: 'SPY',
+      timeframe: '1min',
+      direction: 'long',
+      patterns: {
+        entry: 'test-pattern',
+      },
+    },
+    patterns: {
+      entry: {},
+    },
+  };
+
+  const mockMergedConfigValue: MergedConfig = {
+    ticker: 'TEST',
+    timeframe: '1min',
+    direction: 'long',
+    from: '2023-01-01',
+    to: '2023-01-05',
+    entryPattern: 'test-pattern',
+    generateCharts: false,
+    chartsDir: './charts',
+    llmConfirmationScreen: mockLlmScreenConfig,
+  };
+
+  const mockEntryPatternValue = {
+    name: 'test-pattern',
+    sql: 'test-sql',
+    description: 'Test pattern',
+    defaultConfig: {},
+  };
+
+  const mockExitStrategiesValue = [{ name: 'maxHoldTime', evaluate: vi.fn() }];
+  const mockQueryValue = 'SELECT * FROM test';
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCliOptions = { config: 'path/to/config.yaml' };
-    mockRawConfig = { someBaseOpt: 'value' };
-    mockMergedConfigValue = {
-      ticker: 'TEST',
-      from: '2023-01-01',
-      to: '2023-01-02',
-      entryPattern: 'test-entry',
-      exitPattern: 'test-exit',
-      timeframe: '1min',
-      direction: 'long',
-      llmConfirmationScreen: { enabled: false },
-      generateCharts: false,
-      someBaseOpt: 'value',
-      config: 'path/to/config.yaml',
-    };
-    mockEntryPatternValue = { name: 'test-entry', direction: 'long', apply: vi.fn() };
-    mockExitPatternValue = { name: 'test-exit', apply: vi.fn() };
-
-    vi.mocked(loadConfig).mockReturnValue(mockRawConfig);
+    vi.mocked(loadConfig).mockReturnValue(mockRawConfigValue);
     vi.mocked(mergeConfigWithCliOptions).mockReturnValue(mockMergedConfigValue);
     vi.mocked(getEntryPattern).mockReturnValue(mockEntryPatternValue);
-    vi.mocked(getExitPattern).mockReturnValue(mockExitPatternValue);
+    vi.mocked(createExitStrategies).mockReturnValue(mockExitStrategiesValue);
     vi.mocked(buildAnalysisQuery).mockReturnValue(mockQueryValue);
+    vi.mocked(LlmConfirmationScreen).mockImplementation(() => ({}) as any);
   });
 
   it('should load config, get patterns, and build query', () => {
-    const result = mainModule.initializeAnalysis(mockCliOptions);
-    expect(loadConfig).toHaveBeenCalledWith(mockCliOptions.config);
-    expect(mergeConfigWithCliOptions).toHaveBeenCalledWith(mockRawConfig, mockCliOptions);
+    const cliOptions = { config: 'test.yaml' };
+    const result = initializeAnalysis(cliOptions);
+
+    expect(loadConfig).toHaveBeenCalledWith(cliOptions.config);
+    expect(mergeConfigWithCliOptions).toHaveBeenCalledWith(mockRawConfigValue, cliOptions);
+
     expect(getEntryPattern).toHaveBeenCalledWith(
       mockMergedConfigValue.entryPattern,
       mockMergedConfigValue
     );
-    expect(getExitPattern).toHaveBeenCalledWith(undefined, mockMergedConfigValue);
-    expect(buildAnalysisQuery).toHaveBeenCalledWith(
-      mockMergedConfigValue,
-      mockEntryPatternValue,
-      mockExitPatternValue
-    );
-    expect(result.query).toBe(mockQueryValue);
-    expect(result.entryPattern.name).toBe('test-entry');
-    expect(result.exitPattern.name).toBe('test-exit');
-    expect(result.rawConfig).toEqual(mockRawConfig);
-    expect(result.mergedConfig).toEqual(mockMergedConfigValue);
+    expect(createExitStrategies).toHaveBeenCalledWith(mockMergedConfigValue);
+
+    expect(buildAnalysisQuery).toHaveBeenCalledWith(mockMergedConfigValue, mockEntryPatternValue);
+
+    expect(result).toEqual({
+      rawConfig: mockRawConfigValue,
+      mergedConfig: mockMergedConfigValue,
+      llmScreenInstance: null,
+      screenSpecificLLMConfig: mockMergedConfigValue.llmConfirmationScreen,
+      entryPattern: mockEntryPatternValue,
+      exitStrategies: mockExitStrategiesValue,
+      query: mockQueryValue,
+    });
   });
 
   it('should enable LLM screen if configured', () => {
-    const llmEnabledConfig = {
-      ...mockMergedConfigValue,
-      llmConfirmationScreen: { enabled: true },
+    const enabledLlmConfig = {
+      ...mockLlmScreenConfig,
+      enabled: true,
     };
-    vi.mocked(mergeConfigWithCliOptions).mockReturnValue(llmEnabledConfig);
-    const { llmScreenInstance, screenSpecificLLMConfig } =
-      mainModule.initializeAnalysis(mockCliOptions);
-    expect(llmScreenInstance).not.toBeNull();
+
+    const mergedConfigWithLLM: MergedConfig = {
+      ...mockMergedConfigValue,
+      llmConfirmationScreen: enabledLlmConfig,
+    };
+    vi.mocked(mergeConfigWithCliOptions).mockReturnValue(mergedConfigWithLLM);
+
+    const result = initializeAnalysis({});
+
     expect(LlmConfirmationScreen).toHaveBeenCalled();
-    expect(screenSpecificLLMConfig.enabled).toBe(true);
+    expect(result.llmScreenInstance).not.toBeNull();
   });
 });

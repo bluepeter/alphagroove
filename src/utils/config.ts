@@ -31,16 +31,54 @@ const EntryPatternsConfigSchema = z.object({
   'fixed-time-entry': FixedTimeEntryConfigSchema.optional(),
 });
 
-// NEW: Define schema for MaxHoldTime configuration
+// NEW: Define schemas for exit strategies
+// Stop Loss configuration
+const StopLossConfigSchema = z.object({
+  percentFromEntry: z.number().default(1.0),
+  atrMultiplier: z.number().optional(),
+});
+
+// Profit Target configuration
+const ProfitTargetConfigSchema = z.object({
+  percentFromEntry: z.number().default(2.0),
+  atrMultiplier: z.number().optional(),
+});
+
+// Trailing Stop configuration
+const TrailingStopConfigSchema = z.object({
+  activationPercent: z.number().default(1.0),
+  trailPercent: z.number().default(0.5),
+});
+
+// End of Day configuration
+const EndOfDayConfigSchema = z.object({
+  time: z
+    .string()
+    .regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Time must be in HH:MM format')
+    .default('16:00'),
+});
+
+// Slippage model configuration
+const SlippageConfigSchema = z.object({
+  model: z.enum(['percent', 'fixed']).default('percent'),
+  value: z.number().default(0.05),
+});
+
+// Define schema for MaxHoldTime configuration
 const MaxHoldTimeConfigSchema = z.object({
   minutes: z.number().int().positive().default(60),
 });
 
-// NEW: Define schema for ExitStrategies configuration
+// Define schema for ExitStrategies configuration
 const ExitStrategiesConfigSchema = z
   .object({
     enabled: z.array(z.string()).default(['maxHoldTime']),
     maxHoldTime: MaxHoldTimeConfigSchema.optional(),
+    stopLoss: StopLossConfigSchema.optional(),
+    profitTarget: ProfitTargetConfigSchema.optional(),
+    trailingStop: TrailingStopConfigSchema.optional(),
+    endOfDay: EndOfDayConfigSchema.optional(),
+    slippage: SlippageConfigSchema.optional(),
   })
   .default({
     enabled: ['maxHoldTime'],
@@ -139,6 +177,14 @@ const ConfigSchema = z
 export type Config = z.infer<typeof ConfigSchema>;
 export type ExitStrategiesConfig = z.infer<typeof ExitStrategiesConfigSchema>; // Exporting for use elsewhere
 
+// Export types for each strategy configuration
+export type StopLossConfig = z.infer<typeof StopLossConfigSchema>;
+export type ProfitTargetConfig = z.infer<typeof ProfitTargetConfigSchema>;
+export type TrailingStopConfig = z.infer<typeof TrailingStopConfigSchema>;
+export type EndOfDayConfig = z.infer<typeof EndOfDayConfigSchema>;
+export type MaxHoldTimeConfig = z.infer<typeof MaxHoldTimeConfigSchema>;
+export type SlippageConfig = z.infer<typeof SlippageConfigSchema>;
+
 /**
  * Default configuration when no config file exists
  */
@@ -156,6 +202,26 @@ const DEFAULT_CONFIG: Config = {
     },
     exitStrategies: {
       enabled: ['maxHoldTime'],
+      maxHoldTime: {
+        minutes: 60,
+      },
+      stopLoss: {
+        percentFromEntry: 1.0,
+      },
+      profitTarget: {
+        percentFromEntry: 2.0,
+      },
+      trailingStop: {
+        activationPercent: 1.0,
+        trailPercent: 0.5,
+      },
+      endOfDay: {
+        time: '16:00',
+      },
+      slippage: {
+        model: 'percent',
+        value: 0.05,
+      },
     },
   },
   patterns: {
@@ -179,6 +245,26 @@ const DEFAULT_CONFIG: Config = {
   }),
   exitStrategies: {
     enabled: ['maxHoldTime'],
+    maxHoldTime: {
+      minutes: 60,
+    },
+    stopLoss: {
+      percentFromEntry: 1.0,
+    },
+    profitTarget: {
+      percentFromEntry: 2.0,
+    },
+    trailingStop: {
+      activationPercent: 1.0,
+      trailPercent: 0.5,
+    },
+    endOfDay: {
+      time: '16:00',
+    },
+    slippage: {
+      model: 'percent',
+      value: 0.05,
+    },
   },
 };
 
@@ -241,6 +327,26 @@ export const createDefaultConfigFile = (): void => {
         },
         exitStrategies: {
           enabled: ['maxHoldTime'],
+          maxHoldTime: {
+            minutes: 60,
+          },
+          stopLoss: {
+            percentFromEntry: 1.0,
+          },
+          profitTarget: {
+            percentFromEntry: 2.0,
+          },
+          trailingStop: {
+            activationPercent: 1.0,
+            trailPercent: 0.5,
+          },
+          endOfDay: {
+            time: '16:00',
+          },
+          slippage: {
+            model: 'percent',
+            value: 0.05,
+          },
         },
       },
       patterns: {
@@ -265,6 +371,26 @@ export const createDefaultConfigFile = (): void => {
       },
       exitStrategies: {
         enabled: ['maxHoldTime'],
+        maxHoldTime: {
+          minutes: 60,
+        },
+        stopLoss: {
+          percentFromEntry: 1.0,
+        },
+        profitTarget: {
+          percentFromEntry: 2.0,
+        },
+        trailingStop: {
+          activationPercent: 1.0,
+          trailPercent: 0.5,
+        },
+        endOfDay: {
+          time: '16:00',
+        },
+        slippage: {
+          model: 'percent',
+          value: 0.05,
+        },
       },
     };
 

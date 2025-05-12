@@ -6,7 +6,6 @@ import {
   getAvailableEntryPatterns,
   getAvailableExitPatterns,
   getEntryPattern,
-  getExitPattern,
 } from './patterns/pattern-factory.js';
 import { type Signal } from './patterns/types';
 import { LlmConfirmationScreen } from './screens/llm-confirmation.screen';
@@ -22,7 +21,11 @@ import {
   mergeConfigWithCliOptions,
   type MergedConfig,
 } from './utils/config.js';
-import { fetchTradesFromQuery } from './utils/data-loader.js';
+import {
+  fetchTradesFromQuery,
+  fetchBarsForTradingDay,
+  fetchBarsForATR,
+} from './utils/data-loader.js';
 import { mapRawDataToTrade } from './utils/mappers.js';
 import {
   printHeader,
@@ -36,6 +39,13 @@ import {
   type DirectionalTradeStats,
 } from './utils/output.js';
 import { buildAnalysisQuery } from './utils/query-builder.js';
+import {
+  createExitStrategies,
+  ExitStrategy,
+  ExitSignal,
+  applySlippage,
+} from './patterns/exit/exit-strategy.js';
+import { calculateATR } from './utils/calculations.js';
 
 const generateChartForLLMDecision = async (
   signalData: EnrichedSignal,
@@ -129,9 +139,12 @@ export const initializeAnalysis = (cliOptions: Record<string, any>) => {
   }
 
   const entryPattern = getEntryPattern(mergedConfig.entryPattern, mergedConfig);
-  const exitPattern = getExitPattern(undefined, mergedConfig);
 
-  const query = buildAnalysisQuery(mergedConfig, entryPattern, exitPattern);
+  // Create exit strategies from config
+  const exitStrategies = createExitStrategies(mergedConfig);
+
+  // Generate entry signals query
+  const query = buildAnalysisQuery(mergedConfig, entryPattern);
 
   if (cliOptions.debug || cliOptions.dryRun) {
     console.log('\nDEBUG - SQL Query:\n' + query);
@@ -143,7 +156,7 @@ export const initializeAnalysis = (cliOptions: Record<string, any>) => {
     llmScreenInstance,
     screenSpecificLLMConfig,
     entryPattern,
-    exitPattern,
+    exitStrategies,
     query,
   };
 };
@@ -153,6 +166,7 @@ export const processTradesLoop = async (
   tradesFromQuery: any[],
   mergedConfig: MergedConfig,
   entryPattern: any,
+  exitStrategies: ExitStrategy[],
   llmScreenInstance: LlmConfirmationScreen | null,
   screenSpecificLLMConfig: ScreenLLMConfig | undefined,
   rawConfig: any,
@@ -192,13 +206,16 @@ export const processTradesLoop = async (
     }
 
     const entryTimestamp = rawTradeData.entry_time as string;
+    const tradeDate = rawTradeData.trade_date as string;
+    const entryPrice = rawTradeData.entry_price as number;
+
     const signalDirectionForLlm: 'long' | 'short' =
       initialGlobalDirection === 'llm_decides' ? 'long' : initialGlobalDirection;
 
     const currentSignal: EnrichedSignal = {
       ticker: mergedConfig.ticker,
-      trade_date: rawTradeData.trade_date as string,
-      price: rawTradeData.entry_price as number,
+      trade_date: tradeDate,
+      price: entryPrice,
       timestamp: entryTimestamp,
       type: 'entry',
       direction: signalDirectionForLlm,
@@ -232,10 +249,7 @@ export const processTradesLoop = async (
       actualTradeDirection = llmConfirmationDirection;
     } else if (!llmScreenInstance || !screenSpecificLLMConfig?.enabled) {
       // LLM screen not active / specified no direction
-      // This implies LLM screen was bypassed or returned proceed:true without a direction (which it shouldn't for active screens)
       if (initialGlobalDirection === 'llm_decides') {
-        // This case should ideally be prevented by config validation (llm_decides requires LLM enabled)
-        // or LlmConfirmationScreen should always return a direction if it proceeds and strategy is llm_decides.
         console.warn(
           "[processTradesLoop] LLM screen did not provide direction for 'llm_decides' strategy, or was disabled. Defaulting to 'long'. Trade on " +
             rawTradeData.trade_date
@@ -252,16 +266,97 @@ export const processTradesLoop = async (
       continue;
     }
 
-    const sqlQueryDirection = rawTradeData.direction as 'long' | 'short';
+    // New code for bar-by-bar exit logic
+    // Fetch bars for the trading day and for ATR calculation
+    const tradingDayBars = fetchBarsForTradingDay(
+      mergedConfig.ticker,
+      mergedConfig.timeframe,
+      tradeDate,
+      entryTimestamp.split(' ')[1] // Extract HH:MM:SS part
+    );
 
-    let adjustedReturnPct = rawTradeData.return_pct as number;
-    if (sqlQueryDirection && sqlQueryDirection !== actualTradeDirection) {
-      adjustedReturnPct *= -1;
+    // If we have no bars for the trading day, skip this trade
+    if (tradingDayBars.length === 0) {
+      console.warn(`No bars found for trading day ${tradeDate}. Skipping trade.`);
+      continue;
     }
 
-    // Moved trade object creation earlier
+    // Fetch bars for ATR calculation if needed
+    let atr: number | undefined;
+    if (
+      exitStrategies.some(
+        es =>
+          (es.name === 'stopLoss' || es.name === 'profitTarget') &&
+          mergedConfig.exitStrategies?.[es.name]?.atrMultiplier
+      )
+    ) {
+      const atrBars = fetchBarsForATR(
+        mergedConfig.ticker,
+        mergedConfig.timeframe,
+        tradeDate,
+        entryTimestamp.split(' ')[1],
+        14 // Use 14 periods for ATR calculation
+      );
+
+      atr = calculateATR(atrBars);
+    }
+
+    // Evaluate each exit strategy in order
+    let exitSignal: ExitSignal | null = null;
+    for (const strategy of exitStrategies) {
+      const signal = strategy.evaluate(
+        entryPrice,
+        entryTimestamp,
+        tradingDayBars,
+        actualTradeDirection === 'long',
+        atr
+      );
+
+      if (signal) {
+        exitSignal = signal;
+        break; // First exit signal triggered wins
+      }
+    }
+
+    // If no exit strategy was triggered, use the last bar of the day
+    if (!exitSignal && tradingDayBars.length > 0) {
+      const lastBar = tradingDayBars[tradingDayBars.length - 1];
+      exitSignal = {
+        timestamp: lastBar.timestamp,
+        price: lastBar.close,
+        type: 'exit',
+        reason: 'endOfDay',
+      };
+    }
+
+    // If we still don't have an exit signal (shouldn't happen), skip this trade
+    if (!exitSignal) {
+      console.warn(`No exit signal found for trade on ${tradeDate}. Skipping trade.`);
+      continue;
+    }
+
+    // Apply slippage to exit price
+    const exitPrice = applySlippage(
+      exitSignal.price,
+      actualTradeDirection === 'long',
+      mergedConfig.exitStrategies?.slippage
+    );
+
+    // Calculate return percentage
+    const returnPct =
+      actualTradeDirection === 'long'
+        ? (exitPrice - entryPrice) / entryPrice
+        : (entryPrice - exitPrice) / entryPrice;
+
+    // Create the trade object with exit information
     const trade = mapRawDataToTrade(
-      { ...rawTradeData, return_pct: adjustedReturnPct },
+      {
+        ...rawTradeData,
+        exit_price: exitPrice,
+        exit_time: exitSignal.timestamp,
+        return_pct: returnPct,
+        exit_reason: exitSignal.reason,
+      },
       actualTradeDirection,
       llmChartPath
     );
@@ -269,9 +364,9 @@ export const processTradesLoop = async (
     const statsBucket =
       actualTradeDirection === 'long' ? totalStats.long_stats : totalStats.short_stats;
     statsBucket.trades.push(trade);
-    statsBucket.all_returns.push(adjustedReturnPct);
-    statsBucket.total_return_sum += adjustedReturnPct;
-    if (isWinningTrade(adjustedReturnPct, actualTradeDirection === 'short')) {
+    statsBucket.all_returns.push(returnPct);
+    statsBucket.total_return_sum += returnPct;
+    if (isWinningTrade(returnPct, actualTradeDirection === 'short')) {
       statsBucket.winning_trades++;
     }
 
@@ -354,6 +449,7 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
       llmScreenInstance,
       screenSpecificLLMConfig,
       entryPattern,
+      exitStrategies,
       query,
     } = initializeAnalysis(cliOptions);
 
@@ -366,19 +462,9 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
     const tradesFromQuery = fetchTradesFromQuery(query);
 
     // Determine exit strategy name for header
-    let exitStrategyName = 'default'; // Default if no specific strategy is identified
-    if (mergedConfig.exitStrategies?.enabled?.includes('maxHoldTime')) {
-      exitStrategyName = `maxHoldTime (${mergedConfig.exitStrategies.maxHoldTime?.minutes} min)`;
-    } else if (
-      mergedConfig.exitStrategies?.enabled &&
-      mergedConfig.exitStrategies.enabled.length > 0
-    ) {
-      // If other strategies are enabled, list them or use a generic name
+    let exitStrategyName = 'default';
+    if (mergedConfig.exitStrategies?.enabled && mergedConfig.exitStrategies.enabled.length > 0) {
       exitStrategyName = mergedConfig.exitStrategies.enabled.join(', ');
-    } else {
-      // If no exitStrategies are explicitly enabled, try to get a name from a default exit pattern if one were to be resolved.
-      // This relies on getExitPattern returning a DefaultExitStrategyPattern or similar if undefined is passed.
-      exitStrategyName = getExitPattern(undefined, mergedConfig).name;
     }
 
     printHeader(
@@ -386,7 +472,7 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
       mergedConfig.from,
       mergedConfig.to,
       entryPattern.name,
-      exitStrategyName, // Use the determined exit strategy name
+      exitStrategyName,
       mergedConfig.direction as 'long' | 'short'
     );
 
@@ -400,8 +486,8 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
       long_stats: { ...initialDirectionalStatsTemplate, trades: [], all_returns: [] },
       short_stats: { ...initialDirectionalStatsTemplate, trades: [], all_returns: [] },
       total_trading_days: 0,
-      total_raw_matches: 0, // Will be set from tradesFromQuery.length or specific aggregate
-      total_llm_confirmed_trades: 0, // Will be calculated in finalizeAnalysis
+      total_raw_matches: 0,
+      total_llm_confirmed_trades: 0,
       grandTotalLlmCost: 0,
     };
 
@@ -414,6 +500,7 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
       tradesFromQuery,
       mergedConfig,
       entryPattern,
+      exitStrategies,
       llmScreenInstance,
       screenSpecificLLMConfig,
       rawConfig,
@@ -423,7 +510,12 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
     await finalizeAnalysis(totalStats, entryPattern, mergedConfig);
   } catch (error) {
     console.error('Error running analysis:', error);
-    process.exit(1);
+    // Don't exit the process during tests
+    if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+      process.exit(1);
+    }
+    // Re-throw the error so tests can catch it
+    throw error;
   }
 };
 
@@ -453,7 +545,9 @@ const parseCLI = async () => {
     .action(() => {
       createDefaultConfigFile();
       console.log('Created default configuration file: alphagroove.config.yaml');
-      process.exit(0);
+      if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+        process.exit(0);
+      }
     });
 
   program
@@ -466,7 +560,9 @@ const parseCLI = async () => {
       console.log('\nAvailable Exit Patterns:');
       getAvailableExitPatterns().forEach(pattern => console.log(`- ${pattern}`));
 
-      process.exit(0);
+      if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+        process.exit(0);
+      }
     });
 
   program.allowUnknownOption(true);
@@ -507,7 +603,9 @@ const main = async () => {
     await runAnalysis(cliOptions);
   } catch (error) {
     console.error('Error:', error);
-    process.exit(1);
+    if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+      process.exit(1);
+    }
   }
 };
 

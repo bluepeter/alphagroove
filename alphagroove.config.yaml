@@ -13,9 +13,26 @@ default:
     generate: true
     outputDir: './charts'
   exitStrategies:
-    enabled: ['maxHoldTime']
+    enabled:
+      - stopLoss
+      - profitTarget
+      - trailingStop
+      - maxHoldTime
+      - endOfDay
     maxHoldTime:
-      minutes: 60
+      minutes: 500
+    stopLoss:
+      percentFromEntry: 1.0
+    profitTarget:
+      percentFromEntry: 2.0
+    trailingStop:
+      activationPercent: 1.0
+      trailPercent: 0.5
+    endOfDay:
+      time: '16:00'
+    slippage:
+      model: 'percent'
+      value: 0.05
 
 patterns:
   entry:

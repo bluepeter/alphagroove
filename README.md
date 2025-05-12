@@ -15,6 +15,104 @@ over spreadsheets, precision over black boxes, and clarity over curve-fitting.
 
 For future enhancement ideas, see [docs/enhancement-ideas.md](docs/enhancement-ideas.md).
 
+## Advanced Exit Strategies
+
+AlphaGroove supports dynamic exit strategies that analyze price action bar-by-bar. The following
+exit strategies are available:
+
+### Stop Loss
+
+Exits the trade when price moves against your position by a specified amount.
+
+**Configuration options:**
+
+- `percentFromEntry`: Exit when price moves against your position by this percentage (e.g., 1.0
+  means 1%)
+- `atrMultiplier`: Alternative to percentFromEntry; exit when price moves against your position by
+  this multiple of ATR (Average True Range)
+
+### Profit Target
+
+Exits the trade when price moves in your favor by a specified amount.
+
+**Configuration options:**
+
+- `percentFromEntry`: Exit when price moves in your favor by this percentage (e.g., 2.0 means 2%)
+- `atrMultiplier`: Alternative to percentFromEntry; exit when price moves in your favor by this
+  multiple of ATR
+
+### Trailing Stop
+
+Implements a trailing stop that activates after price moves a certain amount in your favor, then
+follows the price by a specified percentage.
+
+**Configuration options:**
+
+- `activationPercent`: The trailing stop activates after price moves this percent in your favor
+  (e.g., 1.0 means 1%)
+- `trailPercent`: Once activated, the stop trails the best price by this percentage (e.g., 0.5 means
+  0.5%)
+
+### Max Hold Time
+
+Exits the trade after holding for a specified number of minutes, regardless of price action.
+
+**Configuration options:**
+
+- `minutes`: Number of minutes to hold the position before exiting (e.g., 60 for a 1-hour trade)
+
+### End of Day
+
+Exits the trade at a specific time of day, useful for avoiding overnight exposure.
+
+**Configuration options:**
+
+- `time`: Time of day to exit in HH:MM format (e.g., '16:00' for 4:00 PM)
+
+### Slippage Model
+
+Models realistic trading costs by applying slippage to exit prices.
+
+**Configuration options:**
+
+- `model`: Type of slippage model to use, either 'percent' or 'fixed'
+- `value`: For percent model, the percentage of slippage (e.g., 0.05 for 0.05%); for fixed model,
+  the absolute amount
+
+These strategies can be combined in order of priority, and the first triggered condition will
+execute the exit. The `enabled` array in the configuration defines which strategies are active and
+their order of evaluation.
+
+### Configuration Example
+
+```yaml
+exitStrategies:
+  enabled:
+    - stopLoss
+    - profitTarget
+    - trailingStop
+    - maxHoldTime
+    - endOfDay
+  maxHoldTime:
+    minutes: 60
+  stopLoss:
+    percentFromEntry: 1.0
+    # or use ATR-based stop loss with:
+    # atrMultiplier: 1.5
+  profitTarget:
+    percentFromEntry: 2.0
+    # or use ATR-based target with:
+    # atrMultiplier: 3.0
+  trailingStop:
+    activationPercent: 1.0 # activates after 1% favorable move
+    trailPercent: 0.5 # trails by 0.5%
+  endOfDay:
+    time: '16:00' # exit by 4:00 PM
+  slippage:
+    model: 'percent' # or 'fixed'
+    value: 0.05 # 0.05% slippage
+```
+
 ## Prerequisites
 
 ### Required: DuckDB Installation
