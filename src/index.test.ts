@@ -159,6 +159,132 @@ describe('runAnalysis orchestrator tests', () => {
     vi.mocked(buildAnalysisQuery).mockReturnValue(mockQueryValue);
   });
 
+  describe('initializeAnalysis', () => {
+    it('should load config, get patterns, and build query', () => {
+      const result = mainModule.initializeAnalysis(mockCliOptions);
+      expect(loadConfig).toHaveBeenCalledWith(mockCliOptions.config);
+      expect(mergeConfigWithCliOptions).toHaveBeenCalledWith(mockRawConfig, mockCliOptions);
+      expect(getEntryPattern).toHaveBeenCalledWith(
+        mockMergedConfigValue.entryPattern,
+        mockMergedConfigValue
+      );
+      expect(getExitPattern).toHaveBeenCalledWith(
+        mockMergedConfigValue.exitPattern,
+        mockMergedConfigValue
+      );
+      expect(buildAnalysisQuery).toHaveBeenCalledWith(
+        mockMergedConfigValue,
+        mockEntryPatternValue,
+        mockExitPatternValue
+      );
+      expect(result.query).toBe(mockQueryValue);
+      expect(result.entryPattern.name).toBe('test-entry');
+      expect(result.exitPattern.name).toBe('test-exit');
+      expect(result.rawConfig).toEqual(mockRawConfig);
+      expect(result.mergedConfig).toEqual(mockMergedConfigValue);
+    });
+
+    it('should enable LLM screen if configured', () => {
+      const llmEnabledConfig = {
+        ...mockMergedConfigValue,
+        llmConfirmationScreen: { enabled: true },
+      };
+      vi.mocked(mergeConfigWithCliOptions).mockReturnValue(llmEnabledConfig);
+      const { llmScreenInstance, screenSpecificLLMConfig } =
+        mainModule.initializeAnalysis(mockCliOptions);
+      expect(llmScreenInstance).not.toBeNull();
+      expect(LlmConfirmationScreen).toHaveBeenCalled();
+      expect(screenSpecificLLMConfig.enabled).toBe(true);
+    });
+  });
+
+  describe('handleLlmTradeScreeningInternal', () => {
+    const mockSignal = {
+      ticker: 'TEST',
+      trade_date: '2023-01-01',
+      price: 100,
+      timestamp: '09:30',
+      type: 'entry',
+      direction: 'long' as 'long' | 'short',
+    };
+    const mockChartName = 'test-chart';
+    const _mockLocalRawConfig = {};
+    const getMockAppConfig = (): AppConfig => ({
+      default: { direction: 'long', ticker: 'SPY', timeframe: '1min' },
+      patterns: { entry: {}, exit: {} },
+    });
+
+    it('should return { proceed: true, cost: 0 } if LLM screen is not enabled or instance is null', async () => {
+      const resultNullInstance = await mainModule.handleLlmTradeScreeningInternal(
+        mockSignal,
+        mockChartName,
+        null,
+        { enabled: true },
+        mockMergedConfigValue,
+        getMockAppConfig()
+      );
+      expect(resultNullInstance).toEqual({ proceed: true, cost: 0 });
+
+      const resultDisabled = await mainModule.handleLlmTradeScreeningInternal(
+        mockSignal,
+        mockChartName,
+        new (LlmConfirmationScreen as any)(),
+        { enabled: false },
+        mockMergedConfigValue,
+        getMockAppConfig()
+      );
+      expect(resultDisabled).toEqual({ proceed: true, cost: 0 });
+    });
+
+    it('should call LLM screen if enabled and return its decision with cost', async () => {
+      const localMockLlmInstance = new (LlmConfirmationScreen as any)();
+      const expectedChartPath = 'path/to/chart.png';
+      const mockScreenCost = 0.005;
+
+      vi.mocked(localMockLlmInstance.shouldSignalProceed).mockResolvedValueOnce({
+        proceed: false,
+        cost: mockScreenCost,
+      });
+
+      const resultFalse = await mainModule.handleLlmTradeScreeningInternal(
+        mockSignal,
+        mockChartName,
+        localMockLlmInstance,
+        { enabled: true },
+        mockMergedConfigValue,
+        getMockAppConfig()
+      );
+      expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalledWith(
+        mockSignal,
+        expectedChartPath,
+        { enabled: true },
+        getMockAppConfig()
+      );
+      expect(resultFalse).toEqual({ proceed: false, cost: mockScreenCost });
+
+      const secondMockCost = mockScreenCost + 0.001;
+      vi.mocked(localMockLlmInstance.shouldSignalProceed).mockResolvedValueOnce({
+        proceed: true,
+        cost: secondMockCost,
+      });
+
+      const resultTrue = await mainModule.handleLlmTradeScreeningInternal(
+        mockSignal,
+        mockChartName,
+        localMockLlmInstance,
+        { enabled: true },
+        mockMergedConfigValue,
+        getMockAppConfig()
+      );
+      expect(resultTrue).toEqual({
+        proceed: true,
+        chartPath: expectedChartPath,
+        cost: secondMockCost,
+      });
+      expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalledTimes(2);
+    });
+  });
+
   describe('processTradesLoop', () => {
     it('should process trades, and correctly call mappers and output functions', async () => {
       const mockTradesFromQueryData = [
