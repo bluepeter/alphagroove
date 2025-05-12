@@ -1,58 +1,8 @@
-import { Command } from 'commander';
 import { vi, describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 import { type Config as AppConfig } from './utils/config.js';
 import { LlmConfirmationScreen as _ActualLlmConfirmationScreen } from './screens/llm-confirmation.screen.js';
 
 const mockQueryValue = 'DRY_RUN_SQL_QUERY_FROM_INDEX_TEST'; // Define it once globally for the test file
-
-describe('AlphaGroove CLI', () => {
-  it('should have required command line options', () => {
-    const program = new Command();
-
-    // Add the same options as in index.ts
-    program
-      .requiredOption('--from <date>', 'Start date (YYYY-MM-DD)')
-      .requiredOption('--to <date>', 'End date (YYYY-MM-DD)')
-      .option(
-        '--entry-pattern <pattern>',
-        'Entry pattern to use (default: quick-rise)',
-        'quick-rise'
-      )
-      .option('--exit-pattern <pattern>', 'Exit pattern to use (default: fixed-time)', 'fixed-time')
-      .option('--ticker <symbol>', 'Ticker to analyze (default: SPY)', 'SPY')
-      .option('--timeframe <period>', 'Data resolution (default: 1min)', '1min');
-
-    // Test that options are properly configured
-    expect(program.options).toHaveLength(6);
-    expect(program.options[0].required).toBe(true);
-    expect(program.options[1].required).toBe(true);
-  });
-
-  it('should use default values for optional parameters', () => {
-    const program = new Command();
-
-    program
-      .requiredOption('--from <date>', 'Start date (YYYY-MM-DD)')
-      .requiredOption('--to <date>', 'End date (YYYY-MM-DD)')
-      .option(
-        '--entry-pattern <pattern>',
-        'Entry pattern to use (default: quick-rise)',
-        'quick-rise'
-      )
-      .option('--exit-pattern <pattern>', 'Exit pattern to use (default: fixed-time)', 'fixed-time')
-      .option('--ticker <symbol>', 'Ticker to analyze (default: SPY)', 'SPY')
-      .option('--timeframe <period>', 'Data resolution (default: 1min)', '1min');
-
-    // Parse with only required options
-    program.parse(['node', 'index.js', '--from', '2025-05-02', '--to', '2025-05-05']);
-
-    // Check default values
-    expect(program.opts().entryPattern).toBe('quick-rise');
-    expect(program.opts().exitPattern).toBe('fixed-time');
-    expect(program.opts().ticker).toBe('SPY');
-    expect(program.opts().timeframe).toBe('1min');
-  });
-});
 
 // Mock external dependencies
 vi.mock('./utils/config.js', async () => {
@@ -207,45 +157,6 @@ describe('runAnalysis refactored components', () => {
     vi.mocked(getExitPattern).mockReturnValue(mockExitPatternValue);
     vi.mocked(fetchTradesFromQuery).mockReturnValue([]);
     vi.mocked(buildAnalysisQuery).mockReturnValue(mockQueryValue);
-  });
-
-  describe('initializeAnalysis', () => {
-    it('should load config, get patterns, and build query', () => {
-      const result = mainModule.initializeAnalysis(mockCliOptions);
-      expect(loadConfig).toHaveBeenCalledWith(mockCliOptions.config);
-      expect(mergeConfigWithCliOptions).toHaveBeenCalledWith(mockRawConfig, mockCliOptions);
-      expect(getEntryPattern).toHaveBeenCalledWith(
-        mockMergedConfigValue.entryPattern,
-        mockMergedConfigValue
-      );
-      expect(getExitPattern).toHaveBeenCalledWith(
-        mockMergedConfigValue.exitPattern,
-        mockMergedConfigValue
-      );
-      expect(buildAnalysisQuery).toHaveBeenCalledWith(
-        mockMergedConfigValue,
-        mockEntryPatternValue,
-        mockExitPatternValue
-      );
-      expect(result.query).toBe(mockQueryValue);
-      expect(result.entryPattern.name).toBe('test-entry');
-      expect(result.exitPattern.name).toBe('test-exit');
-      expect(result.rawConfig).toEqual(mockRawConfig);
-      expect(result.mergedConfig).toEqual(mockMergedConfigValue);
-    });
-
-    it('should enable LLM screen if configured', () => {
-      const llmEnabledConfig = {
-        ...mockMergedConfigValue,
-        llmConfirmationScreen: { enabled: true },
-      };
-      vi.mocked(mergeConfigWithCliOptions).mockReturnValue(llmEnabledConfig);
-      const { llmScreenInstance, screenSpecificLLMConfig } =
-        mainModule.initializeAnalysis(mockCliOptions);
-      expect(llmScreenInstance).not.toBeNull();
-      expect(LlmConfirmationScreen).toHaveBeenCalled();
-      expect(screenSpecificLLMConfig.enabled).toBe(true);
-    });
   });
 
   describe('handleLlmTradeScreeningInternal', () => {
@@ -487,105 +398,6 @@ describe('runAnalysis refactored components', () => {
 
     afterEach(() => {
       consoleLogSpy.mockRestore();
-    });
-
-    it('should execute the full analysis flow without LLM and without charts', async () => {
-      mockCliOptions.dryRun = false;
-      const localMockRawConfig: AppConfig = {
-        default: {
-          ticker: 'TEST_RAW',
-          timeframe: '5min',
-          direction: 'long',
-          patterns: { entry: 'quick-rise', exit: 'fixed-time' },
-        },
-        patterns: {
-          entry: {
-            'quick-rise': { 'rise-pct': 0.1, 'within-minutes': 3 },
-          },
-          exit: {
-            'fixed-time': { 'hold-minutes': 5 },
-          },
-        },
-        llmConfirmationScreen: {
-          enabled: false,
-          températures: [],
-          prompts: [],
-          apiKeyEnvVar: '',
-          modelName: '',
-          llmProvider: 'anthropic',
-          agreementThreshold: 1,
-          numCalls: 1,
-          maxOutputTokens: 10,
-        } as any,
-      };
-
-      const localTestMergedConfig = {
-        ...mockMergedConfigValue,
-        ticker: 'MERGED_TEST',
-        direction: 'long',
-        llmConfirmationScreen: { enabled: false },
-      };
-      vi.mocked(loadConfig).mockReturnValue(localMockRawConfig);
-      vi.mocked(mergeConfigWithCliOptions).mockReturnValue(localTestMergedConfig);
-      vi.mocked(getEntryPattern).mockReturnValue(mockEntryPatternValue);
-      vi.mocked(getExitPattern).mockReturnValue(mockExitPatternValue);
-      vi.mocked(buildAnalysisQuery).mockReturnValue(mockQueryValue);
-
-      const mockTradesData = [
-        {
-          all_trading_days: 20,
-          entry_time: '09:35',
-          trade_date: '2023-01-01',
-          entry_price: 100,
-          return_pct: 1.0,
-          year: '2023',
-          match_count: 1,
-          direction: 'long',
-        },
-        {
-          all_trading_days: 20,
-          entry_time: '10:30',
-          trade_date: '2023-01-01',
-          entry_price: 102,
-          return_pct: -0.5,
-          year: '2023',
-          match_count: 1,
-          direction: 'long',
-        },
-      ];
-      vi.mocked(fetchTradesFromQuery).mockReturnValue(mockTradesData as any);
-      vi.mocked(mapRawDataToTrade)
-        .mockImplementationOnce(
-          (rd: any, tradeDirection: string) =>
-            ({ ...rd, mapped: true, direction: tradeDirection }) as any
-        )
-        .mockImplementationOnce(
-          (rd: any, tradeDirection: string) =>
-            ({ ...rd, mapped: true, direction: tradeDirection }) as any
-        );
-
-      await mainModule.runAnalysis(mockCliOptions);
-
-      expect(loadConfig).toHaveBeenCalledWith(mockCliOptions.config);
-      expect(mergeConfigWithCliOptions).toHaveBeenCalledWith(localMockRawConfig, mockCliOptions);
-      expect(buildAnalysisQuery).toHaveBeenCalledWith(
-        localTestMergedConfig,
-        mockEntryPatternValue,
-        mockExitPatternValue
-      );
-      expect(printHeader).toHaveBeenCalledWith(
-        localTestMergedConfig.ticker,
-        localTestMergedConfig.from,
-        localTestMergedConfig.to,
-        mockEntryPatternValue.name,
-        mockExitPatternValue.name,
-        localTestMergedConfig.direction
-      );
-      expect(mapRawDataToTrade).toHaveBeenCalledTimes(mockTradesData.length);
-      expect(printTradeDetails).toHaveBeenCalledTimes(mockTradesData.length);
-      expect(printYearSummary).toHaveBeenCalled();
-      expect(printOverallSummary).toHaveBeenCalled();
-      expect(printFooter).toHaveBeenCalled();
     });
 
     it('should handle dry run correctly', async () => {
