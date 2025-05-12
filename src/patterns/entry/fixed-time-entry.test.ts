@@ -47,6 +47,26 @@ describe('Fixed Time Entry Pattern', () => {
       expect(specificUpdatedPattern.direction).toBe('long'); // updateConfig preserves the original pattern's direction
     });
 
+    it('should handle entry-time property from config file', () => {
+      // This simulates how the property is named in the alphagroove.config.yaml
+      const updatedPattern = fixedTimeEntryPattern.updateConfig({
+        'entry-time': '13:00',
+      } as Partial<FixedTimeEntryConfig> & Record<string, any>);
+      const specificUpdatedPattern = updatedPattern as FixedTimeEntryPatternType;
+      expect(specificUpdatedPattern.config.time).toBe('13:00');
+      expect(specificUpdatedPattern.sql).toContain("WHERE bar_time = '13:00'");
+    });
+
+    it('should prioritize entry-time over time when both are provided', () => {
+      const updatedPattern = fixedTimeEntryPattern.updateConfig({
+        time: '12:30',
+        'entry-time': '13:45',
+      } as Partial<FixedTimeEntryConfig> & Record<string, any>);
+      const specificUpdatedPattern = updatedPattern as FixedTimeEntryPatternType;
+      expect(specificUpdatedPattern.config.time).toBe('13:45');
+      expect(specificUpdatedPattern.sql).toContain("WHERE bar_time = '13:45'");
+    });
+
     it('should update SQL query when configuration is changed', () => {
       const patternOriginal = fixedTimeEntryPattern;
       const pattern1200 = patternOriginal.updateConfig({ time: '12:00' });
