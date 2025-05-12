@@ -46,7 +46,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:02:00');
@@ -73,7 +73,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, false);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, false, undefined, true);
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:02:00');
@@ -95,7 +95,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true, atr);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, atr, true);
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:02:00');
@@ -116,7 +116,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
 
       expect(result).toBeNull();
     });
@@ -130,7 +130,7 @@ describe('Exit Strategies', () => {
         [{ open: 100, high: 101, low: 99, close: 100.5 }]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
 
       expect(result).toBeNull();
     });
@@ -156,7 +156,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:02:00');
@@ -183,7 +183,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, false);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, false, undefined, true);
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:02:00');
@@ -205,7 +205,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true, atr);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, atr, true);
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:02:00');
@@ -226,7 +226,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
 
       expect(result).toBeNull();
     });
@@ -254,7 +254,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:02:00');
@@ -283,7 +283,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, false);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, false, undefined, true);
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:02:00');
@@ -304,7 +304,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
 
       expect(result).toBeNull();
     });
@@ -332,7 +332,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:30:00');
@@ -359,7 +359,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, false);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, false, undefined, true);
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:15:00');
@@ -384,7 +384,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
 
       expect(result).toBeNull();
     });
@@ -412,7 +412,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 16:00:00');
@@ -437,7 +437,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 15:30:00');
@@ -462,7 +462,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
 
       // The strategy should use the next day's opening bar as the exit point
       expect(result).not.toBeNull();

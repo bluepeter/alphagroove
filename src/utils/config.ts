@@ -442,30 +442,74 @@ export const mergeConfigWithCliOptions = (
   const defaultFromLoaded = loadedConfig.default.exitStrategies;
   const rootFromLoaded = loadedConfig.exitStrategies;
   const schemaDefaultFromZod = ExitStrategiesConfigSchema.parse({});
-  const schemaDefaultMinutes = MaxHoldTimeConfigSchema.parse({}).minutes; // 60
 
   // Determine which enabled array to use with precedence: root > default > schema
   const enabledArray =
     rootFromLoaded?.enabled || defaultFromLoaded?.enabled || schemaDefaultFromZod.enabled;
 
-  // Fix: Correctly determine minutes value with proper precedence
-  let finalMhtMinutes: number | undefined;
-
-  // Priority order for maxHoldTime.minutes: root > default > schema default (if enabled)
-  if (rootFromLoaded?.maxHoldTime?.minutes !== undefined) {
-    finalMhtMinutes = rootFromLoaded.maxHoldTime.minutes;
-  } else if (defaultFromLoaded?.maxHoldTime?.minutes !== undefined) {
-    finalMhtMinutes = defaultFromLoaded.maxHoldTime.minutes;
-  } else if (enabledArray?.includes('maxHoldTime')) {
-    finalMhtMinutes = schemaDefaultMinutes;
-  }
-
+  // Create merged exit strategies with all configurations merged properly
   const mergedExitStrategies: ExitStrategiesConfig = {
     enabled: enabledArray,
-    maxHoldTime:
-      enabledArray?.includes('maxHoldTime') && finalMhtMinutes !== undefined
-        ? { minutes: finalMhtMinutes }
-        : undefined,
+    // Apply proper precedence for each exit strategy configuration
+    maxHoldTime: enabledArray?.includes('maxHoldTime')
+      ? {
+          minutes:
+            rootFromLoaded?.maxHoldTime?.minutes ??
+            defaultFromLoaded?.maxHoldTime?.minutes ??
+            MaxHoldTimeConfigSchema.parse({}).minutes,
+        }
+      : undefined,
+    stopLoss: enabledArray?.includes('stopLoss')
+      ? {
+          percentFromEntry:
+            rootFromLoaded?.stopLoss?.percentFromEntry ??
+            defaultFromLoaded?.stopLoss?.percentFromEntry ??
+            StopLossConfigSchema.parse({}).percentFromEntry,
+          atrMultiplier:
+            rootFromLoaded?.stopLoss?.atrMultiplier ?? defaultFromLoaded?.stopLoss?.atrMultiplier,
+        }
+      : undefined,
+    profitTarget: enabledArray?.includes('profitTarget')
+      ? {
+          percentFromEntry:
+            rootFromLoaded?.profitTarget?.percentFromEntry ??
+            defaultFromLoaded?.profitTarget?.percentFromEntry ??
+            ProfitTargetConfigSchema.parse({}).percentFromEntry,
+          atrMultiplier:
+            rootFromLoaded?.profitTarget?.atrMultiplier ??
+            defaultFromLoaded?.profitTarget?.atrMultiplier,
+        }
+      : undefined,
+    trailingStop: enabledArray?.includes('trailingStop')
+      ? {
+          activationPercent:
+            rootFromLoaded?.trailingStop?.activationPercent ??
+            defaultFromLoaded?.trailingStop?.activationPercent ??
+            TrailingStopConfigSchema.parse({}).activationPercent,
+          trailPercent:
+            rootFromLoaded?.trailingStop?.trailPercent ??
+            defaultFromLoaded?.trailingStop?.trailPercent ??
+            TrailingStopConfigSchema.parse({}).trailPercent,
+        }
+      : undefined,
+    endOfDay: enabledArray?.includes('endOfDay')
+      ? {
+          time:
+            rootFromLoaded?.endOfDay?.time ??
+            defaultFromLoaded?.endOfDay?.time ??
+            EndOfDayConfigSchema.parse({}).time,
+        }
+      : undefined,
+    slippage: {
+      model:
+        rootFromLoaded?.slippage?.model ??
+        defaultFromLoaded?.slippage?.model ??
+        SlippageConfigSchema.parse({}).model,
+      value:
+        rootFromLoaded?.slippage?.value ??
+        defaultFromLoaded?.slippage?.value ??
+        SlippageConfigSchema.parse({}).value,
+    },
   };
 
   const mergedConfig: MergedConfig = {

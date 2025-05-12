@@ -1,7 +1,7 @@
 default:
   date:
-    from: '2024-05-01'
-    to: '2024-06-01'
+    from: '2023-01-01'
+    to: '2023-06-01'
   ticker: 'SPY'
   timeframe: '1min'
   # direction can be 'long', 'short', or 'llm_decides'.
@@ -22,12 +22,12 @@ default:
     maxHoldTime:
       minutes: 500
     stopLoss:
-      percentFromEntry: 1.0
+      percentFromEntry: 0.5
     profitTarget:
-      percentFromEntry: 2.0
+      percentFromEntry: 1.0
     trailingStop:
-      activationPercent: 1.0
-      trailPercent: 0.5
+      activationPercent: 0.5
+      trailPercent: 0.1
     endOfDay:
       time: '16:00'
     slippage:
