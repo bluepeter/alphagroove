@@ -20,3 +20,12 @@ export interface PatternResult {
   exit: Signal | null;
   bars: Bar[];
 }
+
+export interface PatternDefinition {
+  name: string;
+  description: string;
+  sql: string;
+  defaultConfig?: Record<string, any>;
+  info?: () => string;
+  direction?: 'long' | 'short';
+}

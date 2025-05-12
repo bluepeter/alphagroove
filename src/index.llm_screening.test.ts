@@ -131,7 +131,7 @@ describe('LLM Trade Screening Tests', () => {
     const mockChartName = 'test-chart';
     const getMockAppConfig = (): AppConfig => ({
       default: { direction: 'long', ticker: 'SPY', timeframe: '1min' },
-      patterns: { entry: {}, exit: {} },
+      patterns: { entry: {} },
     });
 
     it('should return { proceed: true, cost: 0 } if LLM screen is not enabled or instance is null', async () => {

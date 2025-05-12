@@ -1,4 +1,4 @@
-import { PatternDefinition } from '../pattern-factory.js';
+import { PatternDefinition } from '../types.js';
 import { Bar, Signal } from '../types.js';
 
 /**

@@ -129,7 +129,7 @@ export const initializeAnalysis = (cliOptions: Record<string, any>) => {
   }
 
   const entryPattern = getEntryPattern(mergedConfig.entryPattern, mergedConfig);
-  const exitPattern = getExitPattern(mergedConfig.exitPattern, mergedConfig);
+  const exitPattern = getExitPattern(undefined, mergedConfig);
 
   const query = buildAnalysisQuery(mergedConfig, entryPattern, exitPattern);
 
@@ -354,7 +354,6 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
       llmScreenInstance,
       screenSpecificLLMConfig,
       entryPattern,
-      exitPattern,
       query,
     } = initializeAnalysis(cliOptions);
 
@@ -366,12 +365,28 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
 
     const tradesFromQuery = fetchTradesFromQuery(query);
 
+    // Determine exit strategy name for header
+    let exitStrategyName = 'default'; // Default if no specific strategy is identified
+    if (mergedConfig.exitStrategies?.enabled?.includes('maxHoldTime')) {
+      exitStrategyName = `maxHoldTime (${mergedConfig.exitStrategies.maxHoldTime?.minutes} min)`;
+    } else if (
+      mergedConfig.exitStrategies?.enabled &&
+      mergedConfig.exitStrategies.enabled.length > 0
+    ) {
+      // If other strategies are enabled, list them or use a generic name
+      exitStrategyName = mergedConfig.exitStrategies.enabled.join(', ');
+    } else {
+      // If no exitStrategies are explicitly enabled, try to get a name from a default exit pattern if one were to be resolved.
+      // This relies on getExitPattern returning a DefaultExitStrategyPattern or similar if undefined is passed.
+      exitStrategyName = getExitPattern(undefined, mergedConfig).name;
+    }
+
     printHeader(
       mergedConfig.ticker,
       mergedConfig.from,
       mergedConfig.to,
       entryPattern.name,
-      exitPattern.name,
+      exitStrategyName, // Use the determined exit strategy name
       mergedConfig.direction as 'long' | 'short'
     );
 

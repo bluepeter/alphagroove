@@ -1,53 +1,95 @@
 import { describe, it, expect } from 'vitest';
 
-import { mergeConfigWithCliOptions, Config } from './config';
+import { mergeConfigWithCliOptions, Config, LLMScreenConfig } from './config';
+
+const defaultLlmScreenConfig: LLMScreenConfig = {
+  enabled: false,
+  llmProvider: 'anthropic',
+  modelName: 'claude-3-7-sonnet-latest',
+  apiKeyEnvVar: 'ANTHROPIC_API_KEY',
+  numCalls: 3,
+  agreementThreshold: 2,
+  temperatures: [0.2, 0.5, 0.8],
+  prompts: 'Default prompt',
+  commonPromptSuffixForJson: 'Default suffix',
+  maxOutputTokens: 150,
+};
 
 describe('Configuration System', () => {
   describe('mergeConfigWithCliOptions', () => {
-    it('should merge default config with CLI options', () => {
-      // Setup
-      const config: Config = {
-        default: {
-          ticker: 'SPY',
-          timeframe: '1min',
-          direction: 'long',
-          date: {
-            from: '2023-01-01',
-            to: '2023-12-31',
-          },
-          patterns: {
-            entry: 'quick-rise',
-            exit: 'fixed-time',
-          },
+    const baseConfigStructure: Omit<
+      Config,
+      'default' | 'patterns' | 'exitStrategies' | 'llmConfirmationScreen'
+    > = {};
+
+    const createTestConfig = (overrides: Partial<Config> = {}): Config => {
+      const defaultConfigPart = {
+        ticker: 'SPY',
+        timeframe: '1min',
+        direction: 'long' as const,
+        date: {
+          from: '2023-01-01',
+          to: '2023-12-31',
         },
         patterns: {
-          entry: {
-            'quick-rise': {
-              'rise-pct': 0.3,
-              'within-minutes': 5,
-            },
-            'quick-fall': {
-              'fall-pct': 0.3,
-              'within-minutes': 5,
-            },
-          },
-          exit: {
-            'fixed-time': {
-              'hold-minutes': 10,
-            },
-          },
+          entry: 'quick-rise',
         },
+        charts: {
+          generate: false,
+          outputDir: './charts',
+        },
+        exitStrategies: {
+          enabled: ['maxHoldTime'],
+          maxHoldTime: { minutes: 60 },
+        },
+        ...(overrides.default || {}),
       };
 
+      const patternsPart = {
+        entry: {
+          'quick-rise': {
+            'rise-pct': 0.3,
+            'within-minutes': 5,
+          },
+          'quick-fall': {
+            'fall-pct': 0.3,
+            'within-minutes': 5,
+          },
+          'fixed-time-entry': {
+            'entry-time': '13:00',
+          },
+        },
+        ...(overrides.patterns || {}),
+      };
+
+      const rootExitStrategiesPart = {
+        enabled: ['maxHoldTime'],
+        maxHoldTime: { minutes: 60 },
+        ...(overrides.exitStrategies || {}),
+      };
+
+      return {
+        ...baseConfigStructure,
+        default: defaultConfigPart,
+        patterns: patternsPart,
+        exitStrategies: rootExitStrategiesPart,
+        llmConfirmationScreen: {
+          ...defaultLlmScreenConfig,
+          ...(overrides.llmConfirmationScreen || {}),
+        },
+        ...overrides,
+      };
+    };
+
+    it('should merge default config with CLI options', () => {
+      const config = createTestConfig();
       const cliOptions = {
         ticker: 'QQQ',
         from: '2024-01-01',
       };
 
-      // Execute
       const merged = mergeConfigWithCliOptions(config, cliOptions);
 
-      // Verify
       expect(merged).toMatchObject({
         ticker: 'QQQ',
         timeframe: '1min',
@@ -55,105 +97,49 @@ describe('Configuration System', () => {
         from: '2024-01-01',
         to: '2023-12-31',
         entryPattern: 'quick-rise',
-        exitPattern: 'fixed-time',
         'quick-rise': {
           'rise-pct': 0.3,
           'within-minutes': 5,
         },
+        exitStrategies: {
+          enabled: ['maxHoldTime'],
+          maxHoldTime: { minutes: 60 },
+        },
       });
     });
 
-    it('should handle pattern-specific options with dot notation', () => {
-      // Setup
-      const config: Config = {
-        default: {
-          ticker: 'SPY',
-          timeframe: '1min',
-          direction: 'long',
-          patterns: {
-            entry: 'quick-rise',
-            exit: 'fixed-time',
-          },
-        },
-        patterns: {
-          entry: {
-            'quick-rise': {
-              'rise-pct': 0.3,
-              'within-minutes': 5,
-            },
-            'quick-fall': {
-              'fall-pct': 0.3,
-              'within-minutes': 5,
-            },
-          },
-          exit: {
-            'fixed-time': {
-              'hold-minutes': 10,
-            },
-          },
-        },
-      };
-
+    it('should handle entry pattern-specific options with dot notation', () => {
+      const config = createTestConfig();
       const cliOptions = {
         'quick-rise.rise-pct': 0.7,
-        'fixed-time.hold-minutes': 20,
       };
 
-      // Execute
       const merged = mergeConfigWithCliOptions(config, cliOptions);
 
-      // Verify
       expect(merged).toMatchObject({
         'quick-rise': {
           'rise-pct': 0.7,
           'within-minutes': 5,
         },
-        'fixed-time': {
-          'hold-minutes': 20,
-        },
       });
     });
 
     it('should handle legacy risePct option for backward compatibility', () => {
-      // Setup
-      const config: Config = {
+      const config = createTestConfig({
         default: {
           ticker: 'SPY',
           timeframe: '1min',
           direction: 'long',
-          patterns: {
-            entry: 'quick-rise',
-            exit: 'fixed-time',
-          },
+          patterns: { entry: 'quick-rise' },
         },
-        patterns: {
-          entry: {
-            'quick-rise': {
-              'rise-pct': 0.3,
-              'within-minutes': 5,
-            },
-            'quick-fall': {
-              'fall-pct': 0.3,
-              'within-minutes': 5,
-            },
-          },
-          exit: {
-            'fixed-time': {
-              'hold-minutes': 10,
-            },
-          },
-        },
-      };
-
+      });
       const cliOptions = {
         entryPattern: 'quick-rise',
         risePct: '0.8',
       };
 
-      // Execute
       const merged = mergeConfigWithCliOptions(config, cliOptions);
 
-      // Verify
       expect(merged).toMatchObject({
         entryPattern: 'quick-rise',
         'quick-rise': {
@@ -164,44 +150,120 @@ describe('Configuration System', () => {
     });
 
     it('should use entry pattern specified in config when not provided in CLI', () => {
-      // Setup
-      const config: Config = {
+      const config = createTestConfig({
         default: {
           ticker: 'SPY',
           timeframe: '1min',
           direction: 'long',
-          patterns: {
-            entry: 'quick-fall',
-            exit: 'fixed-time',
+          patterns: { entry: 'quick-fall' },
+        },
+      });
+      const cliOptions = {};
+
+      const merged = mergeConfigWithCliOptions(config, cliOptions);
+
+      expect(merged.entryPattern).toBe('quick-fall');
+    });
+
+    it('should correctly load default exitStrategies configuration', () => {
+      const config = createTestConfig();
+      const cliOptions = {};
+      const merged = mergeConfigWithCliOptions(config, cliOptions);
+
+      expect(merged.exitStrategies).toBeDefined();
+      expect(merged.exitStrategies?.enabled).toEqual(['maxHoldTime']);
+      expect(merged.exitStrategies?.maxHoldTime?.minutes).toBe(60);
+    });
+
+    it('should allow overriding exitStrategies.maxHoldTime.minutes in config default section', () => {
+      const config = createTestConfig({
+        default: {
+          ticker: 'SPY',
+          timeframe: '1min',
+          direction: 'long',
+          exitStrategies: {
+            enabled: ['maxHoldTime'],
+            maxHoldTime: { minutes: 30 },
+          },
+        },
+        exitStrategies: undefined,
+      });
+      const cliOptions = {};
+      const merged = mergeConfigWithCliOptions(config, cliOptions);
+      expect(merged.exitStrategies?.maxHoldTime?.minutes).toBe(30);
+    });
+
+    it('should allow overriding exitStrategies.maxHoldTime.minutes in config root section, taking precedence over default section', () => {
+      const config = createTestConfig({
+        default: {
+          ticker: 'SPY',
+          timeframe: '1min',
+          direction: 'long',
+          exitStrategies: {
+            enabled: ['maxHoldTime'],
+            maxHoldTime: { minutes: 30 },
+          },
+        },
+        exitStrategies: {
+          enabled: ['maxHoldTime'],
+          maxHoldTime: { minutes: 90 },
+        },
+      });
+      const cliOptions = {};
+      const merged = mergeConfigWithCliOptions(config, cliOptions);
+      expect(merged.exitStrategies?.maxHoldTime?.minutes).toBe(90);
+    });
+
+    it('should correctly merge fixed-time-entry pattern options', () => {
+      const config = createTestConfig({
+        default: {
+          ticker: 'SPY',
+          timeframe: '1min',
+          direction: 'long',
+          patterns: { entry: 'fixed-time-entry' },
+        },
+        patterns: {
+          entry: {
+            'fixed-time-entry': { 'entry-time': '10:00' },
+          },
+        },
+      });
+      const cliOptions = {
+        'fixed-time-entry.entry-time': '14:30',
+      };
+      const merged = mergeConfigWithCliOptions(config, cliOptions);
+      expect(merged.entryPattern).toBe('fixed-time-entry');
+      expect(merged['fixed-time-entry']?.['entry-time']).toBe('14:30');
+    });
+
+    it('should ensure exitStrategies.maxHoldTime is populated with defaults if enabled but not specified', () => {
+      const configWithOnlyEnabled: Config = {
+        default: {
+          ticker: 'SPY',
+          timeframe: '1min',
+          direction: 'long',
+          patterns: { entry: 'quick-rise' },
+          charts: { generate: false, outputDir: './charts' },
+          exitStrategies: {
+            enabled: ['maxHoldTime'],
           },
         },
         patterns: {
           entry: {
-            'quick-rise': {
-              'rise-pct': 0.3,
-              'within-minutes': 5,
-            },
-            'quick-fall': {
-              'fall-pct': 0.3,
-              'within-minutes': 5,
-            },
-          },
-          exit: {
-            'fixed-time': {
-              'hold-minutes': 10,
-            },
+            'quick-rise': { 'rise-pct': 0.3, 'within-minutes': 5 },
           },
         },
+        exitStrategies: {
+          enabled: ['maxHoldTime'],
+        },
+        llmConfirmationScreen: { ...defaultLlmScreenConfig },
       };
 
-      const cliOptions = {};
-
-      // Execute
-      const merged = mergeConfigWithCliOptions(config, cliOptions);
-
-      // Verify
-      expect(merged.entryPattern).toBe('quick-fall');
-      expect(merged.exitPattern).toBe('fixed-time');
+      const merged = mergeConfigWithCliOptions(configWithOnlyEnabled, {});
+      expect(merged.exitStrategies).toBeDefined();
+      expect(merged.exitStrategies?.enabled).toEqual(['maxHoldTime']);
+      expect(merged.exitStrategies?.maxHoldTime).toBeDefined();
+      expect(merged.exitStrategies?.maxHoldTime?.minutes).toBe(60);
     });
   });
 });

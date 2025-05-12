@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { PatternDefinition } from '../patterns/pattern-factory.js';
-import { buildAnalysisQuery, MergedConfig } from './query-builder.js';
+import { PatternDefinition } from '../patterns/types.js';
+import { buildAnalysisQuery } from './query-builder.js';
+import { MergedConfig } from './config.js';
 
 // Minimal mock pattern definitions for testing buildAnalysisQuery
 const mockExitPatternGeneric: PatternDefinition = {
   name: 'mock-exit',
   description: 'Mock exit pattern',
   sql: "SELECT 'mock_exit_signal' as exit_signal;",
-  direction: 'long',
 };
 
 const createMockEntryPattern = (
@@ -26,8 +26,8 @@ const createMockEntryPattern = (
         strftime(timestamp, '%Y') as year, 
         column1::DOUBLE as open_price_at_entry, 
         column4::DOUBLE as entry_price, 
-        \'${direction}\' as direction 
-      FROM raw_data WHERE name = \'${name}\';`,
+        '${direction}' as direction 
+      FROM raw_data WHERE name = '${name}';`,
   direction,
 });
 
@@ -39,9 +39,13 @@ describe('buildAnalysisQuery', () => {
     to: '2023-01-05',
     direction: 'long',
     entryPattern: 'Quick Rise',
-    exitPattern: 'fixed-time',
     'quick-rise': { 'rise-pct': 0.5 },
-    'fixed-time': { 'hold-minutes': 15 }, // Default hold for baseOptions unless overridden
+    exitStrategies: {
+      enabled: ['maxHoldTime'],
+      maxHoldTime: { minutes: 15 },
+    },
+    generateCharts: false,
+    chartsDir: './charts',
   };
 
   it('should build a query for quick-rise (long)', () => {
@@ -103,8 +107,11 @@ describe('buildAnalysisQuery', () => {
     const defaultHoldOptions: MergedConfig = {
       ...baseOptions,
       entryPattern: 'Quick Rise',
-      'fixed-time': {},
-    }; // uses default 10 min from query-builder
+      exitStrategies: {
+        enabled: ['maxHoldTime'],
+        maxHoldTime: { minutes: 10 },
+      },
+    };
     const queryDefault = buildAnalysisQuery(
       defaultHoldOptions,
       entryPatternDefault,
@@ -115,7 +122,10 @@ describe('buildAnalysisQuery', () => {
     const customHoldOptions: MergedConfig = {
       ...baseOptions,
       entryPattern: 'Quick Rise',
-      'fixed-time': { 'hold-minutes': 25 },
+      exitStrategies: {
+        enabled: ['maxHoldTime'],
+        maxHoldTime: { minutes: 25 },
+      },
     };
     const queryCustom = buildAnalysisQuery(
       customHoldOptions,
@@ -127,7 +137,10 @@ describe('buildAnalysisQuery', () => {
     const longHoldOptions: MergedConfig = {
       ...baseOptions,
       entryPattern: 'Quick Rise',
-      'fixed-time': { 'hold-minutes': 85 },
+      exitStrategies: {
+        enabled: ['maxHoldTime'],
+        maxHoldTime: { minutes: 85 },
+      },
     };
     const queryLong = buildAnalysisQuery(
       longHoldOptions,
@@ -161,15 +174,17 @@ describe('buildAnalysisQuery', () => {
           close as entry_price, 
           '{direction}' as direction 
         FROM raw_data WHERE bar_time = '12:00'`,
-      direction: 'long',
     };
 
     const fixedTimeOptions: MergedConfig = {
-      ...baseOptions, // Includes ticker, timeframe, from, to
-      entryPattern: 'Fixed Time Entry', // Name to trigger the correct path in buildAnalysisQuery
+      ...baseOptions,
+      entryPattern: 'Fixed Time Entry',
       direction: 'long',
-      'fixed-time-entry': { 'entry-time': '12:00' }, // Pattern-specific config (used by pattern factory, not directly by this query builder path)
-      'fixed-time': { 'hold-minutes': 20 }, // Exit pattern config
+      'fixed-time-entry': { 'entry-time': '12:00' },
+      exitStrategies: {
+        enabled: ['maxHoldTime'],
+        maxHoldTime: { minutes: 20 },
+      },
     };
 
     it('should use the entry SQL from FixedTimeEntryPatternDefinition', () => {
@@ -178,9 +193,9 @@ describe('buildAnalysisQuery', () => {
         fixedTimeEntryPatternDef,
         mockExitPatternGeneric
       );
-      expect(query).toContain("WHERE bar_time = '12:00'"); // From fixedTimeEntryPatternDef.sql
-      expect(query).toContain('open as open_price_at_entry'); // From fixedTimeEntryPatternDef.sql
-      expect(query).not.toContain('five_min_high'); // Should not use quick-rise logic
+      expect(query).toContain("WHERE bar_time = '12:00'");
+      expect(query).toContain('open as open_price_at_entry');
+      expect(query).not.toContain('five_min_high');
     });
 
     it('should calculate exit time based on entry_time + holdMinutes for Fixed Time Entry', () => {
@@ -202,20 +217,20 @@ describe('buildAnalysisQuery', () => {
     });
 
     it('should handle short direction for Fixed Time Entry', () => {
-      const shortFixedTimeOptions: MergedConfig = { ...fixedTimeOptions, direction: 'short' };
-      // The direction in fixedTimeEntryPatternDef will be overridden by options.direction for SQL interpolation
+      const shortFixedTimeOptions: MergedConfig = {
+        ...fixedTimeOptions,
+        direction: 'short',
+      };
       const shortPatternDef = {
         ...fixedTimeEntryPatternDef,
-        direction: 'short' as 'long' | 'short',
       };
       const query = buildAnalysisQuery(
         shortFixedTimeOptions,
-        shortPatternDef,
+        shortPatternDef as PatternDefinition,
         mockExitPatternGeneric
       );
       expect(query).toContain('((entry_price - exit_price) / entry_price) as return_pct');
-      // Check the interpolated direction in the entry SQL part
-      expect(query).toContain("\'short\' as direction");
+      expect(query).toContain("'short' as direction");
     });
   });
 
@@ -225,10 +240,15 @@ describe('buildAnalysisQuery', () => {
       timeframe: '5min',
       from: '2024-01-01',
       to: '2024-01-31',
-      entryPattern: 'Quick Rise', // To go through the quick-rise/fall path
+      entryPattern: 'Quick Rise',
       direction: 'long',
       'quick-rise': { 'rise-pct': 0.2 },
-      'fixed-time': { 'hold-minutes': 10 },
+      exitStrategies: {
+        enabled: ['maxHoldTime'],
+        maxHoldTime: { minutes: 10 },
+      },
+      generateCharts: false,
+      chartsDir: './charts',
     };
     const entryPattern = createMockEntryPattern('Quick Rise', 'Desc specific options');
     const query = buildAnalysisQuery(specificOptions, entryPattern, mockExitPatternGeneric);
@@ -239,14 +259,22 @@ describe('buildAnalysisQuery', () => {
 
   // Legacy tests adapted
   it('[Legacy] should handle different timeframes', () => {
-    const options: MergedConfig = { ...baseOptions, timeframe: '5min', entryPattern: 'Quick Rise' };
+    const options: MergedConfig = {
+      ...baseOptions,
+      timeframe: '5min',
+      entryPattern: 'Quick Rise',
+    };
     const entryPattern = createMockEntryPattern('Quick Rise', 'Desc timeframe legacy');
     const query = buildAnalysisQuery(options, entryPattern, mockExitPatternGeneric);
     expect(query).toContain('tickers/TEST/5min.csv');
   });
 
   it('[Legacy] should handle different tickers', () => {
-    const options: MergedConfig = { ...baseOptions, ticker: 'SPY', entryPattern: 'Quick Rise' };
+    const options: MergedConfig = {
+      ...baseOptions,
+      ticker: 'SPY',
+      entryPattern: 'Quick Rise',
+    };
     const entryPattern = createMockEntryPattern('Quick Rise', 'Desc ticker legacy');
     const query = buildAnalysisQuery(options, entryPattern, mockExitPatternGeneric);
     expect(query).toContain('tickers/SPY/1min.csv');
@@ -256,13 +284,12 @@ describe('buildAnalysisQuery', () => {
     const options: MergedConfig = {
       ...baseOptions,
       entryPattern: 'Quick Rise',
-      'fixed-time': { 'hold-minutes': 15 },
-    }; // baseOptions sets 15 min hold
+    };
     const entryPattern = createMockEntryPattern('Quick Rise', 'Desc market hours legacy');
     const query = buildAnalysisQuery(options, entryPattern, mockExitPatternGeneric);
     expect(query).toContain("strftime(timestamp, '%H:%M') = '09:30'");
     expect(query).toContain("strftime(r.timestamp, '%H:%M') = '09:35'");
-    expect(query).toContain("strftime(r.timestamp, '%H:%M') = '09:50'"); // 9:35 + 15 min (from baseOptions)
+    expect(query).toContain("strftime(r.timestamp, '%H:%M') = '09:50'"); // 9:35 + 15 min
   });
 
   it('[Legacy] should use custom rise threshold for quick-rise', () => {
@@ -289,7 +316,10 @@ describe('buildAnalysisQuery', () => {
   });
 
   it('[Legacy] should exclude weekends from trading days (quick-rise/fall path)', () => {
-    const options: MergedConfig = { ...baseOptions, entryPattern: 'Quick Rise' };
+    const options: MergedConfig = {
+      ...baseOptions,
+      entryPattern: 'Quick Rise',
+    };
     const entryPattern = createMockEntryPattern('Quick Rise', 'Desc weekends legacy');
     const query = buildAnalysisQuery(options, entryPattern, mockExitPatternGeneric);
     expect(query).toContain("strftime(timestamp, '%w') NOT IN ('0', '6')");
@@ -297,41 +327,38 @@ describe('buildAnalysisQuery', () => {
 
   it("[Legacy] should use specified risePct from MergedConfig if pattern.'quick-rise'.'rise-pct' missing", () => {
     const options: MergedConfig = {
-      ...baseOptions, // has quick-rise.rise-pct: 0.5
+      ...baseOptions,
       entryPattern: 'Quick Rise',
-      risePct: '0.2', // This is a direct MergedConfig property
-      'quick-rise': {}, // Empty object, so rise-pct is not here
+      risePct: '0.2',
+      'quick-rise': {},
     };
     const entryPattern = createMockEntryPattern('Quick Rise', 'Desc legacy MergedConfig.risePct');
-    // The quick-rise/fall path in buildAnalysisQuery prioritizes options['quick-rise']['rise-pct'].
-    // If that's not present, THEN it looks at options.risePct. Here, options['quick-rise'] is {}, so it uses options.risePct.
     const query = buildAnalysisQuery(options, entryPattern, mockExitPatternGeneric);
-    expect(query).toContain('0.002'); // Should use 0.2 from options.risePct
+    expect(query).toContain('0.002');
   });
 
   it('[Legacy] should use default risePct (0.3) if specific and legacy MergedConfig.risePct missing', () => {
     const options: MergedConfig = {
       ...baseOptions,
       entryPattern: 'Quick Rise',
-      'quick-rise': {}, // No rise-pct here
-      // No risePct property either in this specific options object
+      'quick-rise': {},
     };
-    delete options.risePct; // Ensure it's not from baseOptions accidentally
+    delete options.risePct;
     const entryPattern = createMockEntryPattern('Quick Rise', 'Desc default legacy');
     const query = buildAnalysisQuery(options, entryPattern, mockExitPatternGeneric);
-    expect(query).toContain('0.003'); // Default 0.3%
+    expect(query).toContain('0.003');
   });
 
   it('[Legacy] should prioritize pattern-specific config over MergedConfig.risePct', () => {
     const options: MergedConfig = {
       ...baseOptions,
       entryPattern: 'Quick Rise',
-      risePct: '0.2', // Legacy, should be ignored
-      'quick-rise': { 'rise-pct': 1.0 }, // Specific, should be used
+      risePct: '0.2',
+      'quick-rise': { 'rise-pct': 1.0 },
     };
     const entryPattern = createMockEntryPattern('Quick Rise', 'Desc priority legacy');
     const query = buildAnalysisQuery(options, entryPattern, mockExitPatternGeneric);
-    expect(query).toContain('0.01'); // 1.0% from pattern-specific
+    expect(query).toContain('0.01');
     expect(query).not.toContain('0.002');
   });
 });

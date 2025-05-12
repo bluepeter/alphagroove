@@ -16,11 +16,6 @@ const QuickFallConfigSchema = z.object({
   'within-minutes': z.number().default(5),
 });
 
-// Define schema for the fixed-time pattern
-const FixedTimeConfigSchema = z.object({
-  'hold-minutes': z.number().default(10),
-});
-
 // Define schema for the Fixed Time Entry pattern configuration
 const FixedTimeEntryConfigSchema = z.object({
   'entry-time': z
@@ -36,15 +31,25 @@ const EntryPatternsConfigSchema = z.object({
   'fixed-time-entry': FixedTimeEntryConfigSchema.optional(),
 });
 
-// Define schema for exit pattern configurations
-const ExitPatternsConfigSchema = z.object({
-  'fixed-time': FixedTimeConfigSchema.optional(),
+// NEW: Define schema for MaxHoldTime configuration
+const MaxHoldTimeConfigSchema = z.object({
+  minutes: z.number().int().positive().default(60),
 });
+
+// NEW: Define schema for ExitStrategies configuration
+const ExitStrategiesConfigSchema = z
+  .object({
+    enabled: z.array(z.string()).default(['maxHoldTime']),
+    maxHoldTime: MaxHoldTimeConfigSchema.optional(),
+  })
+  .default({
+    enabled: ['maxHoldTime'],
+  });
 
 // Define schema for pattern configurations
 const PatternsConfigSchema = z.object({
   entry: EntryPatternsConfigSchema,
-  exit: ExitPatternsConfigSchema,
+  // exit: ExitPatternsConfigSchema, // Removed
 });
 
 // Schema for date range
@@ -56,7 +61,7 @@ const DateRangeSchema = z.object({
 // Schema for default pattern selection
 const DefaultPatternsSchema = z.object({
   entry: z.string().default('quick-rise'),
-  exit: z.string().default('fixed-time'),
+  // exit: z.string().default('fixed-time'), // Removed
 });
 
 // Schema for chart options
@@ -108,9 +113,13 @@ const ConfigSchema = z
       direction: z.enum(['long', 'short', 'llm_decides']).default('long'),
       patterns: DefaultPatternsSchema.optional(),
       charts: ChartOptionsSchema.optional(),
+      // NEW: Add exitStrategies to default config
+      exitStrategies: ExitStrategiesConfigSchema.optional(),
     }),
     patterns: PatternsConfigSchema,
     llmConfirmationScreen: LLMScreenConfigSchema.optional(),
+    // NEW: Add exitStrategies to root config
+    exitStrategies: ExitStrategiesConfigSchema.optional(),
   })
   .refine(
     data => {
@@ -128,6 +137,7 @@ const ConfigSchema = z
 
 // Type for the validated config
 export type Config = z.infer<typeof ConfigSchema>;
+export type ExitStrategiesConfig = z.infer<typeof ExitStrategiesConfigSchema>; // Exporting for use elsewhere
 
 /**
  * Default configuration when no config file exists
@@ -139,11 +149,13 @@ const DEFAULT_CONFIG: Config = {
     direction: 'long',
     patterns: {
       entry: 'quick-rise',
-      exit: 'fixed-time',
     },
     charts: {
       generate: false,
       outputDir: './charts',
+    },
+    exitStrategies: {
+      enabled: ['maxHoldTime'],
     },
   },
   patterns: {
@@ -160,16 +172,14 @@ const DEFAULT_CONFIG: Config = {
         'entry-time': '12:00',
       },
     },
-    exit: {
-      'fixed-time': {
-        'hold-minutes': 10,
-      },
-    },
   },
   llmConfirmationScreen: LLMScreenConfigSchema.parse({
     // systemPrompt will be undefined by default due to .optional()
     // Explicitly set a default system prompt if desired when creating the config file
   }),
+  exitStrategies: {
+    enabled: ['maxHoldTime'],
+  },
 };
 
 /**
@@ -224,11 +234,13 @@ export const createDefaultConfigFile = (): void => {
         direction: 'long',
         patterns: {
           entry: 'quick-rise',
-          exit: 'fixed-time',
         },
         charts: {
           generate: false,
           outputDir: './charts',
+        },
+        exitStrategies: {
+          enabled: ['maxHoldTime'],
         },
       },
       patterns: {
@@ -245,16 +257,14 @@ export const createDefaultConfigFile = (): void => {
             'entry-time': '12:00',
           },
         },
-        exit: {
-          'fixed-time': {
-            'hold-minutes': 10,
-          },
-        },
       },
       llmConfirmationScreen: {
         ...LLMScreenConfigSchema.parse({}),
         systemPrompt:
           'You are an AI assistant that strictly follows user instructions for output format. You will be provided with a task and an example of the JSON output required. Respond ONLY with the valid JSON object described.',
+      },
+      exitStrategies: {
+        enabled: ['maxHoldTime'],
       },
     };
 
@@ -279,13 +289,13 @@ export interface MergedConfig {
   from: string;
   to: string;
   entryPattern: string;
-  exitPattern: string;
   generateCharts: boolean;
   chartsDir: string;
   llmConfirmationScreen?: LLMScreenConfig;
+  exitStrategies?: ExitStrategiesConfig; // NEW: Add exitStrategies
   'quick-rise'?: Record<string, any>;
   'quick-fall'?: Record<string, any>;
-  'fixed-time'?: Record<string, any>;
+  'fixed-time-entry'?: Record<string, any>; // Added for consistency, was missing before
   [key: string]: any;
 }
 
@@ -301,7 +311,36 @@ export const mergeConfigWithCliOptions = (
   cliOptions: Record<string, any>
 ): MergedConfig => {
   const defaultEntryPattern = loadedConfig.default.patterns?.entry || 'quick-rise';
-  const defaultExitPattern = loadedConfig.default.patterns?.exit || 'fixed-time';
+
+  // Get exit strategies configurations from different sources
+  const defaultFromLoaded = loadedConfig.default.exitStrategies;
+  const rootFromLoaded = loadedConfig.exitStrategies;
+  const schemaDefaultFromZod = ExitStrategiesConfigSchema.parse({});
+  const schemaDefaultMinutes = MaxHoldTimeConfigSchema.parse({}).minutes; // 60
+
+  // Determine which enabled array to use with precedence: root > default > schema
+  const enabledArray =
+    rootFromLoaded?.enabled || defaultFromLoaded?.enabled || schemaDefaultFromZod.enabled;
+
+  // Fix: Correctly determine minutes value with proper precedence
+  let finalMhtMinutes: number | undefined;
+
+  // Priority order for maxHoldTime.minutes: root > default > schema default (if enabled)
+  if (rootFromLoaded?.maxHoldTime?.minutes !== undefined) {
+    finalMhtMinutes = rootFromLoaded.maxHoldTime.minutes;
+  } else if (defaultFromLoaded?.maxHoldTime?.minutes !== undefined) {
+    finalMhtMinutes = defaultFromLoaded.maxHoldTime.minutes;
+  } else if (enabledArray?.includes('maxHoldTime')) {
+    finalMhtMinutes = schemaDefaultMinutes;
+  }
+
+  const mergedExitStrategies: ExitStrategiesConfig = {
+    enabled: enabledArray,
+    maxHoldTime:
+      enabledArray?.includes('maxHoldTime') && finalMhtMinutes !== undefined
+        ? { minutes: finalMhtMinutes }
+        : undefined,
+  };
 
   const mergedConfig: MergedConfig = {
     ticker: cliOptions.ticker || loadedConfig.default.ticker,
@@ -310,7 +349,6 @@ export const mergeConfigWithCliOptions = (
     from: cliOptions.from || loadedConfig.default.date?.from || '2010-01-01',
     to: cliOptions.to || loadedConfig.default.date?.to || '2025-12-31',
     entryPattern: cliOptions.entryPattern || cliOptions['entry-pattern'] || defaultEntryPattern,
-    exitPattern: cliOptions.exitPattern || cliOptions['exit-pattern'] || defaultExitPattern,
     generateCharts:
       cliOptions.generateCharts !== undefined
         ? cliOptions.generateCharts
@@ -318,10 +356,11 @@ export const mergeConfigWithCliOptions = (
     chartsDir: cliOptions.chartsDir || loadedConfig.default.charts?.outputDir || './charts',
     llmConfirmationScreen: loadedConfig.llmConfirmationScreen
       ? {
-          ...LLMScreenConfigSchema.parse({}), // Ensure all defaults from Zod schema
-          ...loadedConfig.llmConfirmationScreen, // Then overlay loaded YAML values
+          ...LLMScreenConfigSchema.parse({}),
+          ...loadedConfig.llmConfirmationScreen,
         }
-      : LLMScreenConfigSchema.parse({}), // Fallback to schema defaults if not in YAML
+      : LLMScreenConfigSchema.parse({}),
+    exitStrategies: mergedExitStrategies,
   };
 
   const patternOptions: Record<string, Record<string, any>> = {};
@@ -329,13 +368,9 @@ export const mergeConfigWithCliOptions = (
     if (key.includes('.')) {
       const [patternName, optionName] = key.split('.');
       if (
-        [
-          mergedConfig.entryPattern,
-          mergedConfig.exitPattern,
-          'quick-rise',
-          'quick-fall',
-          'fixed-time',
-        ].includes(patternName)
+        [mergedConfig.entryPattern, 'quick-rise', 'quick-fall', 'fixed-time-entry'].includes(
+          patternName
+        )
       ) {
         if (!patternOptions[patternName]) {
           patternOptions[patternName] = {};
@@ -354,9 +389,6 @@ export const mergeConfigWithCliOptions = (
   if (loadedConfig.patterns.entry['fixed-time-entry']) {
     mergedConfig['fixed-time-entry'] = { ...loadedConfig.patterns.entry['fixed-time-entry'] };
   }
-  if (loadedConfig.patterns.exit['fixed-time']) {
-    mergedConfig['fixed-time'] = { ...loadedConfig.patterns.exit['fixed-time'] };
-  }
 
   Object.entries(patternOptions).forEach(([pattern, options]) => {
     if (!mergedConfig[pattern]) {
@@ -364,8 +396,11 @@ export const mergeConfigWithCliOptions = (
         mergedConfig[pattern] = { ...loadedConfig.patterns.entry['quick-rise'] };
       } else if (pattern === 'quick-fall' && loadedConfig.patterns.entry['quick-fall']) {
         mergedConfig[pattern] = { ...loadedConfig.patterns.entry['quick-fall'] };
-      } else if (pattern === 'fixed-time' && loadedConfig.patterns.exit['fixed-time']) {
-        mergedConfig[pattern] = { ...loadedConfig.patterns.exit['fixed-time'] };
+      } else if (
+        pattern === 'fixed-time-entry' &&
+        loadedConfig.patterns.entry['fixed-time-entry']
+      ) {
+        mergedConfig[pattern] = { ...loadedConfig.patterns.entry['fixed-time-entry'] };
       } else {
         mergedConfig[pattern] = {};
       }
@@ -382,14 +417,8 @@ export const mergeConfigWithCliOptions = (
     if (!mergedConfig['quick-fall']) mergedConfig['quick-fall'] = {};
     mergedConfig['quick-fall']['fall-pct'] = parseFloat(cliOptions.fallPct as string);
   }
-  if (mergedConfig.exitPattern === 'fixed-time' && cliOptions.holdMinutes !== undefined) {
-    if (!mergedConfig['fixed-time']) mergedConfig['fixed-time'] = {};
-    mergedConfig['fixed-time']['hold-minutes'] = parseInt(cliOptions.holdMinutes as string, 10);
-  }
 
-  const patternNamesFromConfig = Object.keys(loadedConfig.patterns.entry).concat(
-    Object.keys(loadedConfig.patterns.exit)
-  );
+  const patternNamesFromConfig = Object.keys(loadedConfig.patterns.entry);
   patternNamesFromConfig.forEach(patternName => {
     if (cliOptions[patternName] && typeof cliOptions[patternName] === 'object') {
       mergedConfig[patternName] = {
@@ -411,10 +440,10 @@ export const mergeConfigWithCliOptions = (
       ...cliOptions['quick-fall'],
     };
   }
-  if (cliOptions['fixed-time'] && typeof cliOptions['fixed-time'] === 'object') {
-    mergedConfig['fixed-time'] = {
-      ...(mergedConfig['fixed-time'] || {}),
-      ...cliOptions['fixed-time'],
+  if (cliOptions['fixed-time-entry'] && typeof cliOptions['fixed-time-entry'] === 'object') {
+    mergedConfig['fixed-time-entry'] = {
+      ...(mergedConfig['fixed-time-entry'] || {}),
+      ...cliOptions['fixed-time-entry'],
     };
   }
 

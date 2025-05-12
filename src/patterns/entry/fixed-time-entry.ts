@@ -1,4 +1,4 @@
-import { PatternDefinition } from '../pattern-factory.js';
+import { PatternDefinition } from '../types.js';
 import { Bar, Signal } from '../types.js';
 
 /**
@@ -114,8 +114,6 @@ export const fixedTimeEntryPattern: PatternDefinition & {
   },
   direction: 'long',
   sql: '',
-  detect: (bars: Bar[], config: FixedTimeEntryConfig, direction: 'long' | 'short') =>
-    detectFixedTimeEntry(bars, config, direction),
   updateConfig(newConfig: Partial<FixedTimeEntryConfig>) {
     const updatedConfig = { ...this.config, ...newConfig };
     // Ensure a defined direction for SQL query generation during config update.

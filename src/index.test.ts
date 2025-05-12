@@ -111,7 +111,7 @@ describe('AlphaGroove Main Module Setup', () => {
 
     vi.mocked(loadConfig).mockReturnValue({
       default: { ticker: 'DEFAULT', timeframe: '1day', direction: 'long' },
-      patterns: { entry: {}, exit: {} },
+      patterns: { entry: {} },
     });
     vi.mocked(mergeConfigWithCliOptions).mockImplementation((baseConfig: any, cliOpts: any) => ({
       ...baseConfig,

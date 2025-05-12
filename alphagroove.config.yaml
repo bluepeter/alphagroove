@@ -9,10 +9,13 @@ default:
   direction: 'llm_decides'
   patterns:
     entry: 'fixed-time-entry'
-    exit: 'fixed-time'
   charts:
     generate: true
     outputDir: './charts'
+  exitStrategies:
+    enabled: ['maxHoldTime']
+    maxHoldTime:
+      minutes: 60
 
 patterns:
   entry:
@@ -24,10 +27,6 @@ patterns:
       within-minutes: 5
     fixed-time-entry:
       entry-time: '13:00'
-
-  exit:
-    fixed-time:
-      hold-minutes: 60
 
 llmConfirmationScreen:
   enabled: true

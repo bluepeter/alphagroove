@@ -58,13 +58,12 @@ const getBaseAppConfig = (direction: 'long' | 'short' = 'long'): AppConfig => ({
     ticker: 'SPY',
     timeframe: '1min',
     direction,
-    patterns: { entry: 'quick-rise', exit: 'fixed-time' },
+    patterns: { entry: 'quick-rise' },
     charts: { generate: false, outputDir: './charts' },
     date: { from: '2023-01-01', to: '2023-12-31' },
   },
   patterns: {
     entry: { 'quick-rise': { 'rise-pct': 0.3, 'within-minutes': 5 } },
-    exit: { 'fixed-time': { 'hold-minutes': 10 } },
   },
 });
 

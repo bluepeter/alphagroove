@@ -1,4 +1,4 @@
-import { PatternDefinition } from '../pattern-factory';
+import { PatternDefinition } from '../types.js';
 import { Bar, Signal } from '../types';
 
 export interface FixedTimeExitConfig {

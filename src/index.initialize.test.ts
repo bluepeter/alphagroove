@@ -131,10 +131,7 @@ describe('initializeAnalysis', () => {
       mockMergedConfigValue.entryPattern,
       mockMergedConfigValue
     );
-    expect(getExitPattern).toHaveBeenCalledWith(
-      mockMergedConfigValue.exitPattern,
-      mockMergedConfigValue
-    );
+    expect(getExitPattern).toHaveBeenCalledWith(undefined, mockMergedConfigValue);
     expect(buildAnalysisQuery).toHaveBeenCalledWith(
       mockMergedConfigValue,
       mockEntryPatternValue,

@@ -1,19 +1,11 @@
-import { PatternDefinition } from '../patterns/pattern-factory.js';
+import { PatternDefinition } from '../patterns/types.js';
+import { MergedConfig } from './config'; // Import MergedConfig type
 
-export interface QueryOptions {
-  ticker: string;
-  timeframe: string;
-  from: string;
-  to: string;
-  entryPattern?: string;
-  exitPattern?: string;
-  risePct?: string;
-  fallPct?: string;
-  direction?: 'long' | 'short';
-}
+// Remove QueryOptions if it's no longer used or replace its usages with MergedConfig
+// export interface QueryOptions { ... }
 
-// Config format used by the new configuration system
-export type MergedConfig = Record<string, any>;
+// Config format used by the new configuration system - REMOVED as it's imported
+// export type MergedConfig = Record<string, any>;
 
 export const buildAnalysisQuery = (
   options: MergedConfig,
@@ -29,10 +21,22 @@ export const buildAnalysisQuery = (
 
   const entryPatternName = entryPatternDefinition.name;
 
-  // Determine hold minutes for exit (assuming fixed-time exit for now)
-  let holdMinutes = 10; // default value
-  if (options['fixed-time'] && options['fixed-time']['hold-minutes']) {
-    holdMinutes = options['fixed-time']['hold-minutes'];
+  // Extract exit strategy configurations
+  const exitStrategies = options.exitStrategies || { enabled: ['maxHoldTime'] };
+  const enabledExitStrategies = exitStrategies.enabled || ['maxHoldTime'];
+
+  // Determine hold minutes from the exitStrategies config
+  let holdMinutes = 60; // Default
+  if (
+    enabledExitStrategies.includes('maxHoldTime') &&
+    exitStrategies.maxHoldTime &&
+    typeof exitStrategies.maxHoldTime.minutes === 'number'
+  ) {
+    holdMinutes = exitStrategies.maxHoldTime.minutes;
+  } else if (enabledExitStrategies.includes('maxHoldTime')) {
+    console.warn(
+      'Warning: maxHoldTime is enabled but minutes not configured properly. Using default 60 minutes.'
+    );
   }
 
   // Interpolate common values into the entry pattern's SQL
@@ -156,7 +160,7 @@ export const buildAnalysisQuery = (
     `;
   }
 
-  // --- Existing QuickRise/QuickFall Logic (slightly adapted) ---
+  // --- Quick Rise/Quick Fall Logic ---
   const isQuickFall = entryPatternName === 'Quick Fall'; // Adjusted to use name
 
   let threshold = 0.3;
@@ -276,7 +280,7 @@ export const buildAnalysisQuery = (
         exit_time,
         ${patternPctCalc},
         ${returnPctCalc},
-        direction as direction
+        '${sqlQueryBaseDirection}' as direction
       FROM exit_prices
       WHERE ${patternCondition}
     ),
