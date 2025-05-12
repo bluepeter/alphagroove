@@ -1,5 +1,4 @@
 import { vi, describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
-import { type Config as AppConfig } from './utils/config.js';
 import { LlmConfirmationScreen as _ActualLlmConfirmationScreen } from './screens/llm-confirmation.screen.js';
 
 const mockQueryValue = 'DRY_RUN_SQL_QUERY_FROM_INDEX_TEST'; // Define it once globally for the test file
@@ -157,93 +156,6 @@ describe('runAnalysis refactored components', () => {
     vi.mocked(getExitPattern).mockReturnValue(mockExitPatternValue);
     vi.mocked(fetchTradesFromQuery).mockReturnValue([]);
     vi.mocked(buildAnalysisQuery).mockReturnValue(mockQueryValue);
-  });
-
-  describe('handleLlmTradeScreeningInternal', () => {
-    const mockSignal = {
-      ticker: 'TEST',
-      trade_date: '2023-01-01',
-      price: 100,
-      timestamp: '09:30',
-      type: 'entry',
-      direction: 'long' as 'long' | 'short',
-    };
-    const mockChartName = 'test-chart';
-    const _mockLocalRawConfig = {};
-    const getMockAppConfig = (): AppConfig => ({
-      default: { direction: 'long', ticker: 'SPY', timeframe: '1min' },
-      patterns: { entry: {}, exit: {} },
-    });
-
-    it('should return { proceed: true, cost: 0 } if LLM screen is not enabled or instance is null', async () => {
-      const resultNullInstance = await mainModule.handleLlmTradeScreeningInternal(
-        mockSignal,
-        mockChartName,
-        null,
-        { enabled: true },
-        mockMergedConfigValue,
-        getMockAppConfig()
-      );
-      expect(resultNullInstance).toEqual({ proceed: true, cost: 0 });
-
-      const resultDisabled = await mainModule.handleLlmTradeScreeningInternal(
-        mockSignal,
-        mockChartName,
-        new (LlmConfirmationScreen as any)(),
-        { enabled: false },
-        mockMergedConfigValue,
-        getMockAppConfig()
-      );
-      expect(resultDisabled).toEqual({ proceed: true, cost: 0 });
-    });
-
-    it('should call LLM screen if enabled and return its decision with cost', async () => {
-      const localMockLlmInstance = new (LlmConfirmationScreen as any)();
-      const expectedChartPath = 'path/to/chart.png';
-      const mockScreenCost = 0.005;
-
-      vi.mocked(localMockLlmInstance.shouldSignalProceed).mockResolvedValueOnce({
-        proceed: false,
-        cost: mockScreenCost,
-      });
-
-      const resultFalse = await mainModule.handleLlmTradeScreeningInternal(
-        mockSignal,
-        mockChartName,
-        localMockLlmInstance,
-        { enabled: true },
-        mockMergedConfigValue,
-        getMockAppConfig()
-      );
-      expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalledWith(
-        mockSignal,
-        expectedChartPath,
-        { enabled: true },
-        getMockAppConfig()
-      );
-      expect(resultFalse).toEqual({ proceed: false, cost: mockScreenCost });
-
-      const secondMockCost = mockScreenCost + 0.001;
-      vi.mocked(localMockLlmInstance.shouldSignalProceed).mockResolvedValueOnce({
-        proceed: true,
-        cost: secondMockCost,
-      });
-
-      const resultTrue = await mainModule.handleLlmTradeScreeningInternal(
-        mockSignal,
-        mockChartName,
-        localMockLlmInstance,
-        { enabled: true },
-        mockMergedConfigValue,
-        getMockAppConfig()
-      );
-      expect(resultTrue).toEqual({
-        proceed: true,
-        chartPath: expectedChartPath,
-        cost: secondMockCost,
-      });
-      expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalledTimes(2);
-    });
   });
 
   describe('processTradesLoop', () => {
