@@ -1,7 +1,8 @@
 import { vi, describe, it, expect, beforeAll, beforeEach, afterEach } from 'vitest';
 
-const mockQueryValue = 'DRY_RUN_SQL_QUERY_FROM_INDEX_TEST';
+const mockQueryValue = 'DRY_RUN_SQL_QUERY_FROM_INDEX_TEST'; // General mock value, specific one used in test
 
+// Mock external dependencies
 vi.mock('./utils/config.js', async () => {
   const actual = await vi.importActual('./utils/config.js');
   return {
@@ -18,7 +19,7 @@ vi.mock('./utils/config.js', async () => {
       timeframe: '1min',
       llmConfirmationScreen: { enabled: false },
       generateCharts: false,
-      debug: false,
+      debug: true, // Important for dry run logging
     })),
   };
 });
@@ -28,7 +29,7 @@ vi.mock('./utils/data-loader.js', () => ({
 }));
 
 vi.mock('./utils/query-builder.js', () => ({
-  buildAnalysisQuery: vi.fn(() => mockQueryValue),
+  buildAnalysisQuery: vi.fn(() => mockQueryValue), // Default, can be overridden by test
 }));
 
 vi.mock('./patterns/pattern-factory.js', async () => {
@@ -60,7 +61,7 @@ vi.mock('./utils/output.js', async () => {
     printTradeDetails: vi.fn(),
     printYearSummary: vi.fn(),
     printOverallSummary: vi.fn(),
-    printFooter: vi.fn(),
+    printFooter: vi.fn(), // Used by dry run path
   };
 });
 
@@ -86,6 +87,7 @@ vi.mock('./utils/calculations.js', async () => {
   };
 });
 
+// Import the modules that are being mocked to access their mocked functions
 import { getEntryPattern, getExitPattern } from './patterns/pattern-factory.js';
 import { loadConfig, mergeConfigWithCliOptions } from './utils/config.js';
 import { fetchTradesFromQuery } from './utils/data-loader.js';
@@ -105,48 +107,8 @@ beforeAll(async () => {
   mainModule = await import('./index.js');
 });
 
-describe('AlphaGroove Main Module Setup', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-
-    vi.mocked(loadConfig).mockReturnValue({
-      default: { ticker: 'DEFAULT', timeframe: '1day', direction: 'long' },
-      patterns: { entry: {}, exit: {} },
-    });
-    vi.mocked(mergeConfigWithCliOptions).mockImplementation((baseConfig: any, cliOpts: any) => ({
-      ...baseConfig,
-      ...cliOpts,
-      ticker: 'DEFAULT_TICKER',
-      from: '1900-01-01',
-      to: '1900-01-02',
-      entryPattern: 'default-entry',
-      exitPattern: 'default-exit',
-      timeframe: '1day',
-      llmConfirmationScreen: { enabled: false },
-      generateCharts: false,
-      debug: false,
-    }));
-    vi.mocked(getEntryPattern).mockReturnValue({
-      name: 'default-entry',
-      direction: 'long',
-      description: 'desc',
-      sql: 'sql',
-    });
-    vi.mocked(getExitPattern).mockReturnValue({
-      name: 'default-exit',
-      description: 'desc',
-      sql: 'sql',
-    });
-    vi.mocked(buildAnalysisQuery).mockReturnValue('DEFAULT_MOCK_QUERY');
-    vi.mocked(fetchTradesFromQuery).mockReturnValue([]);
-  });
-
-  it('main module can be imported', () => {
-    expect(mainModule).toBeDefined();
-  });
-});
-
-describe('runAnalysis refactored components', () => {
+describe('runAnalysis dry run', () => {
+  let consoleLogSpy: ReturnType<typeof vi.spyOn>;
   let mockCliOptions: any;
   let mockRawConfig: any;
   let mockMergedConfigValue: any;
@@ -154,8 +116,23 @@ describe('runAnalysis refactored components', () => {
   let mockExitPatternValue: any;
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    mockCliOptions = { config: 'path/to/config.yaml' };
+    // Clear specific mocks used in the test OR all mocks if preferred
+    vi.mocked(loadConfig).mockClear();
+    vi.mocked(mergeConfigWithCliOptions).mockClear();
+    vi.mocked(getEntryPattern).mockClear();
+    vi.mocked(getExitPattern).mockClear();
+    vi.mocked(buildAnalysisQuery).mockClear();
+    vi.mocked(fetchTradesFromQuery).mockClear();
+    vi.mocked(printHeader).mockClear();
+    vi.mocked(mapRawDataToTrade).mockClear();
+    vi.mocked(printTradeDetails).mockClear();
+    vi.mocked(printYearSummary).mockClear();
+    vi.mocked(printOverallSummary).mockClear();
+    vi.mocked(printFooter).mockClear();
+    consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {}); // Spy and stub console.log
+
+    // Set up general mock return values for this test suite
+    mockCliOptions = { config: 'path/to/config.yaml', dryRun: true }; // dryRun is key here
     mockRawConfig = { someBaseOpt: 'value' };
     mockMergedConfigValue = {
       ticker: 'TEST',
@@ -167,6 +144,7 @@ describe('runAnalysis refactored components', () => {
       direction: 'long',
       llmConfirmationScreen: { enabled: false },
       generateCharts: false,
+      debug: true, // Ensure debug is true for dry run query logging
       someBaseOpt: 'value',
       config: 'path/to/config.yaml',
     };
@@ -177,57 +155,28 @@ describe('runAnalysis refactored components', () => {
     vi.mocked(mergeConfigWithCliOptions).mockReturnValue(mockMergedConfigValue);
     vi.mocked(getEntryPattern).mockReturnValue(mockEntryPatternValue);
     vi.mocked(getExitPattern).mockReturnValue(mockExitPatternValue);
-    vi.mocked(fetchTradesFromQuery).mockReturnValue([]);
-    vi.mocked(buildAnalysisQuery).mockReturnValue(mockQueryValue);
+    // buildAnalysisQuery will be specifically mocked in the test itself if a non-default value is needed
   });
 
-  describe('runAnalysis full flow', () => {
-    let consoleLogSpy: ReturnType<typeof vi.spyOn>;
+  afterEach(() => {
+    consoleLogSpy.mockRestore();
+  });
 
-    beforeEach(() => {
-      vi.mocked(loadConfig).mockClear();
-      vi.mocked(mergeConfigWithCliOptions).mockClear();
-      vi.mocked(getEntryPattern).mockClear();
-      vi.mocked(getExitPattern).mockClear();
-      vi.mocked(buildAnalysisQuery).mockClear();
-      vi.mocked(fetchTradesFromQuery).mockClear();
-      vi.mocked(printHeader).mockClear();
-      vi.mocked(mapRawDataToTrade).mockClear();
-      vi.mocked(printTradeDetails).mockClear();
-      vi.mocked(printYearSummary).mockClear();
-      vi.mocked(printOverallSummary).mockClear();
-      vi.mocked(printFooter).mockClear();
-      consoleLogSpy = vi.spyOn(console, 'log');
-    });
+  it('should handle dry run correctly', async () => {
+    const dryRunQuery = 'DRY_RUN_SQL_QUERY_FOR_TEST'; // Specific query for this test
+    vi.mocked(buildAnalysisQuery).mockReturnValue(dryRunQuery); // Override global mock for this test
 
-    afterEach(() => {
-      consoleLogSpy.mockRestore();
-    });
+    await mainModule.runAnalysis(mockCliOptions);
 
-    it('should handle dry run correctly', async () => {
-      mockCliOptions.dryRun = true;
-      const dryRunQuery = 'DRY RUN SQL QUERY';
-      vi.mocked(loadConfig).mockReturnValue(mockRawConfig);
-      vi.mocked(mergeConfigWithCliOptions).mockReturnValue({
-        ...mockMergedConfigValue,
-        debug: true,
-      });
-      vi.mocked(getEntryPattern).mockReturnValue(mockEntryPatternValue);
-      vi.mocked(getExitPattern).mockReturnValue(mockExitPatternValue);
-      vi.mocked(buildAnalysisQuery).mockReturnValue(dryRunQuery);
-
-      await mainModule.runAnalysis(mockCliOptions);
-
-      expect(buildAnalysisQuery).toHaveBeenCalled();
-      expect(consoleLogSpy).toHaveBeenCalledWith(`\nDEBUG - SQL Query:\n${dryRunQuery}`);
-      expect(consoleLogSpy).toHaveBeenCalledWith(
-        '\nDry run requested. Exiting without executing query.'
-      );
-      expect(fetchTradesFromQuery).not.toHaveBeenCalled();
-      expect(printFooter).toHaveBeenCalledTimes(1);
-      expect(printHeader).not.toHaveBeenCalled();
-      expect(mapRawDataToTrade).not.toHaveBeenCalled();
-      expect(printOverallSummary).not.toHaveBeenCalled();
-    });
+    expect(buildAnalysisQuery).toHaveBeenCalled();
+    expect(consoleLogSpy).toHaveBeenCalledWith(`\nDEBUG - SQL Query:\n${dryRunQuery}`);
+    expect(consoleLogSpy).toHaveBeenCalledWith(
+      '\nDry run requested. Exiting without executing query.'
+    );
+    expect(fetchTradesFromQuery).not.toHaveBeenCalled();
+    expect(printFooter).toHaveBeenCalledTimes(1);
+    expect(printHeader).not.toHaveBeenCalled();
+    expect(mapRawDataToTrade).not.toHaveBeenCalled();
+    expect(printOverallSummary).not.toHaveBeenCalled();
   });
 });
