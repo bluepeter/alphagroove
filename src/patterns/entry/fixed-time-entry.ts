@@ -114,14 +114,25 @@ export const fixedTimeEntryPattern: PatternDefinition & {
   },
   direction: 'long',
   sql: '',
-  updateConfig(newConfig: Partial<FixedTimeEntryConfig>) {
-    const updatedConfig = { ...this.config, ...newConfig };
+  updateConfig(newConfig: Partial<FixedTimeEntryConfig> & Record<string, any>) {
+    // Handle both 'entry-time' and 'time' keys from config
+    const updatedConfig = { ...this.config };
+
+    // If 'entry-time' exists in the config, use it with priority
+    if ('entry-time' in newConfig) {
+      updatedConfig.time = newConfig['entry-time'] as string;
+    }
+    // Otherwise use 'time' if it exists
+    else if (newConfig.time) {
+      updatedConfig.time = newConfig.time;
+    }
+
     // Ensure a defined direction for SQL query generation during config update.
     // The actual strategy execution might use a different direction passed at runtime.
     return {
       ...this,
       config: updatedConfig,
-      sql: createSqlQuery(updatedConfig, this.direction ?? 'long'), // Pass a direction, though it will be ignored if placeholder used and replaced
+      sql: createSqlQuery(updatedConfig, this.direction ?? 'long'),
     };
   },
 };
