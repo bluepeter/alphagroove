@@ -113,17 +113,28 @@ export class LlmConfirmationScreen implements EntryScreen {
       const totalCostString = ` (Total Cost: $${totalCost.toFixed(6)})`;
 
       let logMessage = '';
+      let rationale = '';
 
       if (configuredDirection === 'llm_decides') {
         const meetsLongThreshold = longVotes >= screenConfig.agreementThreshold;
         const meetsShortThreshold = shortVotes >= screenConfig.agreementThreshold;
 
         if (meetsLongThreshold && longVotes > shortVotes) {
-          decision = { proceed: true, direction: 'long', cost: totalCost };
-          // logMessage = `  LLM consensus to GO LONG (${longVotes} long vs ${shortVotes} short). Signal proceeds as LONG.`;
+          decision = {
+            proceed: true,
+            direction: 'long',
+            cost: totalCost,
+            _debug: { responses },
+          };
+          rationale = `LLM consensus to GO LONG (${longVotes} long vs ${shortVotes} short)`;
         } else if (meetsShortThreshold && shortVotes > longVotes) {
-          decision = { proceed: true, direction: 'short', cost: totalCost };
-          // logMessage = `  LLM consensus to GO SHORT (${shortVotes} short vs ${longVotes} long). Signal proceeds as SHORT.`;
+          decision = {
+            proceed: true,
+            direction: 'short',
+            cost: totalCost,
+            _debug: { responses },
+          };
+          rationale = `LLM consensus to GO SHORT (${shortVotes} short vs ${longVotes} long)`;
         } else {
           let detailReason = `LLM consensus (${longVotes} long, ${shortVotes} short) not decisive for 'llm_decides' strategy (threshold: ${screenConfig.agreementThreshold}).`;
           if (meetsLongThreshold && meetsShortThreshold && longVotes === shortVotes) {
@@ -136,20 +147,44 @@ export class LlmConfirmationScreen implements EntryScreen {
             detailReason = `LLM consensus (${longVotes} long, ${shortVotes} short) does not meet threshold (${screenConfig.agreementThreshold}) for either direction.`;
           }
           logMessage = `${detailReason} Signal is filtered out.`;
-          decision = { proceed: false, cost: totalCost };
+          decision = {
+            proceed: false,
+            cost: totalCost,
+            rationale: detailReason,
+            _debug: { responses },
+          };
         }
       } else {
         if (configuredDirection === 'long' && longVotes >= screenConfig.agreementThreshold) {
-          decision = { proceed: true, cost: totalCost, direction: 'long' };
+          decision = {
+            proceed: true,
+            cost: totalCost,
+            direction: 'long',
+            rationale: `LLM consensus to GO LONG, matching configured direction.`,
+            _debug: { responses },
+          };
           logMessage = `  LLM consensus to GO LONG, matching configured direction. Signal proceeds.`;
         } else if (
           configuredDirection === 'short' &&
           shortVotes >= screenConfig.agreementThreshold
         ) {
-          decision = { proceed: true, cost: totalCost, direction: 'short' };
+          decision = {
+            proceed: true,
+            cost: totalCost,
+            direction: 'short',
+            rationale: `LLM consensus to GO SHORT, matching configured direction.`,
+            _debug: { responses },
+          };
           logMessage = `  LLM consensus to GO SHORT, matching configured direction. Signal proceeds.`;
         } else {
-          logMessage = `  LLM consensus (${longVotes} long, ${shortVotes} short) does not meet threshold for configured direction '${configuredDirection}' for ${signal.ticker} on ${signal.trade_date}. Signal is filtered out.`;
+          rationale = `LLM consensus (${longVotes} long, ${shortVotes} short) does not meet threshold for configured direction '${configuredDirection}'.`;
+          logMessage = `  ${rationale} for ${signal.ticker} on ${signal.trade_date}. Signal is filtered out.`;
+          decision = {
+            proceed: false,
+            cost: totalCost,
+            rationale,
+            _debug: { responses },
+          };
         }
       }
       if (debug) {
@@ -158,7 +193,12 @@ export class LlmConfirmationScreen implements EntryScreen {
     } catch (error: any) {
       console.error('Error during LLM screening process:', error.message);
       // Ensure decision reflects failure, potentially with cost if any was incurred before error
-      decision = { proceed: false, rationale: error.message, cost: totalCost };
+      decision = {
+        proceed: false,
+        rationale: error.message,
+        cost: totalCost,
+        _debug: { rawData: error },
+      };
     } finally {
       // Clean up the temporary chart file
       if (tempChartPath) {

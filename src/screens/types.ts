@@ -24,6 +24,10 @@ export interface ScreenDecision {
   direction?: 'long' | 'short'; // Added for LLM to specify trade direction
   rationale?: string; // Added optional rationale field
   cost?: number; // Optional cost, as not all screens will have it
+  _debug?: {
+    responses?: Array<any>; // Just store the raw responses to avoid complicated type changes
+    rawData?: any; // For any additional debug data
+  }; // Simplified debug field
 }
 
 // Define an enriched signal type that includes context like ticker and trade_date

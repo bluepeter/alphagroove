@@ -520,6 +520,76 @@ llmConfirmationScreen:
 Ensure the environment variable specified in `apiKeyEnvVar` is set in your environment (e.g., in an
 `.env.local` file that is gitignored) for the LLM service to function.
 
+### Standalone LLM Chart Analyzer
+
+AlphaGroove includes a standalone CLI tool for analyzing chart images with the LLM configuration
+defined in your `alphagroove.config.yaml` file. This allows you to get LLM analysis of any chart
+image without running a full backtest.
+
+**Usage:**
+
+```bash
+# Basic usage
+pnpm analyze /path/to/chart.png
+
+# Specify suggested direction
+pnpm analyze /path/to/chart.png --direction short
+
+# Show detailed responses (including rationales)
+pnpm analyze /path/to/chart.png --verbose
+
+# Provide additional context
+pnpm analyze /path/to/chart.png --ticker SPY --date 2023-05-15 --price 420.69
+```
+
+**Options:**
+
+- `<imagePath>`: Path to the chart image to analyze (required)
+- `-d, --direction <direction>`: Suggested direction (`long` or `short`, default: `long`)
+- `-c, --config <path>`: Path to configuration file (default: `alphagroove.config.yaml`)
+
+### Trade Levels Calculator
+
+AlphaGroove includes a standalone CLI tool for calculating stop loss, profit target, and trailing
+stop levels based on Average True Range (ATR) from a CSV file with minute bar data. This tool uses
+the same configuration from your `alphagroove.config.yaml` file to ensure that the calculated levels
+match what would be used in a backtest.
+
+**Usage:**
+
+```bash
+# Basic usage
+pnpm levels /path/to/minute-bars.csv --price 420.69
+
+# Specify trade direction
+pnpm levels /path/to/minute-bars.csv --price 420.69 --direction short
+
+# Use a custom config file
+pnpm levels /path/to/minute-bars.csv --price 420.69 --config ./custom-config.yaml
+```
+
+**Options:**
+
+- `<csvPath>`: Path to the CSV file with minute bar data (required)
+- `-p, --price <price>`: Current execution price (required)
+- `-d, --direction <direction>`: Trade direction (`long` or `short`, default: `long`)
+- `-c, --config <path>`: Path to configuration file (default: `alphagroove.config.yaml`)
+
+**CSV Format:**
+
+The minute bars CSV file should have the following columns:
+
+- `Date`: Date in MM/DD/YYYY format
+- `Time`: Time in HH:MM AM/PM format
+- `Open`: Opening price for the period
+- `High`: Highest price for the period
+- `Low`: Lowest price for the period
+- `Close`: Closing price for the period
+- `Volume`: Trading volume for the period (optional)
+
+The tool calculates the ATR from the prior day's data and applies the exit strategy settings from
+your configuration to determine appropriate exit levels for the current trade.
+
 ### Command Examples
 
 ```bash

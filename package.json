@@ -5,7 +5,9 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "alphagroove": "./dist/index.js"
+    "alphagroove": "./dist/index.js",
+    "llm-analyze": "./dist/llm-analyze.js",
+    "trade-levels": "./dist/trade-levels.js"
   },
   "files": [
     "dist",
@@ -27,6 +29,8 @@
     "dev": "tsc --watch",
     "start": "node dist/index.js",
     "dev:start": "tsx src/index.ts",
+    "analyze": "tsx src/llm-analyze.ts",
+    "levels": "tsx src/trade-levels.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -40,6 +44,7 @@
     "chart.js": "4.4.9",
     "chartjs-node-canvas": "5.0.0",
     "commander": "^13.1.0",
+    "csv-parse": "5.6.0",
     "dotenv": "16.5.0",
     "duckdb": "1.2.1",
     "js-yaml": "4.1.0",
