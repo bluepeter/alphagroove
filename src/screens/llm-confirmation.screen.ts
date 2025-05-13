@@ -20,31 +20,33 @@ export class LlmConfirmationScreen implements EntryScreen {
     _context?: EntryScreenContext
   ): Promise<ScreenDecision> {
     const llmConfig = appConfig.llmConfirmationScreen;
+    // 1. Check if LLM feature is enabled at the app level
     if (!llmConfig || !llmConfig.enabled) {
-      // If LLM screen is not enabled in the main config, return proceed:true by default
       return { proceed: true, cost: 0 };
     }
 
-    const llmService = new LlmApiService(llmConfig);
+    // 2. Check if the specific screenConfig passed as argument disables the screen
+    // (In typical use, screenConfig would be === llmConfig, but tests can vary this)
+    if (!screenConfig.enabled) {
+      console.log(
+        `[${this.id}] Screen explicitly disabled via screenConfig argument. Signal for ${signal.ticker} on ${signal.trade_date} proceeds without LLM confirmation.`
+      );
+      return { proceed: true, cost: 0 };
+    }
+
+    // If both above checks pass, proceed to use the LLM service
+    const llmService = new LlmApiService(llmConfig); // Use llmConfig from appConfig
     let totalCost = 0;
     const debug = false;
     let tempChartPath: string | undefined;
+    let decision: ScreenDecision = { proceed: false, cost: totalCost }; // Initialize with cost 0
 
-    // Initialize decision here with a default
-    let decision: ScreenDecision = { proceed: false, cost: 0 };
-
-    if (!screenConfig.enabled) {
-      console.log(
-        `[${this.id}] Screen not enabled. Signal for ${signal.ticker} on ${signal.trade_date} proceeds without LLM confirmation.`
-      );
-      return { proceed: true, cost: totalCost };
-    }
-
+    // 3. Check if the instantiated LLM service is operational (e.g., API key present)
     if (!llmService.isEnabled()) {
       console.warn(
         `[${this.id}] LLM service is not properly enabled (e.g., missing API key for ${signal.ticker} on ${signal.trade_date}). Signal proceeds without LLM confirmation.`
       );
-      return { proceed: true, cost: totalCost };
+      return { proceed: true, cost: totalCost }; // totalCost is still 0 here
     }
 
     try {
