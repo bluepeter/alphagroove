@@ -21,6 +21,7 @@ vi.mock('chalk', () => ({
     red: (text: string) => text,
     cyan: (text: string) => text,
     gray: (text: string) => text,
+    dim: (text: string) => text,
   },
 }));
 
@@ -122,6 +123,202 @@ describe('output utilities', () => {
       expect(output).toContain('0.31%');
       expect(output).toContain('Return: -0.32%');
       expect(output).toContain('❌');
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should display ATR-based stop loss correctly', () => {
+      const consoleLogSpy = vi.spyOn(console, 'log');
+
+      const trade: Trade = {
+        trade_date: '2025-01-06',
+        entry_time: '2025-01-06 13:00:00',
+        exit_time: '2025-01-06 13:03:00',
+        market_open: 597.75,
+        entry_price: 597.47,
+        exit_price: 597.46,
+        rise_pct: 0.001,
+        return_pct: -0.0001,
+        direction: 'short',
+        exit_reason: 'profitTarget',
+        initialStopLossPrice: 599.47,
+        isStopLossAtrBased: true,
+      };
+
+      printTradeDetails(trade);
+
+      const output = consoleLogSpy.mock.calls[0][0];
+      expect(output).toContain('ATR SL: $599.47 (0.33%)');
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should display percentage-based stop loss correctly', () => {
+      const consoleLogSpy = vi.spyOn(console, 'log');
+
+      const trade: Trade = {
+        trade_date: '2025-01-06',
+        entry_time: '2025-01-06 13:00:00',
+        exit_time: '2025-01-06 13:03:00',
+        market_open: 597.75,
+        entry_price: 597.47,
+        exit_price: 597.46,
+        rise_pct: 0.001,
+        return_pct: -0.0001,
+        direction: 'short',
+        exit_reason: 'profitTarget',
+        initialStopLossPrice: 599.47,
+        isStopLossAtrBased: false,
+      };
+
+      printTradeDetails(trade);
+
+      const output = consoleLogSpy.mock.calls[0][0];
+      expect(output).toContain('SL: $599.47 (0.33%)');
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should display ATR-based profit target correctly', () => {
+      const consoleLogSpy = vi.spyOn(console, 'log');
+
+      const trade: Trade = {
+        trade_date: '2025-01-06',
+        entry_time: '2025-01-06 13:00:00',
+        exit_time: '2025-01-06 13:03:00',
+        market_open: 597.75,
+        entry_price: 597.47,
+        exit_price: 597.46,
+        rise_pct: 0.001,
+        return_pct: -0.0001,
+        direction: 'short',
+        exit_reason: 'profitTarget',
+        initialProfitTargetPrice: 596.68,
+        isProfitTargetAtrBased: true,
+      };
+
+      printTradeDetails(trade);
+
+      const output = consoleLogSpy.mock.calls[0][0];
+      expect(output).toContain('ATR PT: $596.68 (-0.13%)');
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should display trailing stop activation level correctly', () => {
+      const consoleLogSpy = vi.spyOn(console, 'log');
+
+      const trade: Trade = {
+        trade_date: '2025-01-06',
+        entry_time: '2025-01-06 13:00:00',
+        exit_time: '2025-01-06 13:03:00',
+        market_open: 597.75,
+        entry_price: 597.47,
+        exit_price: 597.46,
+        rise_pct: 0.001,
+        return_pct: -0.0001,
+        direction: 'short',
+        exit_reason: 'profitTarget',
+        tsActivationLevel: 591.5,
+      };
+
+      printTradeDetails(trade);
+
+      const output = consoleLogSpy.mock.calls[0][0];
+      expect(output).toContain('TS Act: $591.50 (-1.00%)');
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should display ATR-based trail amount with percentage conversion', () => {
+      const consoleLogSpy = vi.spyOn(console, 'log');
+
+      const trade: Trade = {
+        trade_date: '2025-01-06',
+        entry_time: '2025-01-06 13:00:00',
+        exit_time: '2025-01-06 13:03:00',
+        market_open: 597.75,
+        entry_price: 597.47,
+        exit_price: 597.46,
+        rise_pct: 0.001,
+        return_pct: -0.0001,
+        direction: 'short',
+        exit_reason: 'profitTarget',
+        tsTrailAmount: 0.26,
+        isTrailingStopAtrBased: true,
+      };
+
+      printTradeDetails(trade);
+
+      const output = consoleLogSpy.mock.calls[0][0];
+      expect(output).toContain('ATR Trail: $0.26 (0.04%)');
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should display percentage-based trail amount correctly', () => {
+      const consoleLogSpy = vi.spyOn(console, 'log');
+
+      const trade: Trade = {
+        trade_date: '2025-01-06',
+        entry_time: '2025-01-06 13:00:00',
+        exit_time: '2025-01-06 13:03:00',
+        market_open: 597.75,
+        entry_price: 597.47,
+        exit_price: 597.46,
+        rise_pct: 0.001,
+        return_pct: -0.0001,
+        direction: 'short',
+        exit_reason: 'profitTarget',
+        tsTrailAmount: 0.5, // 0.5% trail
+        isTrailingStopAtrBased: false,
+      };
+
+      printTradeDetails(trade);
+
+      const output = consoleLogSpy.mock.calls[0][0];
+      expect(output).toContain('Trail %: 0.50%');
+
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should display full trade with all ATR-based parameters correctly', () => {
+      const consoleLogSpy = vi.spyOn(console, 'log');
+
+      const trade: Trade = {
+        trade_date: '2025-01-07',
+        entry_time: '2025-01-07 13:00:00',
+        exit_time: '2025-01-07 14:39:00',
+        market_open: 590.91,
+        entry_price: 591.06,
+        exit_price: 590.52,
+        rise_pct: 0.001,
+        return_pct: 0.0009,
+        direction: 'short',
+        exit_reason: 'profitTarget',
+        initialStopLossPrice: 592.06,
+        initialProfitTargetPrice: 590.24,
+        tsActivationLevel: 585.15,
+        tsTrailAmount: 0.27,
+        isStopLossAtrBased: true,
+        isProfitTargetAtrBased: true,
+        isTrailingStopAtrBased: true,
+      };
+
+      printTradeDetails(trade);
+
+      const output = consoleLogSpy.mock.calls[0][0];
+      expect(output).toContain('↘️ 2025-01-07');
+      expect(output).toContain('⏰ 13:00:00 → 14:39:00');
+      expect(output).toContain('Open: $590.91');
+      expect(output).toContain('Entry: $591.06');
+      expect(output).toContain('Exit: $590.52');
+      expect(output).toContain('✅ Return: 0.09%');
+      expect(output).toContain('[profitTarget]');
+      expect(output).toContain('ATR SL: $592.06 (0.17%)');
+      expect(output).toContain('ATR PT: $590.24 (-0.14%)');
+      expect(output).toContain('TS Act: $585.15 (-1.00%)');
+      expect(output).toContain('ATR Trail: $0.27 (0.05%)');
 
       consoleLogSpy.mockRestore();
     });

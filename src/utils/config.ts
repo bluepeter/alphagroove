@@ -48,6 +48,8 @@ const ProfitTargetConfigSchema = z.object({
 const TrailingStopConfigSchema = z.object({
   activationPercent: z.number().default(1.0),
   trailPercent: z.number().default(0.5),
+  activationAtrMultiplier: z.number().optional(),
+  trailAtrMultiplier: z.number().optional(),
 });
 
 // End of Day configuration
@@ -450,7 +452,6 @@ export const mergeConfigWithCliOptions = (
   // Create merged exit strategies with all configurations merged properly
   const mergedExitStrategies: ExitStrategiesConfig = {
     enabled: enabledArray,
-    // Apply proper precedence for each exit strategy configuration
     maxHoldTime: enabledArray?.includes('maxHoldTime')
       ? {
           minutes:
@@ -490,6 +491,12 @@ export const mergeConfigWithCliOptions = (
             rootFromLoaded?.trailingStop?.trailPercent ??
             defaultFromLoaded?.trailingStop?.trailPercent ??
             TrailingStopConfigSchema.parse({}).trailPercent,
+          activationAtrMultiplier:
+            rootFromLoaded?.trailingStop?.activationAtrMultiplier ??
+            defaultFromLoaded?.trailingStop?.activationAtrMultiplier, // Optional, so can be undefined
+          trailAtrMultiplier:
+            rootFromLoaded?.trailingStop?.trailAtrMultiplier ??
+            defaultFromLoaded?.trailingStop?.trailAtrMultiplier, // Optional, so can be undefined
         }
       : undefined,
     endOfDay: enabledArray?.includes('endOfDay')

@@ -79,6 +79,32 @@ Models realistic trading costs by applying slippage to exit prices.
 - `value`: For percent model, the percentage of slippage (e.g., 0.05 for 0.05%); for fixed model,
   the absolute amount
 
+### Dynamic Volatility Adjustment (ATR-Based)
+
+To make exit parameters more adaptive to market conditions, Stop Loss, Profit Target, and Trailing
+Stop strategies can optionally use the Average True Range (ATR) calculated from the prior trading
+day to set their levels. The ATR used is the simple average of all 1-minute True Range values from
+the entire prior trading day. This is configured per-strategy:
+
+- **`exitStrategies.stopLoss.atrMultiplier`**: (Optional, e.g., `1.5`) If set and the prior day's
+  ATR (`entryAtrValue`) can be calculated, the stop loss will be
+  `entryPrice - (ATR * atrMultiplier)` for longs, or `entryPrice + (ATR * atrMultiplier)` for
+  shorts.
+- **`exitStrategies.profitTarget.atrMultiplier`**: (Optional, e.g., `3.0`) If set and
+  `entryAtrValue` is available, the profit target will be `entryPrice + (ATR * atrMultiplier)` for
+  longs, or `entryPrice - (ATR * atrMultiplier)` for shorts.
+- **`exitStrategies.trailingStop.activationAtrMultiplier`**: (Optional, e.g., `1.0`) If set and
+  `entryAtrValue` is available, the trailing stop activates after price moves
+  `ATR * activationAtrMultiplier` in your favor.
+- **`exitStrategies.trailingStop.trailAtrMultiplier`**: (Optional, e.g., `0.75`) If set and
+  `entryAtrValue` is available, the stop will trail by `ATR * trailAtrMultiplier` from the peak
+  price (for longs) or trough price (for shorts).
+
+If ATR-based multipliers are not configured for a strategy, or if the prior day's ATR cannot be
+calculated (e.g., insufficient data), the strategies will fall back to their `percentFromEntry`,
+`activationPercent`, and `trailPercent` settings respectively. The trade output will indicate if
+ATR-based parameters were used and their calculated dollar and percentage values.
+
 These strategies can be combined in order of priority, and the first triggered condition will
 execute the exit. The `enabled` array in the configuration defines which strategies are active and
 their order of evaluation.

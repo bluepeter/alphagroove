@@ -257,8 +257,8 @@ describe('Exit Strategies', () => {
       const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
 
       expect(result).not.toBeNull();
-      expect(result?.timestamp).toBe('2023-01-01 10:02:00');
-      expect(result?.price).toBeCloseTo(101.49, 2); // Trailing stop level
+      expect(result?.timestamp).toBe('2023-01-01 10:01:00');
+      expect(result?.price).toBeCloseTo(100.694, 3);
       expect(result?.reason).toBe('trailingStop');
     });
 
@@ -286,8 +286,8 @@ describe('Exit Strategies', () => {
       const result = strategy.evaluate(entryPrice, entryTime, bars, false, undefined, true);
 
       expect(result).not.toBeNull();
-      expect(result?.timestamp).toBe('2023-01-01 10:02:00');
-      expect(result?.price).toBeCloseTo(98.49, 2); // Trailing stop level
+      expect(result?.timestamp).toBe('2023-01-01 10:01:00');
+      expect(result?.price).toBeCloseTo(99.294, 3);
       expect(result?.reason).toBe('trailingStop');
     });
 

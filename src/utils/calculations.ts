@@ -8,6 +8,7 @@ export interface Bar {
   low: number;
   close: number;
   volume?: number;
+  trade_date?: string;
 }
 
 // Helper formatting functions
@@ -166,4 +167,25 @@ export const calculateATRStopLoss = (
     // For short trades, stop is above entry price
     return entryPrice + atr * multiplier;
   }
+};
+
+/**
+ * Calculate the average True Range for a given set of daily bars.
+ * This calculates TR for each bar (except the first) and averages them.
+ * @param dailyBars Array of Bar objects for a single day.
+ * @returns The average True Range for the day, or undefined if not enough data.
+ */
+export const calculateAverageTrueRangeForDay = (dailyBars: Bar[]): number | undefined => {
+  if (dailyBars.length < 2) {
+    return undefined;
+  }
+  const trValues: number[] = [];
+  for (let i = 1; i < dailyBars.length; i++) {
+    trValues.push(calculateTrueRange(dailyBars[i], dailyBars[i - 1]));
+  }
+  if (trValues.length === 0) {
+    return undefined;
+  }
+  const sum = trValues.reduce((acc, val) => acc + val, 0);
+  return sum / trValues.length;
 };

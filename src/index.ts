@@ -24,7 +24,7 @@ import {
 import {
   fetchTradesFromQuery,
   fetchBarsForTradingDay,
-  fetchBarsForATR,
+  getPriorDayTradingBars,
 } from './utils/data-loader.js';
 import { mapRawDataToTrade } from './utils/mappers.js';
 import {
@@ -45,7 +45,7 @@ import {
   ExitSignal,
   applySlippage,
 } from './patterns/exit/exit-strategy.js';
-import { calculateATR } from './utils/calculations.js';
+import { calculateATRStopLoss, calculateAverageTrueRangeForDay } from './utils/calculations.js';
 
 const generateChartForLLMDecision = async (
   signalData: EnrichedSignal,
@@ -266,6 +266,89 @@ export const processTradesLoop = async (
       continue;
     }
 
+    // Calculate ATR from prior day for dynamic exit parameters
+    let entryAtrValue: number | undefined;
+    const priorDayBars = await getPriorDayTradingBars(
+      mergedConfig.ticker,
+      mergedConfig.timeframe,
+      tradeDate
+    );
+    if (priorDayBars.length > 0) {
+      entryAtrValue = calculateAverageTrueRangeForDay(priorDayBars);
+      if (entryAtrValue !== undefined) {
+      } else {
+        console.warn(
+          `[ATR Calc] Could not calculate Average TR for prior day ${tradeDate}. ATR-based exits will use percentages if configured.`
+        );
+      }
+    } else {
+      console.warn(
+        `[ATR Calc] No prior day bars found for ${tradeDate} to calculate ATR. ATR-based exits will use percentages if configured.`
+      );
+    }
+
+    // Determine initial stop-loss, profit-target, and trailing stop parameters FOR LOGGING/INFO
+    // The actual evaluation still happens bar-by-bar within strategies using these inputs
+    let initialStopLossPrice: number | undefined;
+    let initialProfitTargetPrice: number | undefined;
+    let tsActivationLevel: number | undefined;
+    let tsTrailAmount: number | undefined;
+    let isStopLossAtrBased = false;
+    let isProfitTargetAtrBased = false;
+    let isTrailingStopAtrBased = false;
+
+    const stopLossConfig = mergedConfig.exitStrategies?.stopLoss;
+    if (stopLossConfig) {
+      if (entryAtrValue && stopLossConfig.atrMultiplier) {
+        initialStopLossPrice = calculateATRStopLoss(
+          entryPrice,
+          entryAtrValue,
+          stopLossConfig.atrMultiplier,
+          actualTradeDirection === 'long'
+        );
+        isStopLossAtrBased = true;
+      } else if (stopLossConfig.percentFromEntry) {
+        const pct = stopLossConfig.percentFromEntry / 100;
+        initialStopLossPrice =
+          actualTradeDirection === 'long' ? entryPrice * (1 - pct) : entryPrice * (1 + pct);
+      }
+    }
+
+    const profitTargetConfig = mergedConfig.exitStrategies?.profitTarget;
+    if (profitTargetConfig) {
+      if (entryAtrValue && profitTargetConfig.atrMultiplier) {
+        const offset = entryAtrValue * profitTargetConfig.atrMultiplier;
+        initialProfitTargetPrice =
+          actualTradeDirection === 'long' ? entryPrice + offset : entryPrice - offset;
+        isProfitTargetAtrBased = true;
+      } else if (profitTargetConfig.percentFromEntry) {
+        const pct = profitTargetConfig.percentFromEntry / 100;
+        initialProfitTargetPrice =
+          actualTradeDirection === 'long' ? entryPrice * (1 + pct) : entryPrice * (1 - pct);
+      }
+    }
+
+    const trailingStopConfig = mergedConfig.exitStrategies?.trailingStop;
+    if (trailingStopConfig) {
+      if (entryAtrValue && trailingStopConfig.activationAtrMultiplier) {
+        const offset = entryAtrValue * trailingStopConfig.activationAtrMultiplier;
+        tsActivationLevel =
+          actualTradeDirection === 'long' ? entryPrice + offset : entryPrice - offset;
+        isTrailingStopAtrBased = true; // Mark as ATR based if activation is
+      } else if (trailingStopConfig.activationPercent) {
+        const pct = trailingStopConfig.activationPercent / 100;
+        tsActivationLevel =
+          actualTradeDirection === 'long' ? entryPrice * (1 + pct) : entryPrice * (1 - pct);
+      }
+      if (entryAtrValue && trailingStopConfig.trailAtrMultiplier) {
+        tsTrailAmount = entryAtrValue * trailingStopConfig.trailAtrMultiplier;
+        isTrailingStopAtrBased = true; // Mark as ATR based if trail is
+      } else if (trailingStopConfig.trailPercent) {
+        // Store percent to be used by strategy if ATR not used for trail amount
+        tsTrailAmount = trailingStopConfig.trailPercent;
+      }
+    }
+
     // New code for bar-by-bar exit logic
     // Fetch bars for the trading day and for ATR calculation
     const tradingDayBars = fetchBarsForTradingDay(
@@ -281,26 +364,6 @@ export const processTradesLoop = async (
       continue;
     }
 
-    // Fetch bars for ATR calculation if needed
-    let atr: number | undefined;
-    if (
-      exitStrategies.some(
-        es =>
-          (es.name === 'stopLoss' || es.name === 'profitTarget') &&
-          mergedConfig.exitStrategies?.[es.name]?.atrMultiplier
-      )
-    ) {
-      const atrBars = fetchBarsForATR(
-        mergedConfig.ticker,
-        mergedConfig.timeframe,
-        tradeDate,
-        entryTimestamp.split(' ')[1],
-        14 // Use 14 periods for ATR calculation
-      );
-
-      atr = calculateATR(atrBars);
-    }
-
     // Evaluate each exit strategy in order
     let exitSignal: ExitSignal | null = null;
     for (const strategy of exitStrategies) {
@@ -309,7 +372,7 @@ export const processTradesLoop = async (
         entryTimestamp,
         tradingDayBars,
         actualTradeDirection === 'long',
-        atr
+        entryAtrValue // Pass the calculated entryAtrValue here
       );
 
       if (signal) {
@@ -356,6 +419,14 @@ export const processTradesLoop = async (
         exit_time: exitSignal.timestamp,
         return_pct: returnPct,
         exit_reason: exitSignal.reason,
+        // Add dynamic exit params for logging
+        initialStopLossPrice,
+        initialProfitTargetPrice,
+        tsActivationLevel,
+        tsTrailAmount, // This could be an absolute amount or a percentage
+        isStopLossAtrBased,
+        isProfitTargetAtrBased,
+        isTrailingStopAtrBased,
       },
       actualTradeDirection,
       llmChartPath

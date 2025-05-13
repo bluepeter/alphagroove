@@ -1,7 +1,7 @@
 default:
   date:
-    from: '2022-01-01'
-    to: '2022-06-15'
+    from: '2017-01-01'
+    to: '2017-12-31'
   ticker: 'SPY'
   timeframe: '1min'
   # direction can be 'long', 'short', or 'llm_decides'.
@@ -14,20 +14,25 @@ default:
     outputDir: './charts'
   exitStrategies:
     enabled:
-      # - stopLoss
       - profitTarget
       - trailingStop
       - maxHoldTime
       - endOfDay
+    # atrPeriodForEntry: 14 # This specific period is NOT used by the current ATR calculation method (which averages all TRs from the prior day).
+    # Remove or keep commented if you plan to use a period-specific ATR calc in the future.
     maxHoldTime:
       minutes: 500
     stopLoss:
-      percentFromEntry: 0.5
+      # percentFromEntry: 0.5 # Fallback, commented out to prioritize ATR
+      atrMultiplier: 2.0 # Default: Stop at 2.0 * Prior Day's Average TR
     profitTarget:
-      percentFromEntry: 0.5
+      # percentFromEntry: 0.5 # Fallback, commented out to prioritize ATR
+      atrMultiplier: 4.0 # Default: Target 3.0 * Prior Day's Average TR
     trailingStop:
-      activationPercent: 0
-      trailPercent: 0.3
+      # activationPercent: 0 # Fallback, commented out to prioritize ATR
+      # trailPercent: 0.3      # Fallback, commented out to prioritize ATR (0.3 for 0.3% of price)
+      activationAtrMultiplier: 0 # Activate after X * Prior Day's Average TR move
+      trailAtrMultiplier: 2.0 # Default: Trail by 1.0 * Prior Day's Average TR
     endOfDay:
       time: '16:00'
     slippage:

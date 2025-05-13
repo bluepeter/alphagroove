@@ -159,3 +159,116 @@ export const fetchBarsForATR = (
     }))
     .sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 };
+
+/**
+ * Fetches all 1-minute bars for the full trading day immediately preceding a given signal date.
+ * @param ticker The stock ticker symbol.
+ * @param timeframe The data timeframe (should be '1min' or adaptable).
+ * @param signalDate The reference date for the signal (YYYY-MM-DD).
+ * @returns A promise that resolves to an array of Bar objects for the prior trading day, or an empty array.
+ */
+export const getPriorDayTradingBars = async (
+  ticker: string,
+  timeframe: string, // Typically '1min' for this use case
+  signalDate: string // YYYY-MM-DD format
+): Promise<Bar[]> => {
+  const tempFile = join(process.cwd(), 'temp_prior_day_query.sql');
+  const dataFilePath = `tickers/${ticker}/${timeframe}.csv`;
+
+  // Query to find the most recent trading day strictly before the signalDate
+  const priorDayQuery = `
+    WITH AllAvailableTradingDays AS (
+      SELECT DISTINCT strftime(column0::TIMESTAMP, '%Y-%m-%d') AS trade_date_str
+      FROM read_csv_auto('${dataFilePath}', header=false)
+      WHERE strftime(column0::TIMESTAMP, '%Y-%m-%d') < '${signalDate}'
+    )
+    SELECT trade_date_str
+    FROM AllAvailableTradingDays
+    ORDER BY trade_date_str DESC
+    LIMIT 1;
+  `;
+
+  let priorTradingDateStr = '';
+  try {
+    writeFileSync(tempFile, priorDayQuery, 'utf-8');
+    const result = execSync(`duckdb -csv < ${tempFile}`, {
+      encoding: 'utf-8',
+      maxBuffer: 1024 * 1024,
+    });
+    const lines = result.trim().split('\n');
+    priorTradingDateStr = lines.length > 0 ? lines[lines.length - 1].trim() : '';
+    if (priorTradingDateStr === 'trade_date_str') {
+      // Handle case where only header might be left if no data rows
+      priorTradingDateStr = '';
+    }
+  } catch (error) {
+    console.error(`Error fetching prior trading day for ${signalDate} for ${ticker}:`, error);
+    if (existsSync(tempFile)) unlinkSync(tempFile);
+    return [];
+  }
+
+  if (!priorTradingDateStr) {
+    console.warn(`No prior trading day string found before ${signalDate} for ${ticker}.`);
+    if (existsSync(tempFile)) unlinkSync(tempFile);
+    return [];
+  }
+
+  // Query to fetch all bars for that determined prior trading day during market hours
+  const barsQuery = `
+    SELECT 
+      column0::TIMESTAMP as timestamp,
+      column1::DOUBLE as open,
+      column2::DOUBLE as high,
+      column3::DOUBLE as low,
+      column4::DOUBLE as close,
+      column5::BIGINT as volume,
+      strftime(column0::TIMESTAMP, '%Y-%m-%d') as trade_date 
+    FROM read_csv_auto('${dataFilePath}', header=false)
+    WHERE strftime(column0::TIMESTAMP, '%Y-%m-%d') = '${priorTradingDateStr}'
+      AND strftime(column0::TIMESTAMP, '%H:%M') BETWEEN '09:30' AND '16:00'
+    ORDER BY timestamp ASC;
+  `;
+
+  try {
+    writeFileSync(tempFile, barsQuery, 'utf-8');
+    const result = execSync(`duckdb -csv -header < ${tempFile}`, {
+      encoding: 'utf-8',
+      maxBuffer: 100 * 1024 * 1024, // 100MB buffer
+    });
+    const [headerLine, ...lines] = result.trim().split('\n');
+    if (!headerLine || lines.length === 0) {
+      return [];
+    }
+    const columns = headerLine.split(',');
+    return lines
+      .filter(line => line.trim() !== '')
+      .map(line => {
+        const values = line.split(',');
+        const row = columns.reduce(
+          (obj, col, i) => {
+            const value = values[i];
+            obj[col.trim()] =
+              value && value.trim() !== '' && !isNaN(Number(value)) ? Number(value) : value;
+            return obj;
+          },
+          {} as Record<string, string | number>
+        );
+        return {
+          timestamp: row.timestamp as string,
+          open: row.open as number,
+          high: row.high as number,
+          low: row.low as number,
+          close: row.close as number,
+          volume: row.volume as number | undefined,
+          trade_date: row.trade_date as string,
+        };
+      });
+  } catch (error) {
+    console.error(`Error fetching bars for prior day ${priorTradingDateStr} for ${ticker}:`, error);
+    return [];
+  } finally {
+    if (existsSync(tempFile)) {
+      unlinkSync(tempFile);
+    }
+  }
+};

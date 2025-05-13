@@ -2,7 +2,7 @@ import { type Trade } from './output.js';
 
 export const mapRawDataToTrade = (
   rawTradeData: Record<string, any>,
-  entryPatternDirection: 'long' | 'short',
+  actualTradeDirection: 'long' | 'short',
   chartPath?: string
 ): Trade => {
   return {
@@ -28,9 +28,16 @@ export const mapRawDataToTrade = (
     // Optional fields from Trade interface that are in rawTradeData from query
     match_count: rawTradeData.match_count as number,
     all_trading_days: rawTradeData.all_trading_days as number,
-    direction: entryPatternDirection,
+    direction: actualTradeDirection,
     chartPath,
     avg_return: rawTradeData.avg_return as number | undefined,
     exit_reason: rawTradeData.exit_reason as string | undefined,
+    initialStopLossPrice: rawTradeData.initialStopLossPrice as number | undefined,
+    initialProfitTargetPrice: rawTradeData.initialProfitTargetPrice as number | undefined,
+    tsActivationLevel: rawTradeData.tsActivationLevel as number | undefined,
+    tsTrailAmount: rawTradeData.tsTrailAmount as number | undefined,
+    isStopLossAtrBased: rawTradeData.isStopLossAtrBased as boolean | undefined,
+    isProfitTargetAtrBased: rawTradeData.isProfitTargetAtrBased as boolean | undefined,
+    isTrailingStopAtrBased: rawTradeData.isTrailingStopAtrBased as boolean | undefined,
   };
 };

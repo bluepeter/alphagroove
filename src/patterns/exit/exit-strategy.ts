@@ -72,31 +72,24 @@ export class StopLossStrategy implements ExitStrategy {
     atr?: number,
     _testMode?: boolean
   ): ExitSignal | null {
-    // Skip entry bar and filter for regular market hours
     const allTradingBars = bars.filter(bar => bar.timestamp > entryTime);
     const tradingBars = _testMode ? allTradingBars : filterRegularMarketHours(allTradingBars);
 
     if (tradingBars.length === 0) return null;
 
-    // Calculate stop loss level
     let stopLevel: number;
     if (atr && this.config.atrMultiplier) {
-      // Use ATR-based stop if available
       stopLevel = calculateATRStopLoss(entryPrice, atr, this.config.atrMultiplier, isLong);
     } else {
-      // Use percentage-based stop
       const pctMultiplier = this.config.percentFromEntry / 100;
       stopLevel = isLong ? entryPrice * (1 - pctMultiplier) : entryPrice * (1 + pctMultiplier);
     }
 
-    // Check each bar for stop loss hit
     for (let i = 0; i < tradingBars.length; i++) {
       const bar = tradingBars[i];
       if (isLong) {
-        // For long trades, check if price went below stop level
         if (bar.low <= stopLevel) {
           if (_testMode) {
-            // For tests, use the exact stop level and trigger timestamp
             return {
               timestamp: bar.timestamp,
               price: stopLevel,
@@ -104,7 +97,6 @@ export class StopLossStrategy implements ExitStrategy {
               reason: 'stopLoss',
             };
           } else {
-            // For real usage, use next bar's open if available
             const exitPrice = i < tradingBars.length - 1 ? tradingBars[i + 1].open : bar.close;
             return {
               timestamp: i < tradingBars.length - 1 ? tradingBars[i + 1].timestamp : bar.timestamp,
@@ -115,10 +107,8 @@ export class StopLossStrategy implements ExitStrategy {
           }
         }
       } else {
-        // For short trades, check if price went above stop level
         if (bar.high >= stopLevel) {
           if (_testMode) {
-            // For tests, use the exact stop level and trigger timestamp
             return {
               timestamp: bar.timestamp,
               price: stopLevel,
@@ -126,7 +116,6 @@ export class StopLossStrategy implements ExitStrategy {
               reason: 'stopLoss',
             };
           } else {
-            // For real usage, use next bar's open if available
             const exitPrice = i < tradingBars.length - 1 ? tradingBars[i + 1].open : bar.close;
             return {
               timestamp: i < tradingBars.length - 1 ? tradingBars[i + 1].timestamp : bar.timestamp,
@@ -162,32 +151,25 @@ export class ProfitTargetStrategy implements ExitStrategy {
     atr?: number,
     _testMode?: boolean
   ): ExitSignal | null {
-    // Skip entry bar and filter for regular market hours
     const allTradingBars = bars.filter(bar => bar.timestamp > entryTime);
     const tradingBars = _testMode ? allTradingBars : filterRegularMarketHours(allTradingBars);
 
     if (tradingBars.length === 0) return null;
 
-    // Calculate target level
     let targetLevel: number;
     if (atr && this.config.atrMultiplier) {
-      // Use ATR-based target if available
       const atrMultiple = atr * this.config.atrMultiplier;
       targetLevel = isLong ? entryPrice + atrMultiple : entryPrice - atrMultiple;
     } else {
-      // Use percentage-based target
       const pctMultiplier = this.config.percentFromEntry / 100;
       targetLevel = isLong ? entryPrice * (1 + pctMultiplier) : entryPrice * (1 - pctMultiplier);
     }
 
-    // Check each bar for target hit
     for (let i = 0; i < tradingBars.length; i++) {
       const bar = tradingBars[i];
       if (isLong) {
-        // For long trades, check if price went above target level
         if (bar.high >= targetLevel) {
           if (_testMode) {
-            // For tests, use the exact target level and trigger timestamp
             return {
               timestamp: bar.timestamp,
               price: targetLevel,
@@ -195,7 +177,6 @@ export class ProfitTargetStrategy implements ExitStrategy {
               reason: 'profitTarget',
             };
           } else {
-            // For real usage, use next bar's open if available
             const exitPrice = i < tradingBars.length - 1 ? tradingBars[i + 1].open : bar.close;
             return {
               timestamp: i < tradingBars.length - 1 ? tradingBars[i + 1].timestamp : bar.timestamp,
@@ -206,10 +187,8 @@ export class ProfitTargetStrategy implements ExitStrategy {
           }
         }
       } else {
-        // For short trades, check if price went below target level
         if (bar.low <= targetLevel) {
           if (_testMode) {
-            // For tests, use the exact target level and trigger timestamp
             return {
               timestamp: bar.timestamp,
               price: targetLevel,
@@ -217,7 +196,6 @@ export class ProfitTargetStrategy implements ExitStrategy {
               reason: 'profitTarget',
             };
           } else {
-            // For real usage, use next bar's open if available
             const exitPrice = i < tradingBars.length - 1 ? tradingBars[i + 1].open : bar.close;
             return {
               timestamp: i < tradingBars.length - 1 ? tradingBars[i + 1].timestamp : bar.timestamp,
@@ -250,49 +228,49 @@ export class TrailingStopStrategy implements ExitStrategy {
     entryTime: string,
     bars: Bar[],
     isLong: boolean,
-    _atr?: number,
+    atr?: number,
     _testMode?: boolean
   ): ExitSignal | null {
-    // Skip entry bar and filter for regular market hours
     const allTradingBars = bars.filter(bar => bar.timestamp > entryTime);
     const tradingBars = _testMode ? allTradingBars : filterRegularMarketHours(allTradingBars);
 
     if (tradingBars.length === 0) return null;
 
-    // Calculate activation level - price needs to move this much in favorable direction before trailing
-    const activationPct = this.config.activationPercent / 100;
-    const activationLevel = isLong
-      ? entryPrice * (1 + activationPct)
-      : entryPrice * (1 - activationPct);
+    let activationLevel: number;
+    if (atr && this.config.activationAtrMultiplier) {
+      const activationOffset = atr * this.config.activationAtrMultiplier;
+      activationLevel = isLong ? entryPrice + activationOffset : entryPrice - activationOffset;
+    } else {
+      const activationPct = this.config.activationPercent / 100;
+      activationLevel = isLong
+        ? entryPrice * (1 + activationPct)
+        : entryPrice * (1 - activationPct);
+    }
+
+    let trailAmountAbs: number | null = null;
+    if (atr && this.config.trailAtrMultiplier) {
+      trailAmountAbs = atr * this.config.trailAtrMultiplier;
+    }
 
     const trailPct = this.config.trailPercent / 100;
     let trailingStopLevel = isLong ? entryPrice : entryPrice;
     let activated = false;
-
-    // Track best price to calculate trailing stop
     let bestPrice = isLong ? entryPrice : entryPrice;
 
-    // Check each bar for trailing stop conditions
     for (let i = 0; i < tradingBars.length; i++) {
       const bar = tradingBars[i];
       if (isLong) {
-        // For long trades
-        // Check if activation level is reached
         if (!activated && bar.high >= activationLevel) {
           activated = true;
-          bestPrice = bar.high;
-          trailingStopLevel = bestPrice * (1 - trailPct);
-        } else if (activated) {
-          // Update best price and trailing stop if price goes higher
+        }
+        if (activated) {
           if (bar.high > bestPrice) {
             bestPrice = bar.high;
-            trailingStopLevel = bestPrice * (1 - trailPct);
           }
-
-          // Check if price hits trailing stop
+          trailingStopLevel =
+            trailAmountAbs !== null ? bestPrice - trailAmountAbs : bestPrice * (1 - trailPct);
           if (bar.low <= trailingStopLevel) {
             if (_testMode) {
-              // For tests, use the exact trailing stop level and trigger timestamp
               return {
                 timestamp: bar.timestamp,
                 price: trailingStopLevel,
@@ -300,7 +278,6 @@ export class TrailingStopStrategy implements ExitStrategy {
                 reason: 'trailingStop',
               };
             } else {
-              // For real usage, use next bar's open if available
               const exitPrice = i < tradingBars.length - 1 ? tradingBars[i + 1].open : bar.close;
               return {
                 timestamp:
@@ -313,23 +290,17 @@ export class TrailingStopStrategy implements ExitStrategy {
           }
         }
       } else {
-        // For short trades
-        // Check if activation level is reached
         if (!activated && bar.low <= activationLevel) {
           activated = true;
-          bestPrice = bar.low;
-          trailingStopLevel = bestPrice * (1 + trailPct);
-        } else if (activated) {
-          // Update best price and trailing stop if price goes lower
+        }
+        if (activated) {
           if (bar.low < bestPrice) {
             bestPrice = bar.low;
-            trailingStopLevel = bestPrice * (1 + trailPct);
           }
-
-          // Check if price hits trailing stop
+          trailingStopLevel =
+            trailAmountAbs !== null ? bestPrice + trailAmountAbs : bestPrice * (1 + trailPct);
           if (bar.high >= trailingStopLevel) {
             if (_testMode) {
-              // For tests, use the exact trailing stop level and trigger timestamp
               return {
                 timestamp: bar.timestamp,
                 price: trailingStopLevel,
@@ -337,7 +308,6 @@ export class TrailingStopStrategy implements ExitStrategy {
                 reason: 'trailingStop',
               };
             } else {
-              // For real usage, use next bar's open if available
               const exitPrice = i < tradingBars.length - 1 ? tradingBars[i + 1].open : bar.close;
               return {
                 timestamp:
