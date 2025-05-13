@@ -1,7 +1,7 @@
 default:
   date:
     from: '2017-01-01'
-    to: '2017-01-15'
+    to: '2017-12-31'
   ticker: 'SPY'
   timeframe: '1min'
   # direction can be 'long', 'short', or 'llm_decides'.
@@ -37,7 +37,7 @@ default:
       time: '16:00'
     slippage:
       model: 'percent'
-      value: 0.05
+      value: 0.01
 
 patterns:
   entry:

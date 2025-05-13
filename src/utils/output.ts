@@ -103,9 +103,9 @@ export const printTradeDetails = (trade: Trade) => {
   const date = formatDate(trade.trade_date);
   const entryTime = formatTime(trade.entry_time);
   const exitTime = formatTime(trade.exit_time);
-  const open = formatDollar(trade.market_open);
-  const entry = formatDollar(trade.entry_price);
-  const exit = formatDollar(trade.exit_price);
+  const barOpen = formatDollar(trade.market_open);
+  const adjEntry = formatDollar(trade.entry_price);
+  const adjExit = formatDollar(trade.exit_price);
 
   let changeText = '';
   if (trade.rise_pct !== null) {
@@ -183,7 +183,7 @@ export const printTradeDetails = (trade: Trade) => {
   }
 
   console.log(
-    `${emoji} ${date} ⏰ ${entryTime} → ${exitTime} Open: ${open} Entry: ${entry} Exit: ${exit} ${changeText ? changeText + ' ' : ''}${returnEmoji} Return: ${isWin ? chalk.green(returnPctStr) : chalk.red(returnPctStr)} ${exitReasonText}${exitParamsInfo}`
+    `${emoji} ${date} ⏰ ${entryTime} → ${exitTime} Entry: ${barOpen} Adj Entry: ${adjEntry} Adj Exit: ${adjExit} ${changeText ? changeText + ' ' : ''}${returnEmoji} ${isWin ? chalk.green(returnPctStr) : chalk.red(returnPctStr)} ${exitReasonText}${exitParamsInfo}`
   );
 };
 

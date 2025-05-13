@@ -473,73 +473,128 @@ describe('Exit Strategies', () => {
   });
 
   describe('applySlippage', () => {
-    it('should apply percentage slippage for long trades', () => {
+    // Entry price tests - slippage should make trades worse for entry
+    it('should apply percentage slippage for long entries (price increases)', () => {
+      const entryPrice = 100;
+      const isLong = true;
+      const slippageConfig = { model: 'percent' as const, value: 0.1 }; // 0.1% slippage
+      const isEntry = true;
+
+      const result = applySlippage(entryPrice, isLong, slippageConfig, isEntry);
+
+      expect(result).toBe(100.1); // 100 + (100 * 0.001) - Long entries pay more (worse)
+    });
+
+    it('should apply percentage slippage for short entries (price decreases)', () => {
+      const entryPrice = 100;
+      const isLong = false;
+      const slippageConfig = { model: 'percent' as const, value: 0.1 }; // 0.1% slippage
+      const isEntry = true;
+
+      const result = applySlippage(entryPrice, isLong, slippageConfig, isEntry);
+
+      expect(result).toBe(99.9); // 100 - (100 * 0.001) - Short entries receive less (worse)
+    });
+
+    it('should apply fixed slippage for long entries (price increases)', () => {
+      const entryPrice = 100;
+      const isLong = true;
+      const slippageConfig = { model: 'fixed' as const, value: 0.05 }; // 5 cents slippage
+      const isEntry = true;
+
+      const result = applySlippage(entryPrice, isLong, slippageConfig, isEntry);
+
+      expect(result).toBe(100.05); // 100 + 0.05 - Long entries pay more (worse)
+    });
+
+    it('should apply fixed slippage for short entries (price decreases)', () => {
+      const entryPrice = 100;
+      const isLong = false;
+      const slippageConfig = { model: 'fixed' as const, value: 0.05 }; // 5 cents slippage
+      const isEntry = true;
+
+      const result = applySlippage(entryPrice, isLong, slippageConfig, isEntry);
+
+      expect(result).toBe(99.95); // 100 - 0.05 - Short entries receive less (worse)
+    });
+
+    // Exit price tests - slippage should make trades worse for exit
+    it('should apply percentage slippage for long exits (price decreases)', () => {
       const exitPrice = 100;
       const isLong = true;
       const slippageConfig = { model: 'percent' as const, value: 0.1 }; // 0.1% slippage
+      const isEntry = false;
 
-      const result = applySlippage(exitPrice, isLong, slippageConfig);
+      const result = applySlippage(exitPrice, isLong, slippageConfig, isEntry);
 
-      expect(result).toBe(99.9); // 100 - (100 * 0.001)
+      expect(result).toBe(99.9); // 100 - (100 * 0.001) - Long exits receive less (worse)
     });
 
-    it('should apply percentage slippage for short trades', () => {
+    it('should apply percentage slippage for short exits (price increases)', () => {
       const exitPrice = 100;
       const isLong = false;
       const slippageConfig = { model: 'percent' as const, value: 0.1 }; // 0.1% slippage
+      const isEntry = false;
 
-      const result = applySlippage(exitPrice, isLong, slippageConfig);
+      const result = applySlippage(exitPrice, isLong, slippageConfig, isEntry);
 
-      expect(result).toBe(100.1); // 100 + (100 * 0.001)
+      expect(result).toBe(100.1); // 100 + (100 * 0.001) - Short exits pay more (worse)
     });
 
-    it('should apply fixed slippage for long trades', () => {
+    it('should apply fixed slippage for long exits (price decreases)', () => {
       const exitPrice = 100;
       const isLong = true;
       const slippageConfig = { model: 'fixed' as const, value: 0.05 }; // 5 cents slippage
+      const isEntry = false;
 
-      const result = applySlippage(exitPrice, isLong, slippageConfig);
+      const result = applySlippage(exitPrice, isLong, slippageConfig, isEntry);
 
-      expect(result).toBe(99.95); // 100 - 0.05
+      expect(result).toBe(99.95); // 100 - 0.05 - Long exits receive less (worse)
     });
 
-    it('should apply fixed slippage for short trades', () => {
+    it('should apply fixed slippage for short exits (price increases)', () => {
       const exitPrice = 100;
       const isLong = false;
       const slippageConfig = { model: 'fixed' as const, value: 0.05 }; // 5 cents slippage
+      const isEntry = false;
 
-      const result = applySlippage(exitPrice, isLong, slippageConfig);
+      const result = applySlippage(exitPrice, isLong, slippageConfig, isEntry);
 
-      expect(result).toBe(100.05); // 100 + 0.05
-    });
-
-    it('should handle different slippage directions for entry vs exit prices', () => {
-      const price = 100;
-      const slippageConfig = { model: 'percent' as const, value: 0.2 }; // 0.2% slippage
-
-      // For long trades, entry price should increase (worse entry) and exit price should decrease (worse exit)
-      const longEntryResult = applySlippage(price, true, slippageConfig);
-      const longExitResult = applySlippage(price, true, slippageConfig);
-
-      // For short trades, entry price should decrease (worse entry) and exit price should increase (worse exit)
-      const shortEntryResult = applySlippage(price, false, slippageConfig);
-      const shortExitResult = applySlippage(price, false, slippageConfig);
-
-      // All prices should move in the unfavorable direction by the same amount
-      expect(longEntryResult).toBe(99.8); // 100 - (100 * 0.002)
-      expect(longExitResult).toBe(99.8); // 100 - (100 * 0.002)
-      expect(shortEntryResult).toBe(100.2); // 100 + (100 * 0.002)
-      expect(shortExitResult).toBe(100.2); // 100 + (100 * 0.002)
+      expect(result).toBe(100.05); // 100 + 0.05 - Short exits pay more (worse)
     });
 
     it('should return original price if no slippage config is provided', () => {
-      const exitPrice = 100;
+      const price = 100;
 
-      const resultLong = applySlippage(exitPrice, true);
-      const resultShort = applySlippage(exitPrice, false);
+      const resultLongEntry = applySlippage(price, true, undefined, true);
+      const resultShortEntry = applySlippage(price, false, undefined, true);
+      const resultLongExit = applySlippage(price, true, undefined, false);
+      const resultShortExit = applySlippage(price, false, undefined, false);
 
-      expect(resultLong).toBe(100);
-      expect(resultShort).toBe(100);
+      expect(resultLongEntry).toBe(100);
+      expect(resultShortEntry).toBe(100);
+      expect(resultLongExit).toBe(100);
+      expect(resultShortExit).toBe(100);
+    });
+
+    // Validate slippage direction logic for all combinations
+    it('should always apply slippage in the direction that makes trades worse', () => {
+      const price = 100;
+      const slippageConfig = { model: 'percent' as const, value: 0.5 }; // 0.5% slippage
+
+      // Entry prices - slippage should increase cost for buyer, decrease proceeds for seller
+      const longEntryPrice = applySlippage(price, true, slippageConfig, true);
+      const shortEntryPrice = applySlippage(price, false, slippageConfig, true);
+
+      // Exit prices - slippage should decrease proceeds for seller, increase cost for buyer
+      const longExitPrice = applySlippage(price, true, slippageConfig, false);
+      const shortExitPrice = applySlippage(price, false, slippageConfig, false);
+
+      // Validate direction is always unfavorable
+      expect(longEntryPrice).toBeCloseTo(100.5, 5); // Long entry pays MORE (worse)
+      expect(shortEntryPrice).toBeCloseTo(99.5, 5); // Short entry receives LESS (worse)
+      expect(longExitPrice).toBeCloseTo(99.5, 5); // Long exit receives LESS (worse)
+      expect(shortExitPrice).toBeCloseTo(100.5, 5); // Short exit pays MORE (worse)
     });
   });
 

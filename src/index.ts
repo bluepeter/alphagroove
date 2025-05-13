@@ -291,7 +291,8 @@ export const processTradesLoop = async (
     const entryPrice = applySlippage(
       rawEntryPrice,
       actualTradeDirection === 'long',
-      mergedConfig.exitStrategies?.slippage
+      mergedConfig.exitStrategies?.slippage,
+      true // This is an entry price
     );
 
     // Store the original entry price before any modifications to track discrepancies
@@ -419,6 +420,7 @@ export const processTradesLoop = async (
       exitSignal.price,
       actualTradeDirection === 'long',
       mergedConfig.exitStrategies?.slippage
+      // isEntry defaults to false for exit prices
     );
 
     // Calculate return percentage

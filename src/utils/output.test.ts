@@ -89,7 +89,7 @@ describe('output utilities', () => {
       expect(output).toContain('$566.83');
       expect(output).toContain('$567.19');
       expect(output).toContain('0.36%');
-      expect(output).toContain('Return: 0.64%');
+      expect(output).toContain('0.64%');
       expect(output).toContain('✅');
 
       consoleLogSpy.mockRestore();
@@ -121,7 +121,7 @@ describe('output utilities', () => {
       expect(output).toContain('$567.12');
       expect(output).toContain('$566.94');
       expect(output).toContain('0.31%');
-      expect(output).toContain('Return: -0.32%');
+      expect(output).toContain('-0.32%');
       expect(output).toContain('❌');
 
       consoleLogSpy.mockRestore();
@@ -310,10 +310,10 @@ describe('output utilities', () => {
       const output = consoleLogSpy.mock.calls[0][0];
       expect(output).toContain('↘️ 2025-01-07');
       expect(output).toContain('⏰ 13:00:00 → 14:39:00');
-      expect(output).toContain('Open: $590.91');
-      expect(output).toContain('Entry: $591.06');
-      expect(output).toContain('Exit: $590.52');
-      expect(output).toContain('✅ Return: 0.09%');
+      expect(output).toContain('Entry: $590.91');
+      expect(output).toContain('Adj Entry: $591.06');
+      expect(output).toContain('Adj Exit: $590.52');
+      expect(output).toContain('✅ 0.09%');
       expect(output).toContain('[profitTarget]');
       expect(output).toContain('ATR SL: $592.06 (0.17%)');
       expect(output).toContain('ATR PT: $0.82 (-0.14%)');

@@ -491,22 +491,44 @@ export const createExitStrategies = (config: any): ExitStrategy[] => {
 };
 
 /**
- * Apply slippage to the exit price
- * @param price Exit price
+ * Apply slippage to price
+ * @param price The price to apply slippage to
  * @param isLong Whether this is a long trade
  * @param config Slippage configuration
+ * @param isEntry Whether this is an entry price (true) or exit price (false)
  * @returns Price adjusted for slippage
  */
-export const applySlippage = (price: number, isLong: boolean, config?: SlippageConfig): number => {
+export const applySlippage = (
+  price: number,
+  isLong: boolean,
+  config?: SlippageConfig,
+  isEntry: boolean = false
+): number => {
   if (!config) return price;
 
   if (config.model === 'percent') {
     const slippageFactor = config.value / 100;
-    // For long trades, slippage reduces exit price
-    // For short trades, slippage increases exit price
-    return isLong ? price * (1 - slippageFactor) : price * (1 + slippageFactor);
+
+    // Slippage direction depends on whether it's entry or exit
+    if (isEntry) {
+      // For entry:
+      // - Long trades: slippage INCREASES entry price (worse for buyer)
+      // - Short trades: slippage DECREASES entry price (worse for seller)
+      return isLong ? price * (1 + slippageFactor) : price * (1 - slippageFactor);
+    } else {
+      // For exit:
+      // - Long trades: slippage DECREASES exit price (worse for seller)
+      // - Short trades: slippage INCREASES exit price (worse for buyer)
+      return isLong ? price * (1 - slippageFactor) : price * (1 + slippageFactor);
+    }
   } else {
     // Fixed amount slippage
-    return isLong ? price - config.value : price + config.value;
+    if (isEntry) {
+      // For entry:
+      return isLong ? price + config.value : price - config.value;
+    } else {
+      // For exit:
+      return isLong ? price - config.value : price + config.value;
+    }
   }
 };
