@@ -70,7 +70,15 @@ export async function main(imagePath?: string, cmdOptions?: any) {
     const llmScreen = new LlmConfirmationScreen();
 
     // Create a mock signal
-    const direction = options.direction === 'short' ? 'short' : 'long';
+    const cliDirection = options.direction === 'short' ? 'short' : 'long';
+    let signalDirectionForLogic: 'long' | 'short' | undefined = cliDirection;
+    let displayDirection = cliDirection.toUpperCase();
+
+    if (rawConfig.default?.direction === 'llm_decides') {
+      signalDirectionForLogic = undefined; // LLM screen will use its logic to determine direction
+      displayDirection = 'LLM Decides';
+    }
+
     const ticker = options.ticker || 'TICKER';
     const tradeDate = options.date || new Date().toISOString().split('T')[0];
     const price = options.price ? parseFloat(options.price) : 100.0;
@@ -81,12 +89,12 @@ export async function main(imagePath?: string, cmdOptions?: any) {
       price,
       timestamp: `${tradeDate} ${new Date().toTimeString().split(' ')[0]}`,
       type: 'entry',
-      direction,
+      direction: signalDirectionForLogic, // Use the type-corrected direction
     };
 
     // Print analysis info
     console.log(chalk.bold(`\nAnalyzing chart: ${path.basename(chartPath)}`));
-    console.log(chalk.dim(`Direction: ${direction.toUpperCase()}`));
+    console.log(chalk.dim(`Direction: ${displayDirection}`)); // Use displayDirection
     console.log(chalk.dim(`Model: ${llmScreenConfig.modelName}`));
     console.log(chalk.dim(`Calls: ${llmScreenConfig.numCalls}`));
     console.log(chalk.dim(`Threshold: ${llmScreenConfig.agreementThreshold}`));
@@ -101,7 +109,13 @@ export async function main(imagePath?: string, cmdOptions?: any) {
     );
 
     // Determine if the analysis supports the signal direction
-    const supportsSuggestedDirection = decision.direction === direction;
+    let supportsSuggestedDirection = false;
+    if (rawConfig.default?.direction === 'llm_decides') {
+      // If LLM decides, any outcome from LLM is implicitly "supported" in terms of initial setup
+      supportsSuggestedDirection = !!decision.direction;
+    } else {
+      supportsSuggestedDirection = decision.direction === cliDirection;
+    }
 
     // Print results
     console.log(chalk.bold('\nLLM Analysis Results:'));
@@ -116,10 +130,13 @@ export async function main(imagePath?: string, cmdOptions?: any) {
     }
 
     if (options.direction && decision.direction) {
-      const match = supportsSuggestedDirection
-        ? chalk.green('✓ MATCHES')
-        : chalk.red('✗ DIFFERS FROM');
-      console.log(`${match} your suggested ${direction.toUpperCase()} direction`);
+      if (rawConfig.default?.direction !== 'llm_decides') {
+        const match =
+          decision.direction === cliDirection
+            ? chalk.green('✓ MATCHES')
+            : chalk.red('✗ DIFFERS FROM');
+        console.log(`${match} your suggested ${cliDirection.toUpperCase()} direction`);
+      }
     }
 
     if (decision.rationale) {
