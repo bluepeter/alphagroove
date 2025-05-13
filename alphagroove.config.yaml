@@ -1,7 +1,7 @@
 default:
   date:
     from: '2017-01-01'
-    to: '2017-12-31'
+    to: '2025-12-31'
   ticker: 'SPY'
   timeframe: '1min'
   # direction can be 'long', 'short', or 'llm_decides'.
@@ -27,12 +27,12 @@ default:
       atrMultiplier: 2.0 # Default: Stop at 2.0 * Prior Day's Average TR
     profitTarget:
       # percentFromEntry: 0.5 # Fallback, commented out to prioritize ATR
-      atrMultiplier: 4.0 # Default: Target 3.0 * Prior Day's Average TR
+      atrMultiplier: 5.0 # Default: Target 3.0 * Prior Day's Average TR
     trailingStop:
       # activationPercent: 0 # Fallback, commented out to prioritize ATR
       # trailPercent: 0.3      # Fallback, commented out to prioritize ATR (0.3 for 0.3% of price)
       activationAtrMultiplier: 0 # Activate immediately (no favorable movement required)
-      trailAtrMultiplier: 2.0 # Default: Trail by 1.0 * Prior Day's Average TR
+      trailAtrMultiplier: 2.5 # Default: Trail by 1.0 * Prior Day's Average TR
     endOfDay:
       time: '16:00'
     slippage:

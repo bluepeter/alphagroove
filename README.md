@@ -531,15 +531,6 @@ image without running a full backtest.
 ```bash
 # Basic usage
 pnpm analyze /path/to/chart.png
-
-# Specify suggested direction
-pnpm analyze /path/to/chart.png --direction short
-
-# Show detailed responses (including rationales)
-pnpm analyze /path/to/chart.png --verbose
-
-# Provide additional context
-pnpm analyze /path/to/chart.png --ticker SPY --date 2023-05-15 --price 420.69
 ```
 
 **Options:**
@@ -560,12 +551,6 @@ match what would be used in a backtest.
 ```bash
 # Basic usage
 pnpm levels /path/to/minute-bars.csv --price 420.69
-
-# Specify trade direction
-pnpm levels /path/to/minute-bars.csv --price 420.69 --direction short
-
-# Use a custom config file
-pnpm levels /path/to/minute-bars.csv --price 420.69 --config ./custom-config.yaml
 ```
 
 **Options:**
