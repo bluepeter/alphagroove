@@ -83,8 +83,8 @@ describe('output utilities', () => {
 
       const output = consoleLogSpy.mock.calls[0][0];
       expect(output).toContain('2025-05-02');
-      expect(output).toContain('16:54:00');
-      expect(output).toContain('16:55:00');
+      expect(output).toContain('16:54');
+      expect(output).toContain('16:55');
       expect(output).toContain('$566.81');
       expect(output).toContain('$566.83');
       expect(output).toContain('$567.19');
@@ -115,8 +115,8 @@ describe('output utilities', () => {
 
       const output = consoleLogSpy.mock.calls[0][0];
       expect(output).toContain('2025-05-02');
-      expect(output).toContain('16:56:00');
-      expect(output).toContain('16:57:00');
+      expect(output).toContain('16:56');
+      expect(output).toContain('16:57');
       expect(output).toContain('$566.81');
       expect(output).toContain('$567.12');
       expect(output).toContain('$566.94');
@@ -309,7 +309,7 @@ describe('output utilities', () => {
 
       const output = consoleLogSpy.mock.calls[0][0];
       expect(output).toContain('↘️ 2025-01-07');
-      expect(output).toContain('⏰ 13:00:00 → 14:39:00');
+      expect(output).toContain('⏰ 13:00 → 14:39');
       expect(output).toContain('Entry: $590.91');
       expect(output).toContain('Adj Entry: $591.06');
       expect(output).toContain('Adj Exit: $590.52');

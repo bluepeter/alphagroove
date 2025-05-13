@@ -23,7 +23,13 @@ describe('calculation functions', () => {
     });
 
     it('should format time correctly', () => {
-      expect(formatTime('2023-05-15 14:30:00')).toBe('14:30:00');
+      expect(formatTime('2023-05-15 14:30:00')).toBe('14:30');
+      expect(formatTime('2023-05-15 09:05:30')).toBe('09:05');
+      expect(formatTime('10:15:00')).toBe('10:15');
+      expect(formatTime('10:15')).toBe('10:15');
+      expect(formatTime(null)).toBe('--:--');
+      expect(formatTime(undefined)).toBe('--:--');
+      expect(formatTime('')).toBe('--:--');
     });
 
     it('should format dollar values correctly', () => {

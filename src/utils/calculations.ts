@@ -18,10 +18,17 @@ export const formatDate = (dateString: string): string => {
 
 export const formatTime = (timeString: string | undefined | null): string => {
   if (!timeString) {
-    return '--:--:--'; // Default for undefined/null/empty input
+    return '--:--'; // Default for undefined/null/empty input, now HH:MM
   }
   const parts = timeString.split(' ');
-  return parts.length > 1 ? parts[1] : parts[0]; // Return time part if available, else the whole string
+  let timePart = parts.length > 1 ? parts[1] : parts[0]; // Return time part if available, else the whole string
+
+  // Check if the timePart includes seconds (e.g., HH:MM:SS)
+  if (timePart.match(/\d{1,2}:\d{2}:\d{2}/)) {
+    // Slice off the seconds part (last 3 characters: :SS)
+    timePart = timePart.substring(0, timePart.lastIndexOf(':'));
+  }
+  return timePart;
 };
 
 export const formatDollar = (value: number): string => {
