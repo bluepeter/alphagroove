@@ -200,7 +200,7 @@ describe('output utilities', () => {
       printTradeDetails(trade);
 
       const output = consoleLogSpy.mock.calls[0][0];
-      expect(output).toContain('ATR PT: $596.68 (-0.13%)');
+      expect(output).toContain('ATR PT: $0.79 (-0.13%)');
 
       consoleLogSpy.mockRestore();
     });
@@ -316,7 +316,7 @@ describe('output utilities', () => {
       expect(output).toContain('✅ Return: 0.09%');
       expect(output).toContain('[profitTarget]');
       expect(output).toContain('ATR SL: $592.06 (0.17%)');
-      expect(output).toContain('ATR PT: $590.24 (-0.14%)');
+      expect(output).toContain('ATR PT: $0.82 (-0.14%)');
       expect(output).toContain('TS Act: $585.15 (-1.00%)');
       expect(output).toContain('ATR Trail: $0.27 (0.05%)');
 

@@ -237,14 +237,26 @@ export class TrailingStopStrategy implements ExitStrategy {
     if (tradingBars.length === 0) return null;
 
     let activationLevel: number;
+    let immediateActivation = false;
+
     if (atr && this.config.activationAtrMultiplier !== undefined) {
-      const activationOffset = atr * this.config.activationAtrMultiplier;
-      activationLevel = isLong ? entryPrice + activationOffset : entryPrice - activationOffset;
+      if (this.config.activationAtrMultiplier === 0) {
+        activationLevel = entryPrice; // Set to entry price for clarity
+        immediateActivation = true; // Mark for immediate activation
+      } else {
+        const activationOffset = atr * this.config.activationAtrMultiplier;
+        activationLevel = isLong ? entryPrice + activationOffset : entryPrice - activationOffset;
+      }
     } else {
       const activationPct = this.config.activationPercent / 100;
       activationLevel = isLong
         ? entryPrice * (1 + activationPct)
         : entryPrice * (1 - activationPct);
+
+      // Also handle the case where activationPercent=0 from config
+      if (activationPct === 0) {
+        immediateActivation = true;
+      }
     }
 
     let trailAmountAbs: number | null = null;
@@ -254,12 +266,14 @@ export class TrailingStopStrategy implements ExitStrategy {
 
     const trailPct = this.config.trailPercent / 100;
     let trailingStopLevel = isLong ? entryPrice : entryPrice;
-    let activated = false;
+    // Start activated if immediateActivation is true
+    let activated = immediateActivation;
     let bestPrice = isLong ? entryPrice : entryPrice;
 
     for (let i = 0; i < tradingBars.length; i++) {
       const bar = tradingBars[i];
       if (isLong) {
+        // Only check for activation if not already activated
         if (!activated && bar.high >= activationLevel) {
           activated = true;
         }
@@ -290,6 +304,7 @@ export class TrailingStopStrategy implements ExitStrategy {
           }
         }
       } else {
+        // Only check for activation if not already activated
         if (!activated && bar.low <= activationLevel) {
           activated = true;
         }

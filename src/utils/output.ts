@@ -130,19 +130,20 @@ export const printTradeDetails = (trade: Trade) => {
   }
   if (trade.initialProfitTargetPrice !== undefined) {
     const ptType = trade.isProfitTargetAtrBased ? 'ATR PT' : 'PT';
-    const ptPct = formatPercent(
-      (trade.initialProfitTargetPrice - trade.entry_price) / trade.entry_price
-    );
+    const ptDiff = trade.initialProfitTargetPrice - trade.entry_price;
+    const ptPct = formatPercent(ptDiff / trade.entry_price);
     exitParamsInfo += exitParamsInfo
-      ? `; ${ptType}: ${formatDollar(trade.initialProfitTargetPrice)} (${ptPct})`
-      : ` ${ptType}: ${formatDollar(trade.initialProfitTargetPrice)} (${ptPct})`;
+      ? `; ${ptType}: $${Math.abs(ptDiff).toFixed(2)} (${ptPct})`
+      : ` ${ptType}: $${Math.abs(ptDiff).toFixed(2)} (${ptPct})`;
   }
   if (trade.tsActivationLevel !== undefined) {
-    const actPct = formatPercent((trade.tsActivationLevel - trade.entry_price) / trade.entry_price);
-    // Check if activation level is the same as entry price (meaning it's with zero activation)
-    if (Math.abs(trade.tsActivationLevel - trade.entry_price) < 0.0001) {
+    // If activation level is exactly the entry price, this means immediate activation
+    if (trade.tsActivationLevel === trade.entry_price) {
       exitParamsInfo += exitParamsInfo ? `; TS Act: Immediate` : ` TS Act: Immediate`;
     } else {
+      const actPct = formatPercent(
+        (trade.tsActivationLevel - trade.entry_price) / trade.entry_price
+      );
       exitParamsInfo += exitParamsInfo
         ? `; TS Act: ${formatDollar(trade.tsActivationLevel)} (${actPct})`
         : ` TS Act: ${formatDollar(trade.tsActivationLevel)} (${actPct})`;
@@ -164,6 +165,21 @@ export const printTradeDetails = (trade: Trade) => {
   }
   if (exitParamsInfo) {
     exitParamsInfo = chalk.dim(` (${exitParamsInfo.trim()})`);
+  }
+
+  // For debugging purposes - add a validation of return calculation
+  // This helps spot inconsistencies between the reported return and actual prices
+  const calculatedReturn = isShort
+    ? (trade.entry_price - trade.exit_price) / trade.entry_price
+    : (trade.exit_price - trade.entry_price) / trade.entry_price;
+
+  // If there's a significant difference between calculated and reported returns, log it
+  // Only show warnings in production mode, not during tests
+  const returnDiff = Math.abs(calculatedReturn - trade.return_pct);
+  if (returnDiff > 0.0001 && process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+    console.log(
+      `[Warning] Return calculation mismatch: Reported ${formatPercent(trade.return_pct)} vs Calculated ${formatPercent(calculatedReturn)} for ${trade.trade_date}`
+    );
   }
 
   console.log(

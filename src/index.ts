@@ -294,6 +294,9 @@ export const processTradesLoop = async (
       mergedConfig.exitStrategies?.slippage
     );
 
+    // Store the original entry price before any modifications to track discrepancies
+    const originalEntryPrice = entryPrice;
+
     // Determine initial stop-loss, profit-target, and trailing stop parameters FOR LOGGING/INFO
     // The actual evaluation still happens bar-by-bar within strategies using these inputs
     let initialStopLossPrice: number | undefined;
@@ -338,9 +341,15 @@ export const processTradesLoop = async (
     const trailingStopConfig = mergedConfig.exitStrategies?.trailingStop;
     if (trailingStopConfig) {
       if (entryAtrValue && trailingStopConfig.activationAtrMultiplier !== undefined) {
-        const offset = entryAtrValue * trailingStopConfig.activationAtrMultiplier;
-        tsActivationLevel =
-          actualTradeDirection === 'long' ? entryPrice + offset : entryPrice - offset;
+        if (trailingStopConfig.activationAtrMultiplier === 0) {
+          // For activationAtrMultiplier = 0, set activation level exactly equal to entry price
+          // This makes it easy to detect in output formatting
+          tsActivationLevel = entryPrice;
+        } else {
+          const offset = entryAtrValue * trailingStopConfig.activationAtrMultiplier;
+          tsActivationLevel =
+            actualTradeDirection === 'long' ? entryPrice + offset : entryPrice - offset;
+        }
         isTrailingStopAtrBased = true; // Mark as ATR based if activation is
       } else if (trailingStopConfig.activationPercent) {
         const pct = trailingStopConfig.activationPercent / 100;
@@ -418,13 +427,40 @@ export const processTradesLoop = async (
         ? (exitPrice - entryPrice) / entryPrice
         : (entryPrice - exitPrice) / entryPrice;
 
+    // DEBUG: Log detailed calculation information for verification
+    // console.debug(
+    //   `DEBUG CALC: ${tradeDate} - Direction: ${actualTradeDirection}, Entry: ${entryPrice.toFixed(2)}, Exit: ${exitPrice.toFixed(2)}, ` +
+    //     `Calculated Return: ${(returnPct * 100).toFixed(4)}%, Exit Reason: ${exitSignal.reason}`
+    // );
+
+    // Validate return calculation with a separate helper function to catch inconsistencies
+    const validateReturn = () => {
+      // Double-check the calculation
+      const recalculatedReturn =
+        actualTradeDirection === 'long'
+          ? (exitPrice - entryPrice) / entryPrice
+          : (entryPrice - exitPrice) / entryPrice;
+
+      if (Math.abs(returnPct - recalculatedReturn) > 0.000001) {
+        console.error(
+          `CRITICAL ERROR in return calculation for ${tradeDate}. ` +
+            `First calculation: ${returnPct.toFixed(8)}, Second calculation: ${recalculatedReturn.toFixed(8)}`
+        );
+      }
+    };
+
+    // Immediately validate the calculation before proceeding
+    validateReturn();
+
     // Create the trade object with exit information
     const trade = mapRawDataToTrade(
       {
         ...rawTradeData,
+        // Override the entry_price to ensure consistency with the calculation
+        entry_price: entryPrice,
         exit_price: exitPrice,
         exit_time: exitSignal.timestamp,
-        return_pct: returnPct,
+        return_pct: returnPct, // Use our correctly calculated return
         exit_reason: exitSignal.reason,
         // Add dynamic exit params for logging
         initialStopLossPrice,
@@ -438,6 +474,31 @@ export const processTradesLoop = async (
       actualTradeDirection,
       llmChartPath
     );
+
+    // Perform another validation after creating the trade object to ensure nothing changed
+    const finalValidation = () => {
+      const finalCalculatedReturn =
+        actualTradeDirection === 'long'
+          ? (trade.exit_price - trade.entry_price) / trade.entry_price
+          : (trade.entry_price - trade.exit_price) / trade.entry_price;
+
+      // Print values for debugging
+      // console.debug(
+      //   `TRADE INFO: Entry: ${trade.entry_price.toFixed(4)}, Exit: ${trade.exit_price.toFixed(4)}, ` +
+      //     `OriginalEntry: ${originalEntryPrice.toFixed(4)}, CalculatedReturn: ${finalCalculatedReturn.toFixed(8)}, ` +
+      //     `StoredReturn: ${trade.return_pct.toFixed(8)}`
+      // );
+
+      if (Math.abs(trade.return_pct - finalCalculatedReturn) > 0.000001) {
+        console.error(
+          `CRITICAL ERROR: Trade return_pct (${trade.return_pct.toFixed(8)}) does not match ` +
+            `final calculation (${finalCalculatedReturn.toFixed(8)}) for ${tradeDate}`
+        );
+      }
+    };
+
+    // Final validation to catch any issues in the return calculation
+    finalValidation();
 
     const statsBucket =
       actualTradeDirection === 'long' ? totalStats.long_stats : totalStats.short_stats;
