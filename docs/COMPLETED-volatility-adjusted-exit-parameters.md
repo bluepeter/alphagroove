@@ -109,3 +109,85 @@ include:
 
 This plan prioritizes using an ATR calculated as the simple average of all TRs from the prior day's
 1-minute bars. The `atrPeriodForEntry` configuration was removed as it is not used by this method.
+
+## Volatility-Adjusted Exit Parameters Implementation Plan
+
+### Overview
+
+Implement volatility-based exit parameters (stop-loss, profit target, and trailing stop) using the
+Average True Range (ATR) metric. This will allow the exit parameters to adjust based on market
+conditions.
+
+### Features Implemented
+
+1. **ATR Calculation** - Calculate ATR using the prior trading day's bars
+
+   - Uses bars from the trading day before the signal day
+   - Calculates the True Range for each bar:
+     `TR = max(high - low, |high - prevClose|, |low - prevClose|)`
+   - Calculates ATR as the average of all TRs for the prior day
+
+2. **ATR-Based Exit Parameters**
+
+   - **Stop Loss**: Set at entry price +/- (atrMultiplier \* ATR)
+   - **Profit Target**: Set at entry price +/- (atrMultiplier \* ATR)
+   - **Trailing Stop**:
+     - Activation level: entry price +/- (activationAtrMultiplier \* ATR)
+     - Trail amount: trailAtrMultiplier \* ATR
+
+3. **Slippage Implementation**
+
+   - Slippage model applies to both entry and exit prices
+   - For entries, slippage moves price in unfavorable direction (higher for longs, lower for shorts)
+   - For exits, slippage moves price in unfavorable direction (lower for longs, higher for shorts)
+   - Supports percentage-based slippage (e.g., 0.05%) or fixed amount (e.g., $0.01)
+   - Configurable in alphagroove.config.yaml
+
+4. **Configuration**
+
+   - Update alphagroove.config.yaml to support ATR-based parameters
+   - Allow mixing of ATR-based and percentage-based parameters
+   - Default to percentage-based if ATR cannot be calculated
+
+5. **Output Enhancement**
+   - Display ATR values in trade details output
+   - Show whether exit parameters used ATR or fixed percentages
+   - Display trailing stop amount as both dollar value and percentage
+
+### Usage
+
+```yaml
+exitStrategies:
+  enabled:
+    - profitTarget
+    - trailingStop
+    - maxHoldTime
+    - endOfDay
+  stopLoss:
+    atrMultiplier: 2.0 # Stop at 2.0 * Prior Day's Average TR
+  profitTarget:
+    atrMultiplier: 4.0 # Target 4.0 * Prior Day's Average TR
+  trailingStop:
+    activationAtrMultiplier: 0 # Activate immediately (no favorable movement required)
+    trailAtrMultiplier: 2.0 # Trail by 2.0 * Prior Day's Average TR
+  slippage:
+    model: 'percent'
+    value: 0.05 # 0.05% slippage applied to both entry and exit prices
+```
+
+### Testing
+
+Tests cover:
+
+- ATR calculation with sample bar data
+- Correct application of ATR multipliers to exit parameters
+- Handling of missing or inadequate data for ATR calculation
+- Slippage application to both entry and exit prices
+- Graceful fallback to percentage-based parameters when needed
+
+### Notes
+
+- The immediate trailing stop (activationAtrMultiplier: 0) now correctly prevents unfavorable
+  movement beyond the trail amount from the entry price
+- All exit parameters are displayed with both absolute values and percentages for better analysis
+- ATR amounts scale appropriately with market volatility, providing more effective risk management

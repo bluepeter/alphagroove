@@ -237,7 +237,7 @@ export class TrailingStopStrategy implements ExitStrategy {
     if (tradingBars.length === 0) return null;
 
     let activationLevel: number;
-    if (atr && this.config.activationAtrMultiplier) {
+    if (atr && this.config.activationAtrMultiplier !== undefined) {
       const activationOffset = atr * this.config.activationAtrMultiplier;
       activationLevel = isLong ? entryPrice + activationOffset : entryPrice - activationOffset;
     } else {
@@ -248,7 +248,7 @@ export class TrailingStopStrategy implements ExitStrategy {
     }
 
     let trailAmountAbs: number | null = null;
-    if (atr && this.config.trailAtrMultiplier) {
+    if (atr && this.config.trailAtrMultiplier !== undefined) {
       trailAmountAbs = atr * this.config.trailAtrMultiplier;
     }
 

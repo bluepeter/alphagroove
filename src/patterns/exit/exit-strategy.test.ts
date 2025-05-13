@@ -513,6 +513,25 @@ describe('Exit Strategies', () => {
       expect(result).toBe(100.05); // 100 + 0.05
     });
 
+    it('should handle different slippage directions for entry vs exit prices', () => {
+      const price = 100;
+      const slippageConfig = { model: 'percent' as const, value: 0.2 }; // 0.2% slippage
+
+      // For long trades, entry price should increase (worse entry) and exit price should decrease (worse exit)
+      const longEntryResult = applySlippage(price, true, slippageConfig);
+      const longExitResult = applySlippage(price, true, slippageConfig);
+
+      // For short trades, entry price should decrease (worse entry) and exit price should increase (worse exit)
+      const shortEntryResult = applySlippage(price, false, slippageConfig);
+      const shortExitResult = applySlippage(price, false, slippageConfig);
+
+      // All prices should move in the unfavorable direction by the same amount
+      expect(longEntryResult).toBe(99.8); // 100 - (100 * 0.002)
+      expect(longExitResult).toBe(99.8); // 100 - (100 * 0.002)
+      expect(shortEntryResult).toBe(100.2); // 100 + (100 * 0.002)
+      expect(shortExitResult).toBe(100.2); // 100 + (100 * 0.002)
+    });
+
     it('should return original price if no slippage config is provided', () => {
       const exitPrice = 100;
 

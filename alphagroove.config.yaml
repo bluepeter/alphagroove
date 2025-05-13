@@ -31,7 +31,7 @@ default:
     trailingStop:
       # activationPercent: 0 # Fallback, commented out to prioritize ATR
       # trailPercent: 0.3      # Fallback, commented out to prioritize ATR (0.3 for 0.3% of price)
-      activationAtrMultiplier: 0 # Activate after X * Prior Day's Average TR move
+      activationAtrMultiplier: 0 # Activate immediately (no favorable movement required)
       trailAtrMultiplier: 2.0 # Default: Trail by 1.0 * Prior Day's Average TR
     endOfDay:
       time: '16:00'

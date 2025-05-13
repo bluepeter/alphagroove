@@ -207,7 +207,7 @@ export const processTradesLoop = async (
 
     const entryTimestamp = rawTradeData.entry_time as string;
     const tradeDate = rawTradeData.trade_date as string;
-    const entryPrice = rawTradeData.entry_price as number;
+    const rawEntryPrice = rawTradeData.entry_price as number;
 
     const signalDirectionForLlm: 'long' | 'short' =
       initialGlobalDirection === 'llm_decides' ? 'long' : initialGlobalDirection;
@@ -215,7 +215,7 @@ export const processTradesLoop = async (
     const currentSignal: EnrichedSignal = {
       ticker: mergedConfig.ticker,
       trade_date: tradeDate,
-      price: entryPrice,
+      price: rawEntryPrice,
       timestamp: entryTimestamp,
       type: 'entry',
       direction: signalDirectionForLlm,
@@ -287,6 +287,13 @@ export const processTradesLoop = async (
       );
     }
 
+    // Apply slippage to entry price based on direction
+    const entryPrice = applySlippage(
+      rawEntryPrice,
+      actualTradeDirection === 'long',
+      mergedConfig.exitStrategies?.slippage
+    );
+
     // Determine initial stop-loss, profit-target, and trailing stop parameters FOR LOGGING/INFO
     // The actual evaluation still happens bar-by-bar within strategies using these inputs
     let initialStopLossPrice: number | undefined;
@@ -330,7 +337,7 @@ export const processTradesLoop = async (
 
     const trailingStopConfig = mergedConfig.exitStrategies?.trailingStop;
     if (trailingStopConfig) {
-      if (entryAtrValue && trailingStopConfig.activationAtrMultiplier) {
+      if (entryAtrValue && trailingStopConfig.activationAtrMultiplier !== undefined) {
         const offset = entryAtrValue * trailingStopConfig.activationAtrMultiplier;
         tsActivationLevel =
           actualTradeDirection === 'long' ? entryPrice + offset : entryPrice - offset;
@@ -340,7 +347,7 @@ export const processTradesLoop = async (
         tsActivationLevel =
           actualTradeDirection === 'long' ? entryPrice * (1 + pct) : entryPrice * (1 - pct);
       }
-      if (entryAtrValue && trailingStopConfig.trailAtrMultiplier) {
+      if (entryAtrValue && trailingStopConfig.trailAtrMultiplier !== undefined) {
         tsTrailAmount = entryAtrValue * trailingStopConfig.trailAtrMultiplier;
         isTrailingStopAtrBased = true; // Mark as ATR based if trail is
       } else if (trailingStopConfig.trailPercent) {

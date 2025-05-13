@@ -133,11 +133,20 @@ export const printTradeDetails = (trade: Trade) => {
     const ptPct = formatPercent(
       (trade.initialProfitTargetPrice - trade.entry_price) / trade.entry_price
     );
-    exitParamsInfo += ` ${ptType}: ${formatDollar(trade.initialProfitTargetPrice)} (${ptPct})`;
+    exitParamsInfo += exitParamsInfo
+      ? `; ${ptType}: ${formatDollar(trade.initialProfitTargetPrice)} (${ptPct})`
+      : ` ${ptType}: ${formatDollar(trade.initialProfitTargetPrice)} (${ptPct})`;
   }
   if (trade.tsActivationLevel !== undefined) {
     const actPct = formatPercent((trade.tsActivationLevel - trade.entry_price) / trade.entry_price);
-    exitParamsInfo += ` TS Act: ${formatDollar(trade.tsActivationLevel)} (${actPct})`;
+    // Check if activation level is the same as entry price (meaning it's with zero activation)
+    if (Math.abs(trade.tsActivationLevel - trade.entry_price) < 0.0001) {
+      exitParamsInfo += exitParamsInfo ? `; TS Act: Immediate` : ` TS Act: Immediate`;
+    } else {
+      exitParamsInfo += exitParamsInfo
+        ? `; TS Act: ${formatDollar(trade.tsActivationLevel)} (${actPct})`
+        : ` TS Act: ${formatDollar(trade.tsActivationLevel)} (${actPct})`;
+    }
   }
   if (trade.tsTrailAmount !== undefined) {
     // If ATR based, tsTrailAmount is a dollar amount. If percent based, it's a percentage (e.g., 0.5 for 0.5%).
@@ -145,10 +154,12 @@ export const printTradeDetails = (trade: Trade) => {
       // Convert ATR dollar amount to percentage of entry price for display
       const trailPct = (trade.tsTrailAmount / trade.entry_price) * 100;
       const trailDisplay = `${formatDollar(trade.tsTrailAmount)} (${formatPercent(trailPct / 100)})`;
-      exitParamsInfo += ` ATR Trail: ${trailDisplay}`;
+      exitParamsInfo += exitParamsInfo
+        ? `; ATR Trail: ${trailDisplay}`
+        : ` ATR Trail: ${trailDisplay}`;
     } else {
       const trailDisplay = `${formatPercent(trade.tsTrailAmount / 100)}`;
-      exitParamsInfo += ` Trail %: ${trailDisplay}`;
+      exitParamsInfo += exitParamsInfo ? `; Trail %: ${trailDisplay}` : ` Trail %: ${trailDisplay}`;
     }
   }
   if (exitParamsInfo) {
