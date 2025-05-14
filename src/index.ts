@@ -207,8 +207,8 @@ export const processTradesLoop = async (
 
     const entryTimestamp = rawTradeData.entry_time as string;
     const tradeDate = rawTradeData.trade_date as string;
-    const rawEntryPriceFromSQL = rawTradeData.entry_price as number; // This is Close of signal bar
-    const signalBarOpenPrice = rawTradeData.market_open as number; // This is Open of signal bar
+    const _rawEntryPriceFromSQL = rawTradeData.entry_price as number; // This is Close of signal bar
+    const _signalBarOpenPrice = rawTradeData.market_open as number; // This is Open of signal bar
 
     // Fetch all bars for the current trading day starting from the signal bar time
     // This is essential to get the signal bar itself and the subsequent execution bar.
@@ -242,7 +242,7 @@ export const processTradesLoop = async (
     const executionBar = allBarsForDayOfSignal[signalBarIndex + 1];
 
     const actualExecutionTimestamp = executionBar.timestamp;
-    const executionBarOpenPrice = executionBar.open; // For new contextual "Entry" log
+    const _executionBarOpenPrice = executionBar.open; // Unused if market_open for log uses executionBarClosePrice
     const executionBarClosePrice = executionBar.close; // New base for P&L and slippage
 
     const signalDirectionForLlm: 'long' | 'short' =
@@ -336,7 +336,7 @@ export const processTradesLoop = async (
     // Store the original entry price before any modifications to track discrepancies
     // This variable's original purpose might need rethinking or renaming if it was meant to be pre-slippage.
     // For now, it stores the post-slippage price, similar to the old `entryPrice` variable.
-    const originalEntryPrice = finalEntryPriceForPAndL;
+    const _originalEntryPrice = finalEntryPriceForPAndL;
 
     // Determine initial stop-loss, profit-target, and trailing stop parameters FOR LOGGING/INFO
     let initialStopLossPrice: number | undefined;

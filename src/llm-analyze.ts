@@ -14,7 +14,6 @@ import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
 import { Command } from 'commander';
-import { LlmApiService } from './services/llm-api.service';
 import { LlmConfirmationScreen } from './screens/llm-confirmation.screen';
 import { loadConfig } from './utils/config';
 import { EnrichedSignal, LLMScreenConfig } from './screens/types';
@@ -107,15 +106,6 @@ export async function main(imagePath?: string, cmdOptions?: any) {
       llmScreenConfig,
       rawConfig
     );
-
-    // Determine if the analysis supports the signal direction
-    let supportsSuggestedDirection = false;
-    if (rawConfig.default?.direction === 'llm_decides') {
-      // If LLM decides, any outcome from LLM is implicitly "supported" in terms of initial setup
-      supportsSuggestedDirection = !!decision.direction;
-    } else {
-      supportsSuggestedDirection = decision.direction === cliDirection;
-    }
 
     // Print results
     console.log(chalk.bold('\nLLM Analysis Results:'));

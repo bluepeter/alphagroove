@@ -38,7 +38,7 @@ import { parseCSVData, groupBarsByDay, calculateATR, calculateTradeLevels } from
 
 // Mock main function to prevent it from running
 vi.mock('./trade-levels', async importOriginal => {
-  const actual = await importOriginal();
+  const actual = (await importOriginal()) as any;
   return {
     ...actual,
     main: vi.fn(),

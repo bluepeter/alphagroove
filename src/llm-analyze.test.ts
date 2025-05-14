@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
-import path from 'path';
-import { LlmConfirmationScreen } from './screens/llm-confirmation.screen';
-import { loadConfig } from './utils/config';
+// import path from 'path'; // Removed as unused, or use _path if needed for side effects only
+// import { LlmConfirmationScreen } from '../src/screens/llm-confirmation.screen'; // Removed as unused
+// import { loadConfig } from '../src/utils/config'; // Removed as unused
 
 // Mock dependencies
 vi.mock('fs', () => ({
