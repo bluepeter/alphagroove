@@ -21,11 +21,7 @@ import {
   mergeConfigWithCliOptions,
   type MergedConfig,
 } from './utils/config.js';
-import {
-  fetchTradesFromQuery,
-  fetchBarsForTradingDay,
-  getPriorDayTradingBars,
-} from './utils/data-loader.js';
+import { fetchTradesFromQuery, fetchBarsForTradingDay } from './utils/data-loader.js';
 import { mapRawDataToTrade } from './utils/mappers.js';
 import {
   printHeader,
@@ -42,10 +38,10 @@ import { buildAnalysisQuery } from './utils/query-builder.js';
 import {
   createExitStrategies,
   ExitStrategy,
-  ExitSignal,
   applySlippage,
 } from './patterns/exit/exit-strategy.js';
-import { calculateATRStopLoss, calculateAverageTrueRangeForDay } from './utils/calculations.js';
+import { calculateATRStopLoss } from './utils/calculations.js';
+import { calculateEntryAtr, evaluateExitStrategies } from './utils/trade-processing';
 
 const generateChartForLLMDecision = async (
   signalData: EnrichedSignal,
@@ -205,35 +201,30 @@ export const processTradesLoop = async (
       }
     }
 
-    const entryTimestamp = rawTradeData.entry_time as string;
+    const entrySignalTimestamp = rawTradeData.entry_time as string;
     const tradeDate = rawTradeData.trade_date as string;
-    const _rawEntryPriceFromSQL = rawTradeData.entry_price as number; // This is Close of signal bar
-    const _signalBarOpenPrice = rawTradeData.market_open as number; // This is Open of signal bar
+    const _rawEntryPriceFromSQL = rawTradeData.entry_price as number;
+    const _signalBarOpenPrice = rawTradeData.market_open as number;
 
-    // Fetch all bars for the current trading day starting from the signal bar time
-    // This is essential to get the signal bar itself and the subsequent execution bar.
     const allBarsForDayOfSignal = fetchBarsForTradingDay(
       mergedConfig.ticker,
       mergedConfig.timeframe,
       tradeDate,
-      entryTimestamp.split(' ')[1] // HH:MM:SS of signal bar
+      entrySignalTimestamp.split(' ')[1]
     );
 
-    // Identify the signal bar and the potential execution bar (next bar)
-    // The first bar in allBarsForDayOfSignal should be the signal bar itself if entryTimestamp matches its start.
-    // We need to ensure robustly finding the signal bar and then the next bar.
-    const signalBarIndex = allBarsForDayOfSignal.findIndex(bar => bar.timestamp === entryTimestamp);
-
+    const signalBarIndex = allBarsForDayOfSignal.findIndex(
+      bar => bar.timestamp === entrySignalTimestamp
+    );
     if (signalBarIndex === -1) {
       console.warn(
-        `[ProcessTradesLoop] Signal bar at ${entryTimestamp} not found in fetched day bars for ${tradeDate}. Skipping trade.`
+        `[ProcessTradesLoop] Signal bar at ${entrySignalTimestamp} not found in fetched day bars for ${tradeDate}. Skipping trade.`
       );
       continue;
     }
-
     if (signalBarIndex + 1 >= allBarsForDayOfSignal.length) {
       console.warn(
-        `[ProcessTradesLoop] No subsequent bar found for execution after signal at ${entryTimestamp} on ${tradeDate}. Skipping trade.`
+        `[ProcessTradesLoop] No subsequent bar found for execution after signal at ${entrySignalTimestamp} on ${tradeDate}. Skipping trade.`
       );
       continue;
     }
@@ -242,8 +233,7 @@ export const processTradesLoop = async (
     const executionBar = allBarsForDayOfSignal[signalBarIndex + 1];
 
     const actualExecutionTimestamp = executionBar.timestamp;
-    const _executionBarOpenPrice = executionBar.open; // Unused if market_open for log uses executionBarClosePrice
-    const executionBarClosePrice = executionBar.close; // New base for P&L and slippage
+    const executionBarClosePrice = executionBar.close;
 
     const signalDirectionForLlm: 'long' | 'short' =
       initialGlobalDirection === 'llm_decides' ? 'long' : initialGlobalDirection;
@@ -251,8 +241,8 @@ export const processTradesLoop = async (
     const currentSignal: EnrichedSignal = {
       ticker: mergedConfig.ticker,
       trade_date: tradeDate,
-      price: signalBar.close, // LLM still sees the signal bar's close as a key price point
-      timestamp: signalBar.timestamp, // Signal time for LLM context
+      price: signalBar.close,
+      timestamp: signalBar.timestamp,
       type: 'entry',
       direction: signalDirectionForLlm,
     };
@@ -279,12 +269,9 @@ export const processTradesLoop = async (
     }
 
     let actualTradeDirection: 'long' | 'short';
-
     if (llmConfirmationDirection) {
-      // LLM screen was active and decided/confirmed a direction
       actualTradeDirection = llmConfirmationDirection;
     } else if (!llmScreenInstance || !screenSpecificLLMConfig?.enabled) {
-      // LLM screen not active / specified no direction
       if (initialGlobalDirection === 'llm_decides') {
         console.warn(
           "[processTradesLoop] LLM screen did not provide direction for 'llm_decides' strategy, or was disabled. Defaulting to 'long'. Trade on " +
@@ -292,53 +279,30 @@ export const processTradesLoop = async (
         );
         actualTradeDirection = 'long';
       } else {
-        actualTradeDirection = initialGlobalDirection; // Use the fixed global direction
+        actualTradeDirection = initialGlobalDirection;
       }
     } else {
-      // LLM screen was active, said proceed, but provided no direction. This is an error state for an active LLM screen.
       console.warn(
         `[processTradesLoop] LLM proceeded but no direction confirmed by active LLM screen. Skipping trade for ${rawTradeData.trade_date}.`
       );
       continue;
     }
 
-    // Calculate ATR from prior day for dynamic exit parameters
-    let entryAtrValue: number | undefined;
-    // ATR calculation should ideally use data *before* the actualExecutionTimestamp if it needs to be strictly point-in-time
-    // For now, using tradeDate which is the date of the signal, assuming prior day bars are sufficient.
-    const priorDayBars = await getPriorDayTradingBars(
+    const entryAtrValue = await calculateEntryAtr(
       mergedConfig.ticker,
       mergedConfig.timeframe,
       tradeDate
     );
-    if (priorDayBars.length > 0) {
-      entryAtrValue = calculateAverageTrueRangeForDay(priorDayBars);
-      if (entryAtrValue !== undefined) {
-      } else {
-        console.warn(
-          `[ATR Calc] Could not calculate Average TR for prior day ${tradeDate}. ATR-based exits will use percentages if configured.`
-        );
-      }
-    } else {
-      console.warn(
-        `[ATR Calc] No prior day bars found for ${tradeDate} to calculate ATR. ATR-based exits will use percentages if configured.`
-      );
-    }
 
-    // Apply slippage to entry price based on direction
     const finalEntryPriceForPAndL = applySlippage(
-      executionBarClosePrice, // Use CLOSE of EXECUTION bar
+      executionBarClosePrice,
       actualTradeDirection === 'long',
       mergedConfig.exitStrategies?.slippage,
-      true // This is an entry price
+      true
     );
 
-    // Store the original entry price before any modifications to track discrepancies
-    // This variable's original purpose might need rethinking or renaming if it was meant to be pre-slippage.
-    // For now, it stores the post-slippage price, similar to the old `entryPrice` variable.
     const _originalEntryPrice = finalEntryPriceForPAndL;
 
-    // Determine initial stop-loss, profit-target, and trailing stop parameters FOR LOGGING/INFO
     let initialStopLossPrice: number | undefined;
     let initialProfitTargetPrice: number | undefined;
     let tsActivationLevel: number | undefined;
@@ -351,7 +315,7 @@ export const processTradesLoop = async (
     if (stopLossConfig) {
       if (entryAtrValue && stopLossConfig.atrMultiplier) {
         initialStopLossPrice = calculateATRStopLoss(
-          finalEntryPriceForPAndL, // Base on new P&L entry price
+          finalEntryPriceForPAndL,
           entryAtrValue,
           stopLossConfig.atrMultiplier,
           actualTradeDirection === 'long'
@@ -396,7 +360,7 @@ export const processTradesLoop = async (
               ? finalEntryPriceForPAndL + offset
               : finalEntryPriceForPAndL - offset;
         }
-        isTrailingStopAtrBased = true; // Mark as ATR based if activation is
+        isTrailingStopAtrBased = true;
       } else if (trailingStopConfig.activationPercent) {
         const pct = trailingStopConfig.activationPercent / 100;
         tsActivationLevel =
@@ -406,89 +370,52 @@ export const processTradesLoop = async (
       }
       if (entryAtrValue && trailingStopConfig.trailAtrMultiplier !== undefined) {
         tsTrailAmount = entryAtrValue * trailingStopConfig.trailAtrMultiplier;
-        isTrailingStopAtrBased = true; // Mark as ATR based if trail is
+        isTrailingStopAtrBased = true;
       } else if (trailingStopConfig.trailPercent) {
-        // Store percent to be used by strategy if ATR not used for trail amount
         tsTrailAmount = trailingStopConfig.trailPercent;
       }
     }
 
-    // New code for bar-by-bar exit logic
-    // Fetch bars for the trading day and for ATR calculation
-    // Re-evaluate if fetchBarsForTradingDay needs adjustment or if tradingDayBars is already correct.
-    // `allBarsForDayOfSignal` already contains bars from signal time onwards.
-    // Exit strategies filter bars with timestamp > entryTime. If entryTime is actualExecutionTimestamp, they work on bars after execution.
-    const barsForExitEvaluation = allBarsForDayOfSignal; // Pass all bars from signal onwards; exit strategies will filter.
-
-    // If we have no bars for the trading day, skip this trade
-    // This check might be redundant if already handled by executionBar check, but keep for safety.
+    const barsForExitEvaluation = allBarsForDayOfSignal;
     if (barsForExitEvaluation.length === 0) {
-      console.warn(`No bars found for trading day ${tradeDate}. Skipping trade.`);
-      continue;
-    }
-
-    // Evaluate each exit strategy in order
-    let exitSignal: ExitSignal | null = null;
-    for (const strategy of exitStrategies) {
-      const signal = strategy.evaluate(
-        finalEntryPriceForPAndL, // Use the new P&L entry price
-        actualExecutionTimestamp, // Use the new actual execution time
-        barsForExitEvaluation, // Bars available from signal time onwards
-        actualTradeDirection === 'long',
-        entryAtrValue
+      console.warn(
+        `No bars found for trading day ${tradeDate} for exit evaluation. Skipping trade.`
       );
-
-      if (signal) {
-        exitSignal = signal;
-        break; // First exit signal triggered wins
-      }
-    }
-
-    // If no exit strategy was triggered, use the last bar of the day
-    if (!exitSignal && barsForExitEvaluation.length > 0) {
-      const lastBar = barsForExitEvaluation[barsForExitEvaluation.length - 1];
-      exitSignal = {
-        timestamp: lastBar.timestamp,
-        price: lastBar.close,
-        type: 'exit',
-        reason: 'endOfDay',
-      };
-    }
-
-    // If we still don't have an exit signal (shouldn't happen), skip this trade
-    if (!exitSignal) {
-      console.warn(`No exit signal found for trade on ${tradeDate}. Skipping trade.`);
       continue;
     }
 
-    // Apply slippage to exit price
+    const exitSignal = evaluateExitStrategies(
+      finalEntryPriceForPAndL,
+      actualExecutionTimestamp,
+      barsForExitEvaluation,
+      actualTradeDirection,
+      entryAtrValue,
+      exitStrategies
+    );
+
+    if (!exitSignal) {
+      console.warn(
+        `No exit signal generated for trade on ${tradeDate} (Entry: ${actualExecutionTimestamp}). Skipping trade.`
+      );
+      continue;
+    }
+
     const exitPrice = applySlippage(
       exitSignal.price,
       actualTradeDirection === 'long',
       mergedConfig.exitStrategies?.slippage
-      // isEntry defaults to false for exit prices
     );
 
-    // Calculate return percentage
     const returnPct =
       actualTradeDirection === 'long'
         ? (exitPrice - finalEntryPriceForPAndL) / finalEntryPriceForPAndL
         : (finalEntryPriceForPAndL - exitPrice) / finalEntryPriceForPAndL;
 
-    // DEBUG: Log detailed calculation information for verification
-    // console.debug(
-    //   `DEBUG CALC: ${tradeDate} - Direction: ${actualTradeDirection}, Entry: ${finalEntryPriceForPAndL.toFixed(2)}, Exit: ${exitPrice.toFixed(2)}, ` +
-    //     `Calculated Return: ${(returnPct * 100).toFixed(4)}%, Exit Reason: ${exitSignal.reason}`
-    // );
-
-    // Validate return calculation with a separate helper function to catch inconsistencies
     const validateReturn = () => {
-      // Double-check the calculation
       const recalculatedReturn =
         actualTradeDirection === 'long'
           ? (exitPrice - finalEntryPriceForPAndL) / finalEntryPriceForPAndL
           : (finalEntryPriceForPAndL - exitPrice) / finalEntryPriceForPAndL;
-
       if (Math.abs(returnPct - recalculatedReturn) > 0.000001) {
         console.error(
           `CRITICAL ERROR in return calculation for ${tradeDate}. ` +
@@ -496,28 +423,22 @@ export const processTradesLoop = async (
         );
       }
     };
-
-    // Immediately validate the calculation before proceeding
     validateReturn();
 
-    // Create the trade object with exit information
     const trade = mapRawDataToTrade(
       {
         ...rawTradeData,
-        entry_time: actualExecutionTimestamp, // Override with actual execution time
-        market_open: executionBarClosePrice, // CHANGED: For new contextual "Entry" log field (was executionBarOpenPrice)
-        entry_price: finalEntryPriceForPAndL, // Override with P&L entry price (becomes "Adj Entry")
-        // rawTradeData.entry_price (Close of signal bar) is no longer directly used for these primary fields
-        // rawTradeData.market_open (Open of signal bar) is also superseded here for these fields
+        entry_time: actualExecutionTimestamp,
+        market_open: executionBar.close,
+        entry_price: finalEntryPriceForPAndL,
         exit_price: exitPrice,
         exit_time: exitSignal.timestamp,
         return_pct: returnPct,
         exit_reason: exitSignal.reason,
-        // Add dynamic exit params for logging
         initialStopLossPrice,
         initialProfitTargetPrice,
         tsActivationLevel,
-        tsTrailAmount, // This could be an absolute amount or a percentage
+        tsTrailAmount,
         isStopLossAtrBased,
         isProfitTargetAtrBased,
         isTrailingStopAtrBased,
@@ -526,20 +447,11 @@ export const processTradesLoop = async (
       llmChartPath
     );
 
-    // Perform another validation after creating the trade object to ensure nothing changed
     const finalValidation = () => {
       const finalCalculatedReturn =
         actualTradeDirection === 'long'
           ? (trade.exit_price - trade.entry_price) / trade.entry_price
           : (trade.entry_price - trade.exit_price) / trade.entry_price;
-
-      // Print values for debugging
-      // console.debug(
-      //   `TRADE INFO: Entry: ${trade.entry_price.toFixed(4)}, Exit: ${trade.exit_price.toFixed(4)}, ` +
-      //     `OriginalEntry: ${originalEntryPrice.toFixed(4)}, CalculatedReturn: ${finalCalculatedReturn.toFixed(8)}, ` +
-      //     `StoredReturn: ${trade.return_pct.toFixed(8)}`
-      // );
-
       if (Math.abs(trade.return_pct - finalCalculatedReturn) > 0.000001) {
         console.error(
           `CRITICAL ERROR: Trade return_pct (${trade.return_pct.toFixed(8)}) does not match ` +
@@ -547,8 +459,6 @@ export const processTradesLoop = async (
         );
       }
     };
-
-    // Final validation to catch any issues in the return calculation
     finalValidation();
 
     const statsBucket =
