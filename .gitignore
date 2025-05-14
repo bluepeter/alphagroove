@@ -12,3 +12,4 @@ tickers/*
 !tickers/TEST/*.csv
 charts/
 test-charts/
+temp_chart_query.sql

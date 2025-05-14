@@ -71,12 +71,13 @@ describe('output utilities', () => {
         trade_date: '2025-05-02',
         entry_time: '2025-05-02 16:54:00',
         exit_time: '2025-05-02 16:55:00',
-        market_open: 566.81,
+        executionPriceBase: 566.81,
         entry_price: 566.83,
         exit_price: 567.19,
         rise_pct: 0.0036,
         return_pct: 0.0064,
         direction: 'long',
+        year: 2025,
       };
 
       printTradeDetails(trade);
@@ -103,12 +104,13 @@ describe('output utilities', () => {
         trade_date: '2025-05-02',
         entry_time: '2025-05-02 16:56:00',
         exit_time: '2025-05-02 16:57:00',
-        market_open: 566.81,
+        executionPriceBase: 566.81,
         entry_price: 567.12,
         exit_price: 566.94,
         rise_pct: 0.0031,
         return_pct: -0.0032,
         direction: 'long',
+        year: 2025,
       };
 
       printTradeDetails(trade);
@@ -134,7 +136,7 @@ describe('output utilities', () => {
         trade_date: '2025-01-06',
         entry_time: '2025-01-06 13:00:00',
         exit_time: '2025-01-06 13:03:00',
-        market_open: 597.75,
+        executionPriceBase: 597.75,
         entry_price: 597.47,
         exit_price: 597.46,
         rise_pct: 0.001,
@@ -143,6 +145,7 @@ describe('output utilities', () => {
         exit_reason: 'profitTarget',
         initialStopLossPrice: 599.47,
         isStopLossAtrBased: true,
+        year: 2025,
       };
 
       printTradeDetails(trade);
@@ -160,7 +163,7 @@ describe('output utilities', () => {
         trade_date: '2025-01-06',
         entry_time: '2025-01-06 13:00:00',
         exit_time: '2025-01-06 13:03:00',
-        market_open: 597.75,
+        executionPriceBase: 597.75,
         entry_price: 597.47,
         exit_price: 597.46,
         rise_pct: 0.001,
@@ -169,6 +172,7 @@ describe('output utilities', () => {
         exit_reason: 'profitTarget',
         initialStopLossPrice: 599.47,
         isStopLossAtrBased: false,
+        year: 2025,
       };
 
       printTradeDetails(trade);
@@ -186,7 +190,7 @@ describe('output utilities', () => {
         trade_date: '2025-01-06',
         entry_time: '2025-01-06 13:00:00',
         exit_time: '2025-01-06 13:03:00',
-        market_open: 597.75,
+        executionPriceBase: 597.75,
         entry_price: 597.47,
         exit_price: 597.46,
         rise_pct: 0.001,
@@ -195,6 +199,7 @@ describe('output utilities', () => {
         exit_reason: 'profitTarget',
         initialProfitTargetPrice: 596.68,
         isProfitTargetAtrBased: true,
+        year: 2025,
       };
 
       printTradeDetails(trade);
@@ -212,7 +217,7 @@ describe('output utilities', () => {
         trade_date: '2025-01-06',
         entry_time: '2025-01-06 13:00:00',
         exit_time: '2025-01-06 13:03:00',
-        market_open: 597.75,
+        executionPriceBase: 597.75,
         entry_price: 597.47,
         exit_price: 597.46,
         rise_pct: 0.001,
@@ -220,6 +225,7 @@ describe('output utilities', () => {
         direction: 'short',
         exit_reason: 'profitTarget',
         tsActivationLevel: 591.5,
+        year: 2025,
       };
 
       printTradeDetails(trade);
@@ -237,7 +243,7 @@ describe('output utilities', () => {
         trade_date: '2025-01-06',
         entry_time: '2025-01-06 13:00:00',
         exit_time: '2025-01-06 13:03:00',
-        market_open: 597.75,
+        executionPriceBase: 597.75,
         entry_price: 597.47,
         exit_price: 597.46,
         rise_pct: 0.001,
@@ -246,6 +252,7 @@ describe('output utilities', () => {
         exit_reason: 'profitTarget',
         tsTrailAmount: 0.26,
         isTrailingStopAtrBased: true,
+        year: 2025,
       };
 
       printTradeDetails(trade);
@@ -263,7 +270,7 @@ describe('output utilities', () => {
         trade_date: '2025-01-06',
         entry_time: '2025-01-06 13:00:00',
         exit_time: '2025-01-06 13:03:00',
-        market_open: 597.75,
+        executionPriceBase: 597.75,
         entry_price: 597.47,
         exit_price: 597.46,
         rise_pct: 0.001,
@@ -272,6 +279,7 @@ describe('output utilities', () => {
         exit_reason: 'profitTarget',
         tsTrailAmount: 0.5, // 0.5% trail
         isTrailingStopAtrBased: false,
+        year: 2025,
       };
 
       printTradeDetails(trade);
@@ -289,7 +297,7 @@ describe('output utilities', () => {
         trade_date: '2025-01-07',
         entry_time: '2025-01-07 13:00:00',
         exit_time: '2025-01-07 14:39:00',
-        market_open: 590.91,
+        executionPriceBase: 590.91,
         entry_price: 591.06,
         exit_price: 590.52,
         rise_pct: 0.001,
@@ -303,6 +311,7 @@ describe('output utilities', () => {
         isStopLossAtrBased: true,
         isProfitTargetAtrBased: true,
         isTrailingStopAtrBased: true,
+        year: 2025,
       };
 
       printTradeDetails(trade);
@@ -329,13 +338,14 @@ describe('output utilities', () => {
       trade_date: '2025-01-15',
       entry_time: '09:30',
       exit_time: '10:30',
-      market_open: 100,
+      executionPriceBase: 100,
       entry_price: 101,
       exit_price: 102,
       rise_pct: 0.01,
       return_pct: 0.01, // (102-101)/101 approx 0.01
       direction: 'long',
       total_trading_days: 252, // Example value
+      year: 2025,
     };
 
     it('should print year summary with correct statistics for long trades', () => {
@@ -407,12 +417,13 @@ describe('output utilities', () => {
           trade_date: '2023-01-01',
           entry_time: '09:30',
           exit_time: '10:00',
-          market_open: 100,
+          executionPriceBase: 100,
           entry_price: 101,
           exit_price: 102,
           rise_pct: 0.01,
           return_pct: 0.01,
           direction: 'long',
+          year: 2023,
         },
       ];
       const shortTrades: Trade[] = [
@@ -420,12 +431,13 @@ describe('output utilities', () => {
           trade_date: '2023-01-02',
           entry_time: '09:30',
           exit_time: '10:00',
-          market_open: 100,
+          executionPriceBase: 100,
           entry_price: 102,
           exit_price: 101,
           rise_pct: -0.01,
           return_pct: 0.01,
           direction: 'short',
+          year: 2023,
         }, // profit for short
       ];
 

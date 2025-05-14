@@ -21,7 +21,7 @@ export interface Trade {
   trade_date: string;
   entry_time: string;
   exit_time: string;
-  market_open: number;
+  executionPriceBase: number;
   entry_price: number;
   exit_price: number;
   rise_pct: number | null;
@@ -103,13 +103,13 @@ export const printTradeDetails = (trade: Trade) => {
   const date = formatDate(trade.trade_date);
   const entryTime = formatTime(trade.entry_time);
   const exitTime = formatTime(trade.exit_time);
-  const barOpen = formatDollar(trade.market_open);
+  const barOpen = formatDollar(trade.executionPriceBase);
   const adjEntry = formatDollar(trade.entry_price);
   const adjExit = formatDollar(trade.exit_price);
 
   let changeText = '';
   if (trade.rise_pct !== null) {
-    const isFallPattern = trade.entry_price < trade.market_open && trade.rise_pct > 0;
+    const isFallPattern = trade.entry_price < trade.executionPriceBase && trade.rise_pct > 0;
     const changeValue = isFallPattern ? -trade.rise_pct : trade.rise_pct;
     changeText = `Change: ${formatPercent(changeValue)}`;
   }

@@ -118,12 +118,18 @@ accuracy and transparency, particularly concerning trade execution and cost mode
   potential code review findings).
 - **Goal:** Determine if and how trading commissions are modeled.
 
-### Step 4: Standardize Logging (Propose Changes)
+### Step 4: Standardize Logging (Propose Changes) (Completed)
 
-- **Action:** Based on findings from prior steps, propose changes to the trade logging format.
-- **Goal:** Ensure logs accurately reflect the actual execution timing and prices, including how
-  slippage and commissions (if any) are incorporated into "Adj Entry" and "Adj Exit".
-- **Proposal Example (Refined):**
+- **Action:**
+  - Decided current log labels ("Entry:", "Adj Entry:") are acceptable.
+  - Changed the internal field name in the `Trade` object from `market_open` to `executionPriceBase`
+    to accurately reflect that it holds the Close of the Execution Bar (the base price for P&L
+    before slippage, and the value for the "Entry:" log label).
+  - Updated `mapRawDataToTrade` and `processTradesLoop` to use this new field name.
+  - Verified `printTradeDetails` now uses `trade.executionPriceBase` for its "Entry:" log output.
+- **Goal:** Ensure logs accurately reflect the actual execution timing and prices, and internal data
+  structures are semantically correct.
+- **Proposal Example (Refined - Implemented reflects this):**
   - `Signal Time`: `YYYY-MM-DD HH:MM:SS` (e.g., 13:00:00)
   - `Execution Time`: `YYYY-MM-DD HH:MM:SS` (e.g., 13:01:00 for entry)
   - `Signal Bar Open (Contextual)`: Open of signal bar.
@@ -132,19 +138,30 @@ accuracy and transparency, particularly concerning trade execution and cost mode
     field if desired, or just part of Adj. Fill calc).
   - `Adjusted Fill Price (P&L Entry, "Adj Entry" in logs)`: `ExecutionBarClose +/- Slippage`.
 
-### Step 5: Update Documentation (`tickers/README.md` and/or other relevant docs)
+### Step 5: Update Documentation (`tickers/README.md` and/or other relevant docs) (Completed)
 
-- **Action:** Draft updates to documentation.
-- **Goal:** Clearly explain:
-  - The trade entry mechanism (signal generation vs. execution, e.g., "entry at next bar close +
-    slippage").
-  - How slippage is _actually_ modeled and applied.
-  - How commissions are modeled (or if they are omitted).
-  - The exit mechanism (e.g., "exits trigger and fill intra-bar").
+- **Action:**
+  - `tickers/README.md` has been updated with the "Trade Execution Model (Backtesting)" section
+    explaining the next bar entry.
+  - Main project `README.md` and other developer docs should be reviewed by the user if they detail
+    specific log fields or the `Trade` object structure to ensure consistency with
+    `executionPriceBase` and the refined backtesting model.
+- **Goal:** Clearly explain the backtesting methodology.
 
-### Step 6: Final Review and Recommendations
+### Step 6: Final Review and Recommendations (Completed)
 
-- **Action:** Summarize all findings and their impact on interpreting the backtest results
-  (especially the high win rates).
-- **Goal:** Provide a clear picture of the backtesting model's realism and suggest any further
-  refinements if needed.
+- **Action:** Summarized all findings and the impact of the refined entry/exit models and lack of
+  commission modeling.
+- **Key Findings:**
+  - Entry logic changed to "Next Bar Close +/- Slippage" for realism.
+  - Exit logic for intraday stops/limits is "Open of Bar After Condition Met +/- Slippage";
+    EOD/MaxHoldTime exits are "Close of Trigger Bar +/- Slippage".
+  - Commissions are not currently modeled; only $0.01 fixed slippage is.
+- **Key Recommendations:**
+  1.  Run strategies with updated code to observe new performance metrics.
+  2.  Implement commission modeling for more realistic P&L.
+  3.  Revisit and implement robust tests for `processTradesLoop` new entry logic (currently
+      deferred).
+  4.  Ensure all project documentation reflects the updated backtesting model.
+- **Goal:** Provide a clear picture of the backtesting model's realism and suggest next steps for
+  improvement.

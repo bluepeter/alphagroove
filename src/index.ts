@@ -429,7 +429,7 @@ export const processTradesLoop = async (
       {
         ...rawTradeData,
         entry_time: actualExecutionTimestamp,
-        market_open: executionBar.close,
+        executionPriceBase: executionBar.close,
         entry_price: finalEntryPriceForPAndL,
         exit_price: exitPrice,
         exit_time: exitSignal.timestamp,

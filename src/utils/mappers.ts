@@ -9,7 +9,7 @@ export const mapRawDataToTrade = (
     trade_date: rawTradeData.trade_date as string,
     entry_time: rawTradeData.entry_time as string,
     exit_time: rawTradeData.exit_time as string,
-    market_open: rawTradeData.market_open as number,
+    executionPriceBase: rawTradeData.executionPriceBase as number,
     entry_price: rawTradeData.entry_price as number,
     exit_price: rawTradeData.exit_price as number,
     rise_pct:

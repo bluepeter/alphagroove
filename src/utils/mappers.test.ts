@@ -24,24 +24,53 @@ describe('Mapper Utilities', () => {
     };
 
     it('should map raw data to a Trade object for a long trade', () => {
+      const baseRawData: Record<string, any> = {
+        trade_date: '2023-01-01',
+        entry_time: '2023-01-01 09:30:00',
+        exit_time: '2023-01-01 09:40:00',
+        executionPriceBase: 100,
+        entry_price: 101,
+        exit_price: 102,
+        rise_pct: 1,
+        return_pct: 0.99,
+        year: '2023',
+        total_trading_days: 252,
+        match_count: 10,
+        all_trading_days: 252,
+        median_return: 0.1,
+        std_dev_return: 0.05,
+        win_rate: 0.6,
+      };
+
       const expectedTrade: Trade = {
         trade_date: '2023-01-01',
         entry_time: '2023-01-01 09:30:00',
         exit_time: '2023-01-01 09:40:00',
-        market_open: 100,
+        executionPriceBase: 100,
         entry_price: 101,
         exit_price: 102,
         rise_pct: 1,
         return_pct: 0.99,
         year: 2023,
         total_trading_days: 252,
+        match_count: 10,
+        all_trading_days: 252,
         median_return: 0.1,
         std_dev_return: 0.05,
         win_rate: 0.6,
-        match_count: 10,
-        all_trading_days: 252,
         direction: 'long',
+        avg_return: undefined,
+        chartPath: undefined,
+        exit_reason: undefined,
+        initialStopLossPrice: undefined,
+        initialProfitTargetPrice: undefined,
+        tsActivationLevel: undefined,
+        tsTrailAmount: undefined,
+        isStopLossAtrBased: undefined,
+        isProfitTargetAtrBased: undefined,
+        isTrailingStopAtrBased: undefined,
       };
+
       const result = mapRawDataToTrade(baseRawData, 'long');
       expect(result).toEqual(expectedTrade);
     });
