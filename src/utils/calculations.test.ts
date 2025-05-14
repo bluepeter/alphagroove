@@ -181,7 +181,7 @@ describe('calculation functions', () => {
   describe('isWinningTrade', () => {
     it('should correctly identify winning trades for long positions', () => {
       expect(isWinningTrade(0.01, false)).toBe(true); // positive return is a win
-      expect(isWinningTrade(0, false)).toBe(true); // zero return is a win
+      expect(isWinningTrade(0, false)).toBe(false); // zero return is NOT a win
       expect(isWinningTrade(-0.01, false)).toBe(false); // negative return is a loss
     });
 

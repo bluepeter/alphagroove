@@ -91,15 +91,20 @@ export const calculateStdDevReturn = (returns: number[], meanReturn: number): nu
   );
 };
 
-// Check if a trade is a winning trade based on return percentage and direction
+/**
+ * Determines if a trade is a winning trade.
+ * @param returnPct The return percentage of the trade.
+ * @param isShort Whether the trade was a short trade.
+ * @returns True if it's a winning trade, false otherwise.
+ */
 export const isWinningTrade = (returnPct: number, isShort: boolean): boolean => {
+  // For short trades, a negative return_pct is a loss (price went up)
+  // For long trades, a positive return_pct is a win
+  // A zero return is not a win.
   if (isShort) {
-    // For shorts, a positive return means a winning trade
-    return returnPct > 0;
-  } else {
-    // For longs, a non-negative return means a winning trade
-    return returnPct >= 0;
+    return returnPct > 0; // For shorts, positive return means entry > exit, which is a win.
   }
+  return returnPct > 0;
 };
 
 /**

@@ -75,6 +75,44 @@ pnpm dev:start --from 2020-01-01 --to 2025-05-02 --ticker SPY --timeframe 1min
 pnpm dev:start --from 2024-01-01 --to 2024-01-07 --ticker TEST --timeframe 1min
 ```
 
+## Trade Execution Model (Backtesting)
+
+It's important to understand how trade entries and exits are simulated in backtesting, as this
+impacts how results should be interpreted.
+
+### Entry Logic
+
+- **Signal Generation:** When a strategy (e.g., "Fixed Time Entry") generates an entry signal at a
+  specific bar (e.g., the 13:00:00 bar), this bar is referred to as the "signal bar".
+- **Execution Timing:** To ensure a more realistic simulation and avoid using information not yet
+  available at the point of decision, trades are executed based on the data of the bar _immediately
+  following_ the signal bar. This is called the "execution bar".
+  - For example, if a signal is generated for the 13:00:00 bar, the actual trade execution will be
+    based on the 13:01:00 bar (assuming a 1-minute timeframe).
+- **Logged Prices:**
+  - The "Entry Time" displayed in trade logs will be the timestamp of the **execution bar** (e.g.,
+    13:01:00).
+  - The contextual "Entry" price displayed in logs is the **CLOSE of the execution bar**. This
+    represents the price level around which the simulated fill occurs.
+  - The "Adj Entry" price, which is used for all Profit & Loss (P&L) calculations, is the **CLOSE of
+    the execution bar, adjusted for configured slippage** (e.g.,
+    `Close_of_Execution_Bar +/- $0.01`).
+- **LLM Analysis:** If an LLM is used for trade confirmation, it analyzes data up to and including
+  the **signal bar**. The decision to trade is made based on this information, before the execution
+  bar's data is known.
+
+### Exit Logic
+
+- Exit conditions (e.g., stop-loss, profit target, trailing stop) are evaluated on a bar-by-bar
+  basis after entry.
+- When an exit condition is met during a bar, the trade is typically simulated to exit at a price
+  within that same bar (e.g., the Open of the next bar if an intraday condition is met, or the Close
+  if it's an end-of-bar condition like `maxHoldTime` or `endOfDay`), adjusted for configured
+  slippage.
+
+This "next bar execution" model for entries aims to provide more conservative and realistic
+backtesting results.
+
 ## Data Characteristics
 
 - **Time Zone**: All timestamps are in US Eastern Time (ET)
