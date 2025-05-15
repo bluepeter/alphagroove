@@ -310,6 +310,10 @@ export const processTradesLoop = async (
     let isStopLossAtrBased = false;
     let isProfitTargetAtrBased = false;
     let isTrailingStopAtrBased = false;
+    let stopLossAtrMultiplierUsed: number | undefined;
+    let profitTargetAtrMultiplierUsed: number | undefined;
+    let tsActivationAtrMultiplierUsed: number | undefined;
+    let tsTrailAtrMultiplierUsed: number | undefined;
 
     const stopLossConfig = mergedConfig.exitStrategies?.stopLoss;
     if (stopLossConfig) {
@@ -321,6 +325,7 @@ export const processTradesLoop = async (
           actualTradeDirection === 'long'
         );
         isStopLossAtrBased = true;
+        stopLossAtrMultiplierUsed = stopLossConfig.atrMultiplier;
       } else if (stopLossConfig.percentFromEntry) {
         const pct = stopLossConfig.percentFromEntry / 100;
         initialStopLossPrice =
@@ -339,6 +344,7 @@ export const processTradesLoop = async (
             ? finalEntryPriceForPAndL + offset
             : finalEntryPriceForPAndL - offset;
         isProfitTargetAtrBased = true;
+        profitTargetAtrMultiplierUsed = profitTargetConfig.atrMultiplier;
       } else if (profitTargetConfig.percentFromEntry) {
         const pct = profitTargetConfig.percentFromEntry / 100;
         initialProfitTargetPrice =
@@ -361,6 +367,7 @@ export const processTradesLoop = async (
               : finalEntryPriceForPAndL - offset;
         }
         isTrailingStopAtrBased = true;
+        tsActivationAtrMultiplierUsed = trailingStopConfig.activationAtrMultiplier;
       } else if (trailingStopConfig.activationPercent) {
         const pct = trailingStopConfig.activationPercent / 100;
         tsActivationLevel =
@@ -371,6 +378,7 @@ export const processTradesLoop = async (
       if (entryAtrValue && trailingStopConfig.trailAtrMultiplier !== undefined) {
         tsTrailAmount = entryAtrValue * trailingStopConfig.trailAtrMultiplier;
         isTrailingStopAtrBased = true;
+        tsTrailAtrMultiplierUsed = trailingStopConfig.trailAtrMultiplier;
       } else if (trailingStopConfig.trailPercent) {
         tsTrailAmount = trailingStopConfig.trailPercent;
       }
@@ -442,6 +450,11 @@ export const processTradesLoop = async (
         isStopLossAtrBased,
         isProfitTargetAtrBased,
         isTrailingStopAtrBased,
+        stopLossAtrMultiplierUsed,
+        profitTargetAtrMultiplierUsed,
+        entryAtrValue,
+        tsActivationAtrMultiplierUsed,
+        tsTrailAtrMultiplierUsed,
       },
       actualTradeDirection,
       llmChartPath

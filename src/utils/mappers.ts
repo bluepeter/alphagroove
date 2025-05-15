@@ -39,5 +39,10 @@ export const mapRawDataToTrade = (
     isStopLossAtrBased: rawTradeData.isStopLossAtrBased as boolean | undefined,
     isProfitTargetAtrBased: rawTradeData.isProfitTargetAtrBased as boolean | undefined,
     isTrailingStopAtrBased: rawTradeData.isTrailingStopAtrBased as boolean | undefined,
+    stopLossAtrMultiplierUsed: rawTradeData.stopLossAtrMultiplierUsed as number | undefined,
+    profitTargetAtrMultiplierUsed: rawTradeData.profitTargetAtrMultiplierUsed as number | undefined,
+    entryAtrValue: rawTradeData.entryAtrValue as number | undefined,
+    tsActivationAtrMultiplierUsed: rawTradeData.tsActivationAtrMultiplierUsed as number | undefined,
+    tsTrailAtrMultiplierUsed: rawTradeData.tsTrailAtrMultiplierUsed as number | undefined,
   };
 };

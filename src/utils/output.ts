@@ -37,13 +37,18 @@ export interface Trade {
   direction?: 'long' | 'short';
   chartPath?: string; // Path to the chart generated for LLM screening
   exit_reason?: string; // Reason for exit (stopLoss, profitTarget, trailingStop, maxHoldTime, endOfDay)
-  initialStopLossPrice?: number; // New
-  initialProfitTargetPrice?: number; // New
-  tsActivationLevel?: number; // New - for trailing stop activation price/level
-  tsTrailAmount?: number; // New - for trailing stop trail amount (could be $ or % if not ATR based)
-  isStopLossAtrBased?: boolean; // New
-  isProfitTargetAtrBased?: boolean; // New
-  isTrailingStopAtrBased?: boolean; // New
+  initialStopLossPrice?: number;
+  initialProfitTargetPrice?: number;
+  tsActivationLevel?: number;
+  tsTrailAmount?: number;
+  isStopLossAtrBased?: boolean;
+  isProfitTargetAtrBased?: boolean;
+  isTrailingStopAtrBased?: boolean; // This might become more granular or be derived
+  stopLossAtrMultiplierUsed?: number;
+  profitTargetAtrMultiplierUsed?: number;
+  entryAtrValue?: number; // Added to display the day's ATR
+  tsActivationAtrMultiplierUsed?: number; // Added for logging
+  tsTrailAtrMultiplierUsed?: number; // Added for logging
 }
 
 // New Statistics Interfaces
@@ -120,52 +125,90 @@ export const printTradeDetails = (trade: Trade) => {
 
   const exitReasonText = trade.exit_reason ? `[${trade.exit_reason}]` : '';
 
-  let exitParamsInfo = '';
+  // Build exit parameter details string
+  const exitParamSegments: string[] = [];
+
+  if (trade.entryAtrValue !== undefined) {
+    exitParamSegments.push(chalk.dim(`ATR: ${formatDollar(trade.entryAtrValue)}`));
+  }
+
+  // Stop Loss Details
   if (trade.initialStopLossPrice !== undefined) {
-    const slType = trade.isStopLossAtrBased ? 'ATR SL' : 'SL';
-    const slPct = formatPercent(
-      (trade.initialStopLossPrice - trade.entry_price) / trade.entry_price
-    );
-    exitParamsInfo += ` ${slType}: ${formatDollar(trade.initialStopLossPrice)} (${slPct})`;
+    let slDetail = 'SL';
+    if (trade.isStopLossAtrBased) {
+      slDetail = 'ATR SL';
+      if (trade.stopLossAtrMultiplierUsed !== undefined) {
+        slDetail += ` [${trade.stopLossAtrMultiplierUsed.toFixed(1)}x]`;
+      }
+    }
+    const slOffset = trade.initialStopLossPrice - trade.entry_price;
+    const slOffsetPct = slOffset / trade.entry_price;
+    const slSign = slOffset < 0 ? '-' : '+';
+    const slAbsOffsetFormatted = formatDollar(Math.abs(slOffset));
+    slDetail += `: ${formatDollar(trade.initialStopLossPrice)} (${slSign}${slAbsOffsetFormatted}, ${formatPercent(slOffsetPct)})`;
+    exitParamSegments.push(chalk.dim(slDetail));
   }
+
+  // Profit Target Details
   if (trade.initialProfitTargetPrice !== undefined) {
-    const ptType = trade.isProfitTargetAtrBased ? 'ATR PT' : 'PT';
-    const ptDiff = trade.initialProfitTargetPrice - trade.entry_price;
-    const ptPct = formatPercent(ptDiff / trade.entry_price);
-    exitParamsInfo += exitParamsInfo
-      ? `; ${ptType}: $${Math.abs(ptDiff).toFixed(2)} (${ptPct})`
-      : ` ${ptType}: $${Math.abs(ptDiff).toFixed(2)} (${ptPct})`;
+    let ptDetail = 'PT';
+    if (trade.isProfitTargetAtrBased) {
+      ptDetail = 'ATR PT';
+      if (trade.profitTargetAtrMultiplierUsed !== undefined) {
+        ptDetail += ` [${trade.profitTargetAtrMultiplierUsed.toFixed(1)}x]`;
+      }
+    }
+    const ptOffset = trade.initialProfitTargetPrice - trade.entry_price;
+    const ptOffsetPct = ptOffset / trade.entry_price;
+    const ptSign = ptOffset < 0 ? '-' : '+';
+    const ptAbsOffsetFormatted = formatDollar(Math.abs(ptOffset));
+    ptDetail += `: ${formatDollar(trade.initialProfitTargetPrice)} (${ptSign}${ptAbsOffsetFormatted}, ${formatPercent(ptOffsetPct)})`;
+    exitParamSegments.push(chalk.dim(ptDetail));
   }
+
+  // Trailing Stop Activation Details
   if (trade.tsActivationLevel !== undefined) {
-    // If activation level is exactly the entry price, this means immediate activation
+    let tsActDetail = 'TS Act';
+    if (
+      trade.isTrailingStopAtrBased &&
+      trade.tsActivationAtrMultiplierUsed !== undefined &&
+      trade.tsActivationAtrMultiplierUsed !== 0
+    ) {
+      tsActDetail += ` [${trade.tsActivationAtrMultiplierUsed.toFixed(1)}x ATR]`;
+    }
     if (trade.tsActivationLevel === trade.entry_price) {
-      exitParamsInfo += exitParamsInfo ? `; TS Act: Immediate` : ` TS Act: Immediate`;
+      tsActDetail += ': Immediate';
     } else {
-      const actPct = formatPercent(
-        (trade.tsActivationLevel - trade.entry_price) / trade.entry_price
-      );
-      exitParamsInfo += exitParamsInfo
-        ? `; TS Act: ${formatDollar(trade.tsActivationLevel)} (${actPct})`
-        : ` TS Act: ${formatDollar(trade.tsActivationLevel)} (${actPct})`;
+      const actOffset = trade.tsActivationLevel - trade.entry_price;
+      const actOffsetPct = actOffset / trade.entry_price;
+      const actSign = actOffset < 0 ? '-' : '+';
+      const actAbsOffsetFormatted = formatDollar(Math.abs(actOffset));
+      tsActDetail += `: ${formatDollar(trade.tsActivationLevel)} (${actSign}${actAbsOffsetFormatted}, ${formatPercent(actOffsetPct)})`;
     }
+    exitParamSegments.push(chalk.dim(tsActDetail));
   }
+
+  // Trailing Stop Trail Amount Details
   if (trade.tsTrailAmount !== undefined) {
-    // If ATR based, tsTrailAmount is a dollar amount. If percent based, it's a percentage (e.g., 0.5 for 0.5%).
-    if (trade.isTrailingStopAtrBased) {
-      // Convert ATR dollar amount to percentage of entry price for display
-      const trailPct = (trade.tsTrailAmount / trade.entry_price) * 100;
-      const trailDisplay = `${formatDollar(trade.tsTrailAmount)} (${formatPercent(trailPct / 100)})`;
-      exitParamsInfo += exitParamsInfo
-        ? `; ATR Trail: ${trailDisplay}`
-        : ` ATR Trail: ${trailDisplay}`;
-    } else {
-      const trailDisplay = `${formatPercent(trade.tsTrailAmount / 100)}`;
-      exitParamsInfo += exitParamsInfo ? `; Trail %: ${trailDisplay}` : ` Trail %: ${trailDisplay}`;
+    let tsTrailDetail = 'TS Trail';
+    if (trade.isTrailingStopAtrBased && trade.tsTrailAtrMultiplierUsed !== undefined) {
+      tsTrailDetail += ` [${trade.tsTrailAtrMultiplierUsed.toFixed(1)}x ATR]`;
     }
+    // For non-ATR based, tsTrailAmount is a percentage of price (e.g. 0.5 for 0.5%).
+    // For ATR based, it is a dollar amount.
+    let trailAmountDisplay = formatDollar(trade.tsTrailAmount);
+    if (!trade.isTrailingStopAtrBased && trade.tsTrailAmount < 10) {
+      // Assuming % trail amounts are small numbers like 0.5, 1.0
+      trailAmountDisplay = `${formatPercent(trade.tsTrailAmount / 100)} of price`;
+    } else if (trade.isTrailingStopAtrBased) {
+      const trailAmountPctOfEntry = trade.tsTrailAmount / trade.entry_price;
+      trailAmountDisplay += ` (${formatPercent(trailAmountPctOfEntry)})`;
+    }
+    tsTrailDetail += `: ${trailAmountDisplay}`;
+    exitParamSegments.push(chalk.dim(tsTrailDetail));
   }
-  if (exitParamsInfo) {
-    exitParamsInfo = chalk.dim(` (${exitParamsInfo.trim()})`);
-  }
+
+  const exitParamsInfoString = exitParamSegments.length > 0 ? exitParamSegments.join('; ') : '';
 
   // For debugging purposes - add a validation of return calculation
   // This helps spot inconsistencies between the reported return and actual prices
@@ -183,7 +226,7 @@ export const printTradeDetails = (trade: Trade) => {
   }
 
   console.log(
-    `${emoji} ${date} ⏰ ${entryTime} → ${exitTime} Entry: ${barOpen} Adj Entry: ${adjEntry} Adj Exit: ${adjExit} ${changeText ? changeText + ' ' : ''}${returnEmoji} ${isWin ? chalk.green(returnPctStr) : chalk.red(returnPctStr)} ${exitReasonText}${exitParamsInfo}`
+    `${emoji} ${date} ⏰ ${entryTime} → ${exitTime} Entry: ${barOpen} Adj Entry: ${adjEntry} Adj Exit: ${adjExit} ${changeText ? changeText + ' ' : ''}${returnEmoji} ${isWin ? chalk.green(returnPctStr) : chalk.red(returnPctStr)} ${exitReasonText} ${exitParamsInfoString}`
   );
 };
 
