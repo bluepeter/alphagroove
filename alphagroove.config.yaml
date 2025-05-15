@@ -24,9 +24,11 @@ default:
     stopLoss:
       # percentFromEntry: 0.5 # Fallback, commented out to prioritize ATR
       atrMultiplier: 2.0 # Default: Stop at 2.0 * Prior Day's Average TR
+      useLlmProposedPrice: true
     profitTarget:
       # percentFromEntry: 0.5 # Fallback, commented out to prioritize ATR
       atrMultiplier: 5.0 # Default: Target 3.0 * Prior Day's Average TR
+      useLlmProposedPrice: true
     trailingStop:
       # activationPercent: 0 # Fallback, commented out to prioritize ATR
       # trailPercent: 0.3      # Fallback, commented out to prioritize ATR (0.3 for 0.3% of price)
@@ -84,6 +86,8 @@ llmConfirmationScreen:
     - What day trade action would you take: go long, go short, or do_nothing?  
     - Provide a one-sentence rationalization for your decision.  
     - Provide target stop loss and profit target prices (only provide if action is long or short)
+    that are realistic exit prices given today's range, remaining time in the day, and the current
+    price.
 
     Your response MUST be a valid JSON object and nothing else.  JSON in the following format:
 

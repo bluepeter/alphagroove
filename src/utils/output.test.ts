@@ -47,14 +47,71 @@ const mockTradeBase: Omit<Trade, 'entry_price' | 'exit_price' | 'return_pct'> = 
 
 describe('output utilities', () => {
   describe('printHeader', () => {
-    it('should print header with correct pattern and date information', () => {
+    it('should print header with detailed exit strategy information', () => {
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      printHeader('SPY', '2025-05-02', '2025-05-05', 'quick-rise', 'fixed-time', 'long');
+      const exitStrategiesConfig = {
+        enabled: ['stopLoss', 'profitTarget', 'endOfDay'],
+        stopLoss: { percentFromEntry: 1.0, useLlmProposedPrice: true, atrMultiplier: 2.0 },
+        profitTarget: { percentFromEntry: 2.0, useLlmProposedPrice: false, atrMultiplier: 3.0 },
+        endOfDay: { time: '16:00' },
+      };
+      printHeader(
+        'SPY',
+        '2025-05-02',
+        '2025-05-05',
+        'quick-rise',
+        exitStrategiesConfig,
+        'llm_decides'
+      );
       const output = consoleLogSpy.mock.calls.map((call: any[]) => call[0]).join('\n');
       expect(output).toContain('SPY Analysis (2025-05-02 to 2025-05-05)');
       expect(output).toContain('Entry Pattern: quick-rise');
-      expect(output).toContain('Exit Pattern: fixed-time');
-      expect(output).toContain('Direction Strategy: Long ↗️');
+      expect(output).toContain('Exit Strategies: Stop Loss (LLM), Profit Target (ATR), End of Day');
+      expect(output).toContain('Direction Strategy: LLM Decides 🧠');
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should print header with percent based exit strategies if ATR and LLM are not set', () => {
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const exitStrategiesConfig = {
+        enabled: ['stopLoss', 'profitTarget'],
+        stopLoss: { percentFromEntry: 1.0, useLlmProposedPrice: false }, // No atrMultiplier
+        profitTarget: { percentFromEntry: 2.0, useLlmProposedPrice: false }, // No atrMultiplier
+      };
+      printHeader('QQQ', '2024-01-01', '2024-01-02', 'quick-fall', exitStrategiesConfig, 'short');
+      const output = consoleLogSpy.mock.calls.map((call: any[]) => call[0]).join('\n');
+      expect(output).toContain('QQQ Analysis (2024-01-01 to 2024-01-02)');
+      expect(output).toContain('Entry Pattern: quick-fall');
+      expect(output).toContain('Exit Strategies: Stop Loss (Percent), Profit Target (Percent)');
+      expect(output).toContain('Direction Strategy: Short ↘️');
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should default to Max Hold Time if exitStrategiesConfig is undefined', () => {
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      printHeader('AAPL', '2023-01-01', '2023-01-02', 'test-pattern', undefined, 'long');
+      const output = consoleLogSpy.mock.calls.map((call: any[]) => call[0]).join('\n');
+      expect(output).toContain('Exit Strategies: Default (Max Hold Time)');
+      consoleLogSpy.mockRestore();
+    });
+
+    it('should handle other strategies correctly', () => {
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const exitStrategiesConfig = {
+        enabled: ['maxHoldTime', 'trailingStop'],
+        maxHoldTime: { minutes: 30 },
+        trailingStop: { activationPercent: 1, trailPercent: 0.5 },
+      };
+      printHeader(
+        'MSFT',
+        '2023-01-01',
+        '2023-01-02',
+        'another-pattern',
+        exitStrategiesConfig,
+        'long'
+      );
+      const output = consoleLogSpy.mock.calls.map((call: any[]) => call[0]).join('\n');
+      expect(output).toContain('Exit Strategies: Max Hold Time, Trailing Stop');
       consoleLogSpy.mockRestore();
     });
   });

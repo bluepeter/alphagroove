@@ -7,7 +7,7 @@ import crypto from 'node:crypto';
 
 import { type LLMResponse } from '../services/llm-api.service'; // Only type needed
 import { type Config as AppConfig, loadConfig } from '../utils/config';
-import { LlmConfirmationScreen } from './llm-confirmation.screen';
+import { LlmConfirmationScreen, calculateAverageProposedPrices } from './llm-confirmation.screen';
 import { type LLMScreenConfig, type EnrichedSignal } from './types';
 
 // Define fs and crypto mock functions at the module scope
@@ -67,7 +67,9 @@ const _mockLLMResponse = (
   rationalization?: string,
   error?: string,
   inputTokens = 100,
-  outputTokens = 50
+  outputTokens = 50,
+  stopLoss?: number,
+  profitTarget?: number
 ): LLMResponse => {
   const INPUT_COST_PER_MILLION_TOKENS = 3;
   const OUTPUT_COST_PER_MILLION_TOKENS = 15;
@@ -79,6 +81,8 @@ const _mockLLMResponse = (
     rationalization,
     error,
     cost,
+    stopLoss,
+    profitTarget,
     rawResponse: { usage: { input_tokens: inputTokens, output_tokens: outputTokens } },
   };
 };
@@ -236,5 +240,65 @@ describe('LlmConfirmationScreen', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+});
+
+describe('calculateAverageProposedPrices', () => {
+  it('should correctly average valid stopLoss and profitTarget for consensus action', () => {
+    const responses: LLMResponse[] = [
+      _mockLLMResponse('long', 'r1', undefined, 100, 50, 100, 110), // Matches
+      _mockLLMResponse('long', 'r2', undefined, 100, 50, 98, 112), // Matches
+      _mockLLMResponse('short', 'r3', undefined, 100, 50, 90, 120), // No match (action)
+      _mockLLMResponse('long', 'r4', undefined, 100, 50, undefined, 114), // Matches, undefined SL
+      _mockLLMResponse('long', 'r5', undefined, 100, 50, 102, undefined), // Matches, undefined PT
+    ];
+    const result = calculateAverageProposedPrices(responses, 'long');
+    expect(result.averagedProposedStopLoss).toBeCloseTo((100 + 98 + 102) / 3);
+    expect(result.averagedProposedProfitTarget).toBeCloseTo((110 + 112 + 114) / 3);
+  });
+
+  it('should return undefined if no valid prices for consensus action', () => {
+    const responses: LLMResponse[] = [
+      _mockLLMResponse('short', 'r1', undefined, 100, 50, 90, 120),
+      _mockLLMResponse('long', 'r2', undefined, 100, 50, undefined, undefined), // Matches action, no prices
+    ];
+    const result = calculateAverageProposedPrices(responses, 'long');
+    expect(result.averagedProposedStopLoss).toBeUndefined();
+    expect(result.averagedProposedProfitTarget).toBeUndefined();
+  });
+
+  it('should ignore non-numeric or NaN prices', () => {
+    const responses: LLMResponse[] = [
+      _mockLLMResponse('long', 'r1', undefined, 100, 50, 100, 110),
+      _mockLLMResponse('long', 'r2', undefined, 100, 50, Number.NaN, 112),
+      _mockLLMResponse('long', 'r3', undefined, 100, 50, 98, Number.NaN),
+      _mockLLMResponse('long', 'r4', undefined, 100, 50, undefined, null as any), // Treat null as undefined
+    ];
+    const result = calculateAverageProposedPrices(responses, 'long');
+    expect(result.averagedProposedStopLoss).toBeCloseTo((100 + 98) / 2);
+    expect(result.averagedProposedProfitTarget).toBeCloseTo((110 + 112) / 2);
+  });
+
+  it('should handle empty responses array', () => {
+    const responses: LLMResponse[] = [];
+    const result = calculateAverageProposedPrices(responses, 'long');
+    expect(result.averagedProposedStopLoss).toBeUndefined();
+    expect(result.averagedProposedProfitTarget).toBeUndefined();
+  });
+
+  it('should only average prices from responses matching the consensus action', () => {
+    const responses: LLMResponse[] = [
+      _mockLLMResponse('long', 'r1', undefined, 100, 50, 100, 110), // Match
+      _mockLLMResponse('short', 'r2', undefined, 100, 50, 50, 60), // No match
+      _mockLLMResponse('long', 'r3', undefined, 100, 50, 98, 112), // Match
+      _mockLLMResponse('do_nothing', 'r4', undefined, 100, 50, 200, 220), // No match
+    ];
+    const result = calculateAverageProposedPrices(responses, 'long');
+    expect(result.averagedProposedStopLoss).toBeCloseTo((100 + 98) / 2);
+    expect(result.averagedProposedProfitTarget).toBeCloseTo((110 + 112) / 2);
+
+    const resultShort = calculateAverageProposedPrices(responses, 'short');
+    expect(resultShort.averagedProposedStopLoss).toBeCloseTo(50);
+    expect(resultShort.averagedProposedProfitTarget).toBeCloseTo(60);
   });
 });

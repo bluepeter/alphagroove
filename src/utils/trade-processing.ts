@@ -42,6 +42,8 @@ export async function calculateEntryAtr(
  * @param tradeDirection The direction of the trade ('long' or 'short').
  * @param entryAtrValue The ATR value calculated at entry, if available.
  * @param exitStrategies An array of configured exit strategy instances.
+ * @param initialStopPrice The initial (potentially LLM-derived) stop price for the trade.
+ * @param initialTargetPrice The initial (potentially LLM-derived) target price for the trade.
  * @param defaultExitReason The reason to log if no strategy triggers an exit explicitly.
  * @returns An ExitSignal object if an exit is triggered, or null if no bars are available for evaluation.
  */
@@ -52,18 +54,29 @@ export function evaluateExitStrategies(
   tradeDirection: 'long' | 'short',
   entryAtrValue: number | undefined,
   exitStrategies: ExitStrategy[],
+  initialStopPrice?: number,
+  initialTargetPrice?: number,
   defaultExitReason: string = 'endOfDay'
 ): ExitSignal | null {
   let exitSignal: ExitSignal | null = null;
 
   // Exit strategies internally filter bars with timestamp > entryTimestamp for their evaluation
   for (const strategy of exitStrategies) {
+    let absoluteLevel: number | undefined = undefined;
+    if (strategy.name === 'stopLoss') {
+      absoluteLevel = initialStopPrice;
+    } else if (strategy.name === 'profitTarget') {
+      absoluteLevel = initialTargetPrice;
+    }
+
     const signal = strategy.evaluate(
       entryPrice,
       entryTimestamp,
       tradingDayBars, // Pass all available bars; strategy filters appropriately
       tradeDirection === 'long',
-      entryAtrValue
+      entryAtrValue,
+      false, // _testMode default
+      absoluteLevel // Pass the determined absolute level
     );
 
     if (signal) {

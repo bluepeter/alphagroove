@@ -8,6 +8,39 @@ import crypto from 'node:crypto';
 import { type EnrichedSignal, type ScreenDecision } from './types';
 import { type EntryScreen, type EntryScreenContext, type LLMScreenConfig } from './types';
 
+// Helper function to average proposed prices from LLM responses
+export const calculateAverageProposedPrices = (
+  responses: LLMResponse[],
+  consensusAction: 'long' | 'short'
+): {
+  averagedProposedStopLoss?: number;
+  averagedProposedProfitTarget?: number;
+} => {
+  let slSum = 0;
+  let slCount = 0;
+  let ptSum = 0;
+  let ptCount = 0;
+
+  responses.forEach(response => {
+    // Only consider prices from responses that align with the consensus action
+    if (response.action === consensusAction) {
+      if (typeof response.stopLoss === 'number' && !isNaN(response.stopLoss)) {
+        slSum += response.stopLoss;
+        slCount++;
+      }
+      if (typeof response.profitTarget === 'number' && !isNaN(response.profitTarget)) {
+        ptSum += response.profitTarget;
+        ptCount++;
+      }
+    }
+  });
+
+  return {
+    averagedProposedStopLoss: slCount > 0 ? slSum / slCount : undefined,
+    averagedProposedProfitTarget: ptCount > 0 ? ptSum / ptCount : undefined,
+  };
+};
+
 export class LlmConfirmationScreen implements EntryScreen {
   public readonly id = 'llm-confirmation';
   public readonly name = 'LLM Chart Confirmation Screen';
@@ -114,24 +147,34 @@ export class LlmConfirmationScreen implements EntryScreen {
 
       let logMessage = '';
       let rationale = '';
+      let averagedPrices: {
+        averagedProposedStopLoss?: number;
+        averagedProposedProfitTarget?: number;
+      } = {};
 
       if (configuredDirection === 'llm_decides') {
         const meetsLongThreshold = longVotes >= screenConfig.agreementThreshold;
         const meetsShortThreshold = shortVotes >= screenConfig.agreementThreshold;
 
         if (meetsLongThreshold && longVotes > shortVotes) {
+          averagedPrices = calculateAverageProposedPrices(responses, 'long');
           decision = {
             proceed: true,
             direction: 'long',
             cost: totalCost,
+            averagedProposedStopLoss: averagedPrices.averagedProposedStopLoss,
+            averagedProposedProfitTarget: averagedPrices.averagedProposedProfitTarget,
             _debug: { responses },
           };
           rationale = `LLM consensus to GO LONG (${longVotes} long vs ${shortVotes} short)`;
         } else if (meetsShortThreshold && shortVotes > longVotes) {
+          averagedPrices = calculateAverageProposedPrices(responses, 'short');
           decision = {
             proceed: true,
             direction: 'short',
             cost: totalCost,
+            averagedProposedStopLoss: averagedPrices.averagedProposedStopLoss,
+            averagedProposedProfitTarget: averagedPrices.averagedProposedProfitTarget,
             _debug: { responses },
           };
           rationale = `LLM consensus to GO SHORT (${shortVotes} short vs ${longVotes} long)`;
@@ -156,11 +199,14 @@ export class LlmConfirmationScreen implements EntryScreen {
         }
       } else {
         if (configuredDirection === 'long' && longVotes >= screenConfig.agreementThreshold) {
+          averagedPrices = calculateAverageProposedPrices(responses, 'long');
           decision = {
             proceed: true,
             cost: totalCost,
             direction: 'long',
             rationale: `LLM consensus to GO LONG, matching configured direction.`,
+            averagedProposedStopLoss: averagedPrices.averagedProposedStopLoss,
+            averagedProposedProfitTarget: averagedPrices.averagedProposedProfitTarget,
             _debug: { responses },
           };
           logMessage = `  LLM consensus to GO LONG, matching configured direction. Signal proceeds.`;
@@ -168,11 +214,14 @@ export class LlmConfirmationScreen implements EntryScreen {
           configuredDirection === 'short' &&
           shortVotes >= screenConfig.agreementThreshold
         ) {
+          averagedPrices = calculateAverageProposedPrices(responses, 'short');
           decision = {
             proceed: true,
             cost: totalCost,
             direction: 'short',
             rationale: `LLM consensus to GO SHORT, matching configured direction.`,
+            averagedProposedStopLoss: averagedPrices.averagedProposedStopLoss,
+            averagedProposedProfitTarget: averagedPrices.averagedProposedProfitTarget,
             _debug: { responses },
           };
           logMessage = `  LLM consensus to GO SHORT, matching configured direction. Signal proceeds.`;

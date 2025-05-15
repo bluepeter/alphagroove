@@ -24,6 +24,8 @@ export interface ScreenDecision {
   direction?: 'long' | 'short'; // Added for LLM to specify trade direction
   rationale?: string; // Added optional rationale field
   cost?: number; // Optional cost, as not all screens will have it
+  averagedProposedStopLoss?: number; // LLM-derived average stop loss
+  averagedProposedProfitTarget?: number; // LLM-derived average profit target
   _debug?: {
     responses?: Array<any>; // Just store the raw responses to avoid complicated type changes
     rawData?: any; // For any additional debug data

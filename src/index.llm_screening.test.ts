@@ -51,7 +51,13 @@ vi.mock('./patterns/pattern-factory.js', async () => {
 vi.mock('./screens/llm-confirmation.screen.js', () => ({
   LlmConfirmationScreen: vi.fn().mockImplementation(() => ({
     shouldSignalProceed: vi.fn(() =>
-      Promise.resolve({ proceed: true, cost: 0, direction: 'long' })
+      Promise.resolve({
+        proceed: true,
+        cost: 0,
+        direction: 'long',
+        averagedProposedStopLoss: undefined,
+        averagedProposedProfitTarget: undefined,
+      })
     ),
   })),
 }));
@@ -188,12 +194,23 @@ describe('LLM Trade Screening Tests', () => {
         screenConfigEnabled,
         currentAppConfig
       );
-      expect(resultFalse).toEqual({ proceed: false, cost: mockScreenCost });
+      expect(resultFalse).toEqual({
+        proceed: false,
+        cost: mockScreenCost,
+        averagedProposedStopLoss: undefined,
+        averagedProposedProfitTarget: undefined,
+      });
 
       const secondMockCost = mockScreenCost + 0.001;
+      const mockAveragedSL = 99.5;
+      const mockAveragedPT = 101.5;
+
       vi.mocked(localMockLlmInstance.shouldSignalProceed).mockResolvedValueOnce({
         proceed: true,
         cost: secondMockCost,
+        direction: 'long',
+        averagedProposedStopLoss: mockAveragedSL,
+        averagedProposedProfitTarget: mockAveragedPT,
       });
 
       const resultTrue = await mainModule.handleLlmTradeScreeningInternal(
@@ -208,6 +225,9 @@ describe('LLM Trade Screening Tests', () => {
         proceed: true,
         chartPath: expectedChartPath,
         cost: secondMockCost,
+        direction: 'long',
+        averagedProposedStopLoss: mockAveragedSL,
+        averagedProposedProfitTarget: mockAveragedPT,
       });
       expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalledTimes(2);
     });

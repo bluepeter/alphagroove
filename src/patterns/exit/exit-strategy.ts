@@ -30,7 +30,8 @@ export interface ExitStrategy {
     bars: Bar[],
     isLong: boolean,
     atr?: number,
-    _testMode?: boolean
+    _testMode?: boolean,
+    absoluteLevelOverride?: number
   ) => ExitSignal | null;
 }
 
@@ -70,7 +71,8 @@ export class StopLossStrategy implements ExitStrategy {
     bars: Bar[],
     isLong: boolean,
     atr?: number,
-    _testMode?: boolean
+    _testMode?: boolean,
+    absoluteLevelOverride?: number
   ): ExitSignal | null {
     const allTradingBars = bars.filter(bar => bar.timestamp > entryTime);
     const tradingBars = _testMode ? allTradingBars : filterRegularMarketHours(allTradingBars);
@@ -78,7 +80,9 @@ export class StopLossStrategy implements ExitStrategy {
     if (tradingBars.length === 0) return null;
 
     let stopLevel: number;
-    if (atr && this.config.atrMultiplier) {
+    if (this.config.useLlmProposedPrice && typeof absoluteLevelOverride === 'number') {
+      stopLevel = absoluteLevelOverride;
+    } else if (atr && this.config.atrMultiplier) {
       stopLevel = calculateATRStopLoss(entryPrice, atr, this.config.atrMultiplier, isLong);
     } else {
       const pctMultiplier = this.config.percentFromEntry / 100;
@@ -149,7 +153,8 @@ export class ProfitTargetStrategy implements ExitStrategy {
     bars: Bar[],
     isLong: boolean,
     atr?: number,
-    _testMode?: boolean
+    _testMode?: boolean,
+    absoluteLevelOverride?: number
   ): ExitSignal | null {
     const allTradingBars = bars.filter(bar => bar.timestamp > entryTime);
     const tradingBars = _testMode ? allTradingBars : filterRegularMarketHours(allTradingBars);
@@ -157,7 +162,9 @@ export class ProfitTargetStrategy implements ExitStrategy {
     if (tradingBars.length === 0) return null;
 
     let targetLevel: number;
-    if (atr && this.config.atrMultiplier) {
+    if (this.config.useLlmProposedPrice && typeof absoluteLevelOverride === 'number') {
+      targetLevel = absoluteLevelOverride;
+    } else if (atr && this.config.atrMultiplier) {
       const atrMultiple = atr * this.config.atrMultiplier;
       targetLevel = isLong ? entryPrice + atrMultiple : entryPrice - atrMultiple;
     } else {
@@ -229,7 +236,8 @@ export class TrailingStopStrategy implements ExitStrategy {
     bars: Bar[],
     isLong: boolean,
     atr?: number,
-    _testMode?: boolean
+    _testMode?: boolean,
+    _absoluteLevelOverride?: number
   ): ExitSignal | null {
     const allTradingBars = bars.filter(bar => bar.timestamp > entryTime);
     const tradingBars = _testMode ? allTradingBars : filterRegularMarketHours(allTradingBars);
@@ -353,12 +361,13 @@ export class MaxHoldTimeStrategy implements ExitStrategy {
   }
 
   evaluate(
-    entryPrice: number,
+    _entryPrice: number,
     entryTime: string,
     bars: Bar[],
     _isLong: boolean,
     _atr?: number,
-    _testMode?: boolean
+    _testMode?: boolean,
+    _absoluteLevelOverride?: number
   ): ExitSignal | null {
     // Skip entry bar and filter for regular market hours
     const allTradingBars = bars.filter(bar => bar.timestamp > entryTime);
@@ -401,12 +410,13 @@ export class EndOfDayStrategy implements ExitStrategy {
   }
 
   evaluate(
-    entryPrice: number,
+    _entryPrice: number,
     entryTime: string,
     bars: Bar[],
     _isLong: boolean,
     _atr?: number,
-    _testMode?: boolean
+    _testMode?: boolean,
+    _absoluteLevelOverride?: number
   ): ExitSignal | null {
     // Skip entry bar - DON'T filter by market hours for EndOfDay
     const tradingBars = bars.filter(bar => bar.timestamp > entryTime);
@@ -461,12 +471,12 @@ export const createExitStrategies = (config: any): ExitStrategy[] => {
       case 'stopLoss':
         return strategies.stopLoss
           ? new StopLossStrategy(strategies.stopLoss)
-          : new StopLossStrategy({ percentFromEntry: 1.0 });
+          : new StopLossStrategy({ percentFromEntry: 1.0, useLlmProposedPrice: false });
 
       case 'profitTarget':
         return strategies.profitTarget
           ? new ProfitTargetStrategy(strategies.profitTarget)
-          : new ProfitTargetStrategy({ percentFromEntry: 2.0 });
+          : new ProfitTargetStrategy({ percentFromEntry: 2.0, useLlmProposedPrice: false });
 
       case 'trailingStop':
         return strategies.trailingStop

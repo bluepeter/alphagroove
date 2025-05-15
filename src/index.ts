@@ -98,6 +98,8 @@ export const handleLlmTradeScreeningInternal = async (
   direction?: 'long' | 'short';
   chartPath?: string;
   cost: number;
+  averagedProposedStopLoss?: number;
+  averagedProposedProfitTarget?: number;
 }> => {
   if (!llmScreenInstance || !screenSpecificLLMConfig?.enabled) {
     return { proceed: true, cost: 0 }; // No direction needed if LLM screen not active
@@ -118,7 +120,14 @@ export const handleLlmTradeScreeningInternal = async (
   if (!screenDecision.proceed) {
     return { ...screenDecision, chartPath: undefined, cost: screenDecision.cost ?? 0 }; // Ensure chartPath is not set and cost is number
   } else {
-    return { ...screenDecision, chartPath: chartPathForLLM, cost: screenDecision.cost ?? 0 }; // Ensure cost is number
+    // Include averaged prices if proceeding
+    return {
+      ...screenDecision,
+      chartPath: chartPathForLLM,
+      cost: screenDecision.cost ?? 0,
+      averagedProposedStopLoss: screenDecision.averagedProposedStopLoss,
+      averagedProposedProfitTarget: screenDecision.averagedProposedProfitTarget,
+    };
   }
 };
 
@@ -253,6 +262,8 @@ export const processTradesLoop = async (
       chartPath: llmChartPath,
       cost: screeningCost,
       direction: llmConfirmationDirection,
+      averagedProposedStopLoss: llmAveragedStopLoss,
+      averagedProposedProfitTarget: llmAveragedProfitTarget,
     } = await handleLlmTradeScreeningInternal(
       currentSignal,
       entryPattern.name,
@@ -311,6 +322,8 @@ export const processTradesLoop = async (
     let isStopLossAtrBased = false;
     let isProfitTargetAtrBased = false;
     let isTrailingStopAtrBased = false;
+    let isStopLossLlmBased = false;
+    let isProfitTargetLlmBased = false;
     let stopLossAtrMultiplierUsed: number | undefined;
     let profitTargetAtrMultiplierUsed: number | undefined;
     let tsActivationAtrMultiplierUsed: number | undefined;
@@ -318,7 +331,14 @@ export const processTradesLoop = async (
 
     const stopLossConfig = mergedConfig.exitStrategies?.stopLoss;
     if (stopLossConfig) {
-      if (entryAtrValue && stopLossConfig.atrMultiplier) {
+      if (
+        stopLossConfig.useLlmProposedPrice &&
+        typeof llmAveragedStopLoss === 'number' &&
+        !isNaN(llmAveragedStopLoss)
+      ) {
+        initialStopLossPrice = llmAveragedStopLoss;
+        isStopLossLlmBased = true;
+      } else if (entryAtrValue && stopLossConfig.atrMultiplier) {
         initialStopLossPrice = calculateATRStopLoss(
           finalEntryPriceForPAndL,
           entryAtrValue,
@@ -338,7 +358,14 @@ export const processTradesLoop = async (
 
     const profitTargetConfig = mergedConfig.exitStrategies?.profitTarget;
     if (profitTargetConfig) {
-      if (entryAtrValue && profitTargetConfig.atrMultiplier) {
+      if (
+        profitTargetConfig.useLlmProposedPrice &&
+        typeof llmAveragedProfitTarget === 'number' &&
+        !isNaN(llmAveragedProfitTarget)
+      ) {
+        initialProfitTargetPrice = llmAveragedProfitTarget;
+        isProfitTargetLlmBased = true;
+      } else if (entryAtrValue && profitTargetConfig.atrMultiplier) {
         const offset = entryAtrValue * profitTargetConfig.atrMultiplier;
         initialProfitTargetPrice =
           actualTradeDirection === 'long'
@@ -399,7 +426,9 @@ export const processTradesLoop = async (
       barsForExitEvaluation,
       actualTradeDirection,
       entryAtrValue,
-      exitStrategies
+      exitStrategies,
+      initialStopLossPrice,
+      initialProfitTargetPrice
     );
 
     if (!exitSignal) {
@@ -437,6 +466,8 @@ export const processTradesLoop = async (
         isStopLossAtrBased,
         isProfitTargetAtrBased,
         isTrailingStopAtrBased,
+        isStopLossLlmBased,
+        isProfitTargetLlmBased,
         stopLossAtrMultiplierUsed,
         profitTargetAtrMultiplierUsed,
         entryAtrValue,
@@ -561,19 +592,13 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
 
     const tradesFromQuery = fetchTradesFromQuery(query);
 
-    // Determine exit strategy name for header
-    let exitStrategyName = 'default';
-    if (mergedConfig.exitStrategies?.enabled && mergedConfig.exitStrategies.enabled.length > 0) {
-      exitStrategyName = mergedConfig.exitStrategies.enabled.join(', ');
-    }
-
     printHeader(
       mergedConfig.ticker,
       mergedConfig.from,
       mergedConfig.to,
       entryPattern.name,
-      exitStrategyName,
-      mergedConfig.direction as 'long' | 'short'
+      mergedConfig.exitStrategies,
+      mergedConfig.direction as 'long' | 'short' | 'llm_decides'
     );
 
     // Ensure distinct arrays for long_stats and short_stats

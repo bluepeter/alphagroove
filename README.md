@@ -30,6 +30,10 @@ Exits the trade when price moves against your position by a specified amount.
   means 1%)
 - `atrMultiplier`: Alternative to percentFromEntry; exit when price moves against your position by
   this multiple of ATR (Average True Range)
+- `useLlmProposedPrice`: (boolean, default: `false`) If `true` and the LLM Confirmation Screen is
+  enabled and returns a valid proposed stop loss price (from the `proposedStopLoss` field in its
+  JSON response, averaged across calls), this price will be used. This overrides `percentFromEntry`
+  and `atrMultiplier` if a valid LLM price is available.
 
 ### Profit Target
 
@@ -40,6 +44,10 @@ Exits the trade when price moves in your favor by a specified amount.
 - `percentFromEntry`: Exit when price moves in your favor by this percentage (e.g., 2.0 means 2%)
 - `atrMultiplier`: Alternative to percentFromEntry; exit when price moves in your favor by this
   multiple of ATR
+- `useLlmProposedPrice`: (boolean, default: `false`) If `true` and the LLM Confirmation Screen is
+  enabled and returns a valid proposed profit target price (from the `proposedProfitTarget` field in
+  its JSON response, averaged across calls), this price will be used. This overrides
+  `percentFromEntry` and `atrMultiplier` if a valid LLM price is available.
 
 ### Trailing Stop
 
@@ -125,10 +133,12 @@ exitStrategies:
     percentFromEntry: 1.0
     # or use ATR-based stop loss with:
     # atrMultiplier: 1.5
+    useLlmProposedPrice: false # Set to true to use LLM-derived stop loss
   profitTarget:
     percentFromEntry: 2.0
     # or use ATR-based target with:
     # atrMultiplier: 3.0
+    useLlmProposedPrice: false # Set to true to use LLM-derived profit target
   trailingStop:
     activationPercent: 1.0 # activates after 1% favorable move
     trailPercent: 0.5 # trails by 0.5%
@@ -462,7 +472,11 @@ analysis.
 - **Multiple Calls:** The system makes a configurable number of parallel calls to the LLM,
   potentially with different temperature settings for varied responses.
 - **JSON Response:** The LLM is prompted to return its decision (long, short, or do_nothing) and a
-  rationalization in a structured JSON format.
+  rationalization in a structured JSON format. If `useLlmProposedPrice` is enabled for stop loss or
+  profit targets in the exit strategy configuration, the prompt should also instruct the LLM to
+  return `proposedStopLoss` and `proposedProfitTarget` numeric values (or null) within its JSON
+  response. The system will average valid prices from responses that align with the consensus trade
+  action.
 - **Consensus Logic:**
   - If `default.direction` in `alphagroove.config.yaml` is set to `long` or `short`: A trade signal
     proceeds only if a configurable number of LLM responses agree on that specific pre-configured
@@ -514,7 +528,8 @@ llmConfirmationScreen:
     - 'Analyze this chart as an aggressive trader. Action: long, short, or do_nothing? Rationale?'
     - 'Analyze this chart as a neutral analyst. Action: long, short, or do_nothing? Rationale?'
   commonPromptSuffixForJson:
-    'Respond in JSON: {"action": "<action>", "rationalization": "<one_sentence_rationale>"}'
+    'Respond in JSON: {"action": "<action>", "rationalization": "<one_sentence_rationale>",
+    "proposedStopLoss": <price_or_null>, "proposedProfitTarget": <price_or_null>}'
   maxOutputTokens: 100
 ```
 

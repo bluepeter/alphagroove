@@ -36,12 +36,14 @@ const EntryPatternsConfigSchema = z.object({
 const StopLossConfigSchema = z.object({
   percentFromEntry: z.number().default(1.0),
   atrMultiplier: z.number().optional(),
+  useLlmProposedPrice: z.boolean().optional().default(false),
 });
 
 // Profit Target configuration
 const ProfitTargetConfigSchema = z.object({
   percentFromEntry: z.number().default(2.0),
   atrMultiplier: z.number().optional(),
+  useLlmProposedPrice: z.boolean().optional().default(false),
 });
 
 // Trailing Stop configuration
@@ -131,7 +133,7 @@ const LLMScreenConfigSchema = z
       .string()
       .optional()
       .default(
-        'Your response MUST be a valid JSON object and nothing else. For example: `{"action": "long", "rationalization": "Price broke resistance with volume."}`'
+        'Your response MUST be a valid JSON object and nothing else. For example: `{"action": "long", "rationalization": "Price broke resistance with volume.", "proposedStopLoss": 123.45, "proposedProfitTarget": 125.67}`'
       ),
     systemPrompt: z.string().optional(),
     maxOutputTokens: z.number().int().min(1).default(150),
@@ -209,9 +211,11 @@ const DEFAULT_CONFIG: Config = {
       },
       stopLoss: {
         percentFromEntry: 1.0,
+        useLlmProposedPrice: false,
       },
       profitTarget: {
         percentFromEntry: 2.0,
+        useLlmProposedPrice: false,
       },
       trailingStop: {
         activationPercent: 1.0,
@@ -252,9 +256,11 @@ const DEFAULT_CONFIG: Config = {
     },
     stopLoss: {
       percentFromEntry: 1.0,
+      useLlmProposedPrice: false,
     },
     profitTarget: {
       percentFromEntry: 2.0,
+      useLlmProposedPrice: false,
     },
     trailingStop: {
       activationPercent: 1.0,
@@ -334,9 +340,11 @@ export const createDefaultConfigFile = (): void => {
           },
           stopLoss: {
             percentFromEntry: 1.0,
+            useLlmProposedPrice: false,
           },
           profitTarget: {
             percentFromEntry: 2.0,
+            useLlmProposedPrice: false,
           },
           trailingStop: {
             activationPercent: 1.0,
@@ -378,9 +386,11 @@ export const createDefaultConfigFile = (): void => {
         },
         stopLoss: {
           percentFromEntry: 1.0,
+          useLlmProposedPrice: false,
         },
         profitTarget: {
           percentFromEntry: 2.0,
+          useLlmProposedPrice: false,
         },
         trailingStop: {
           activationPercent: 1.0,
@@ -468,6 +478,10 @@ export const mergeConfigWithCliOptions = (
             StopLossConfigSchema.parse({}).percentFromEntry,
           atrMultiplier:
             rootFromLoaded?.stopLoss?.atrMultiplier ?? defaultFromLoaded?.stopLoss?.atrMultiplier,
+          useLlmProposedPrice:
+            rootFromLoaded?.stopLoss?.useLlmProposedPrice ??
+            defaultFromLoaded?.stopLoss?.useLlmProposedPrice ??
+            false,
         }
       : undefined,
     profitTarget: enabledArray?.includes('profitTarget')
@@ -479,6 +493,10 @@ export const mergeConfigWithCliOptions = (
           atrMultiplier:
             rootFromLoaded?.profitTarget?.atrMultiplier ??
             defaultFromLoaded?.profitTarget?.atrMultiplier,
+          useLlmProposedPrice:
+            rootFromLoaded?.profitTarget?.useLlmProposedPrice ??
+            defaultFromLoaded?.profitTarget?.useLlmProposedPrice ??
+            false,
         }
       : undefined,
     trailingStop: enabledArray?.includes('trailingStop')

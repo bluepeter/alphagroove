@@ -28,7 +28,7 @@ const createTestBars = (
 describe('Exit Strategies', () => {
   describe('StopLossStrategy', () => {
     it('should trigger stop loss for long position using percentage', () => {
-      const strategy = new StopLossStrategy({ percentFromEntry: 1.0 });
+      const strategy = new StopLossStrategy({ percentFromEntry: 1.0, useLlmProposedPrice: false });
       const entryPrice = 100;
       const entryTime = '2023-01-01 10:00:00';
       const bars = createTestBars(
@@ -46,7 +46,15 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
+      const result = strategy.evaluate(
+        entryPrice,
+        entryTime,
+        bars,
+        true,
+        undefined,
+        true,
+        undefined
+      );
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:02:00');
@@ -55,7 +63,7 @@ describe('Exit Strategies', () => {
     });
 
     it('should trigger stop loss for short position using percentage', () => {
-      const strategy = new StopLossStrategy({ percentFromEntry: 1.0 });
+      const strategy = new StopLossStrategy({ percentFromEntry: 1.0, useLlmProposedPrice: false });
       const entryPrice = 100;
       const entryTime = '2023-01-01 10:00:00';
       const bars = createTestBars(
@@ -73,7 +81,15 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, false, undefined, true);
+      const result = strategy.evaluate(
+        entryPrice,
+        entryTime,
+        bars,
+        false,
+        undefined,
+        true,
+        undefined
+      );
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:02:00');
@@ -82,7 +98,11 @@ describe('Exit Strategies', () => {
     });
 
     it('should trigger stop loss using ATR multiplier for long position', () => {
-      const strategy = new StopLossStrategy({ percentFromEntry: 1.0, atrMultiplier: 2.0 });
+      const strategy = new StopLossStrategy({
+        percentFromEntry: 1.0,
+        atrMultiplier: 2.0,
+        useLlmProposedPrice: false,
+      });
       const entryPrice = 100;
       const entryTime = '2023-01-01 10:00:00';
       const atr = 1.0; // 2 ATR = 2 points
@@ -95,7 +115,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true, atr, true);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, atr, true, undefined);
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:02:00');
@@ -104,7 +124,7 @@ describe('Exit Strategies', () => {
     });
 
     it('should not trigger if stop loss level is not hit', () => {
-      const strategy = new StopLossStrategy({ percentFromEntry: 2.0 });
+      const strategy = new StopLossStrategy({ percentFromEntry: 2.0, useLlmProposedPrice: false });
       const entryPrice = 100;
       const entryTime = '2023-01-01 10:00:00';
       const bars = createTestBars(
@@ -116,13 +136,21 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
+      const result = strategy.evaluate(
+        entryPrice,
+        entryTime,
+        bars,
+        true,
+        undefined,
+        true,
+        undefined
+      );
 
       expect(result).toBeNull();
     });
 
     it('should return null if no trading bars after entry', () => {
-      const strategy = new StopLossStrategy({ percentFromEntry: 1.0 });
+      const strategy = new StopLossStrategy({ percentFromEntry: 1.0, useLlmProposedPrice: false });
       const entryPrice = 100;
       const entryTime = '2023-01-01 10:00:00';
       const bars = createTestBars(
@@ -130,7 +158,15 @@ describe('Exit Strategies', () => {
         [{ open: 100, high: 101, low: 99, close: 100.5 }]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
+      const result = strategy.evaluate(
+        entryPrice,
+        entryTime,
+        bars,
+        true,
+        undefined,
+        true,
+        undefined
+      );
 
       expect(result).toBeNull();
     });
@@ -138,7 +174,10 @@ describe('Exit Strategies', () => {
 
   describe('ProfitTargetStrategy', () => {
     it('should trigger profit target for long position using percentage', () => {
-      const strategy = new ProfitTargetStrategy({ percentFromEntry: 2.0 });
+      const strategy = new ProfitTargetStrategy({
+        percentFromEntry: 2.0,
+        useLlmProposedPrice: false,
+      });
       const entryPrice = 100;
       const entryTime = '2023-01-01 10:00:00';
       const bars = createTestBars(
@@ -156,7 +195,15 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
+      const result = strategy.evaluate(
+        entryPrice,
+        entryTime,
+        bars,
+        true,
+        undefined,
+        true,
+        undefined
+      );
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:02:00');
@@ -165,7 +212,10 @@ describe('Exit Strategies', () => {
     });
 
     it('should trigger profit target for short position using percentage', () => {
-      const strategy = new ProfitTargetStrategy({ percentFromEntry: 2.0 });
+      const strategy = new ProfitTargetStrategy({
+        percentFromEntry: 2.0,
+        useLlmProposedPrice: false,
+      });
       const entryPrice = 100;
       const entryTime = '2023-01-01 10:00:00';
       const bars = createTestBars(
@@ -183,7 +233,15 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, false, undefined, true);
+      const result = strategy.evaluate(
+        entryPrice,
+        entryTime,
+        bars,
+        false,
+        undefined,
+        true,
+        undefined
+      );
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:02:00');
@@ -192,7 +250,11 @@ describe('Exit Strategies', () => {
     });
 
     it('should trigger profit target using ATR multiplier for long position', () => {
-      const strategy = new ProfitTargetStrategy({ percentFromEntry: 2.0, atrMultiplier: 2.0 });
+      const strategy = new ProfitTargetStrategy({
+        percentFromEntry: 2.0,
+        atrMultiplier: 2.0,
+        useLlmProposedPrice: false,
+      });
       const entryPrice = 100;
       const entryTime = '2023-01-01 10:00:00';
       const atr = 1.5; // 2 ATR = 3 points
@@ -205,7 +267,7 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true, atr, true);
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, atr, true, undefined);
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:02:00');
@@ -214,7 +276,10 @@ describe('Exit Strategies', () => {
     });
 
     it('should not trigger if profit target is not hit', () => {
-      const strategy = new ProfitTargetStrategy({ percentFromEntry: 3.0 });
+      const strategy = new ProfitTargetStrategy({
+        percentFromEntry: 3.0,
+        useLlmProposedPrice: false,
+      });
       const entryPrice = 100;
       const entryTime = '2023-01-01 10:00:00';
       const bars = createTestBars(
@@ -226,7 +291,15 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
+      const result = strategy.evaluate(
+        entryPrice,
+        entryTime,
+        bars,
+        true,
+        undefined,
+        true,
+        undefined
+      );
 
       expect(result).toBeNull();
     });
@@ -254,7 +327,15 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
+      const result = strategy.evaluate(
+        entryPrice,
+        entryTime,
+        bars,
+        true,
+        undefined,
+        true,
+        undefined
+      );
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:01:00');
@@ -283,7 +364,15 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, false, undefined, true);
+      const result = strategy.evaluate(
+        entryPrice,
+        entryTime,
+        bars,
+        false,
+        undefined,
+        true,
+        undefined
+      );
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:01:00');
@@ -304,7 +393,15 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
+      const result = strategy.evaluate(
+        entryPrice,
+        entryTime,
+        bars,
+        true,
+        undefined,
+        true,
+        undefined
+      );
 
       expect(result).toBeNull();
     });
@@ -332,7 +429,15 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
+      const result = strategy.evaluate(
+        entryPrice,
+        entryTime,
+        bars,
+        true,
+        undefined,
+        true,
+        undefined
+      );
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:30:00');
@@ -359,7 +464,15 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, false, undefined, true);
+      const result = strategy.evaluate(
+        entryPrice,
+        entryTime,
+        bars,
+        false,
+        undefined,
+        true,
+        undefined
+      );
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 10:15:00');
@@ -384,7 +497,15 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
+      const result = strategy.evaluate(
+        entryPrice,
+        entryTime,
+        bars,
+        true,
+        undefined,
+        true,
+        undefined
+      );
 
       expect(result).toBeNull();
     });
@@ -412,7 +533,15 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
+      const result = strategy.evaluate(
+        entryPrice,
+        entryTime,
+        bars,
+        true,
+        undefined,
+        true,
+        undefined
+      );
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 16:00:00');
@@ -437,7 +566,15 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
+      const result = strategy.evaluate(
+        entryPrice,
+        entryTime,
+        bars,
+        true,
+        undefined,
+        true,
+        undefined
+      );
 
       expect(result).not.toBeNull();
       expect(result?.timestamp).toBe('2023-01-01 15:30:00');
@@ -462,7 +599,15 @@ describe('Exit Strategies', () => {
         ]
       );
 
-      const result = strategy.evaluate(entryPrice, entryTime, bars, true, undefined, true);
+      const result = strategy.evaluate(
+        entryPrice,
+        entryTime,
+        bars,
+        true,
+        undefined,
+        true,
+        undefined
+      );
 
       // The strategy should use the next day's opening bar as the exit point
       expect(result).not.toBeNull();

@@ -17,6 +17,8 @@ import {
 // We could use date-fns for more advanced date formatting in the future
 // import { format } from 'date-fns';
 
+import { type ExitStrategiesConfig } from './config'; // Added for type safety
+
 export interface Trade {
   trade_date: string;
   entry_time: string;
@@ -44,6 +46,8 @@ export interface Trade {
   isStopLossAtrBased?: boolean;
   isProfitTargetAtrBased?: boolean;
   isTrailingStopAtrBased?: boolean; // This might become more granular or be derived
+  isStopLossLlmBased?: boolean;
+  isProfitTargetLlmBased?: boolean;
   stopLossAtrMultiplierUsed?: number;
   profitTargetAtrMultiplierUsed?: number;
   entryAtrValue?: number; // Added to display the day's ATR
@@ -79,12 +83,56 @@ export const printHeader = (
   fromDate: string,
   toDate: string,
   entryPatternName: string,
-  exitPatternName: string,
+  exitStrategiesConfig: ExitStrategiesConfig | undefined,
   direction: 'long' | 'short' | 'llm_decides'
 ) => {
   console.log(chalk.bold(`\n${ticker} Analysis (${fromDate} to ${toDate}):`));
   console.log(chalk.bold(`Entry Pattern: ${entryPatternName}`));
-  console.log(chalk.bold(`Exit Pattern: ${exitPatternName}`));
+
+  let exitStrategyDetails = 'Default (Max Hold Time)';
+  if (
+    exitStrategiesConfig &&
+    exitStrategiesConfig.enabled &&
+    exitStrategiesConfig.enabled.length > 0
+  ) {
+    const details: string[] = [];
+    for (const strategyName of exitStrategiesConfig.enabled) {
+      switch (strategyName) {
+        case 'stopLoss':
+          if (exitStrategiesConfig.stopLoss?.useLlmProposedPrice) {
+            details.push('Stop Loss (LLM)');
+          } else if (exitStrategiesConfig.stopLoss?.atrMultiplier) {
+            details.push('Stop Loss (ATR)');
+          } else {
+            details.push('Stop Loss (Percent)');
+          }
+          break;
+        case 'profitTarget':
+          if (exitStrategiesConfig.profitTarget?.useLlmProposedPrice) {
+            details.push('Profit Target (LLM)');
+          } else if (exitStrategiesConfig.profitTarget?.atrMultiplier) {
+            details.push('Profit Target (ATR)');
+          } else {
+            details.push('Profit Target (Percent)');
+          }
+          break;
+        case 'trailingStop':
+          details.push('Trailing Stop'); // Could be more detailed if needed (ATR/Percent based)
+          break;
+        case 'maxHoldTime':
+          details.push('Max Hold Time');
+          break;
+        case 'endOfDay':
+          details.push('End of Day');
+          break;
+        default:
+          details.push(strategyName); // For any other custom strategies
+      }
+    }
+    exitStrategyDetails = details.join(', ');
+  }
+  console.log(chalk.bold(`Exit Strategies: ${exitStrategyDetails}`));
+
   let directionDisplay = 'Unknown';
   if (direction === 'long') directionDisplay = 'Long ↗️';
   else if (direction === 'short') directionDisplay = 'Short ↘️';
@@ -135,7 +183,9 @@ export const printTradeDetails = (trade: Trade) => {
   // Stop Loss Details
   if (trade.initialStopLossPrice !== undefined) {
     let slDetail = 'SL';
-    if (trade.isStopLossAtrBased) {
+    if (trade.isStopLossLlmBased) {
+      slDetail = 'LLM SL';
+    } else if (trade.isStopLossAtrBased) {
       slDetail = 'ATR SL';
       if (trade.stopLossAtrMultiplierUsed !== undefined) {
         slDetail += ` [${trade.stopLossAtrMultiplierUsed.toFixed(1)}x]`;
@@ -152,7 +202,9 @@ export const printTradeDetails = (trade: Trade) => {
   // Profit Target Details
   if (trade.initialProfitTargetPrice !== undefined) {
     let ptDetail = 'PT';
-    if (trade.isProfitTargetAtrBased) {
+    if (trade.isProfitTargetLlmBased) {
+      ptDetail = 'LLM PT';
+    } else if (trade.isProfitTargetAtrBased) {
       ptDetail = 'ATR PT';
       if (trade.profitTargetAtrMultiplierUsed !== undefined) {
         ptDetail += ` [${trade.profitTargetAtrMultiplierUsed.toFixed(1)}x]`;
