@@ -1,13 +1,11 @@
 import { execSync } from 'child_process';
-import { writeFileSync, unlinkSync, existsSync } from 'fs';
-import { join } from 'path';
 import { Bar } from './calculations';
 
 export const fetchTradesFromQuery = (query: string): Array<Record<string, string | number>> => {
-  const tempFile = join(process.cwd(), 'temp_query.sql');
   try {
-    writeFileSync(tempFile, query, 'utf-8');
-    const result = execSync(`duckdb -csv -header < ${tempFile}`, {
+    // Pass the query directly to duckdb via stdin
+    const result = execSync('duckdb -csv -header', {
+      input: query,
       encoding: 'utf-8',
       maxBuffer: 100 * 1024 * 1024, // 100MB buffer
     });
@@ -47,10 +45,11 @@ export const fetchTradesFromQuery = (query: string): Array<Record<string, string
           {} as Record<string, string | number>
         );
       });
-  } finally {
-    if (existsSync(tempFile)) {
-      unlinkSync(tempFile);
-    }
+  } catch (error) {
+    // It's good practice to handle or log the error.
+    // For instance, you might want to re-throw it or return an empty array based on your error handling strategy.
+    console.error('Error executing DuckDB query:', error);
+    throw error; // Or return [] depending on desired behavior
   }
 };
 
@@ -172,7 +171,6 @@ export const getPriorDayTradingBars = async (
   timeframe: string, // Typically '1min' for this use case
   signalDate: string // YYYY-MM-DD format
 ): Promise<Bar[]> => {
-  const tempFile = join(process.cwd(), 'temp_prior_day_query.sql');
   const dataFilePath = `tickers/${ticker}/${timeframe}.csv`;
 
   // Query to find the most recent trading day strictly before the signalDate
@@ -190,8 +188,9 @@ export const getPriorDayTradingBars = async (
 
   let priorTradingDateStr = '';
   try {
-    writeFileSync(tempFile, priorDayQuery, 'utf-8');
-    const result = execSync(`duckdb -csv < ${tempFile}`, {
+    // Pass the query directly to duckdb via stdin
+    const result = execSync('duckdb -csv', {
+      input: priorDayQuery,
       encoding: 'utf-8',
       maxBuffer: 1024 * 1024,
     });
@@ -203,13 +202,13 @@ export const getPriorDayTradingBars = async (
     }
   } catch (error) {
     console.error(`Error fetching prior trading day for ${signalDate} for ${ticker}:`, error);
-    if (existsSync(tempFile)) unlinkSync(tempFile);
+    // No temp file to unlink
     return [];
   }
 
   if (!priorTradingDateStr) {
     console.warn(`No prior trading day string found before ${signalDate} for ${ticker}.`);
-    if (existsSync(tempFile)) unlinkSync(tempFile);
+    // No temp file to unlink
     return [];
   }
 
@@ -230,8 +229,9 @@ export const getPriorDayTradingBars = async (
   `;
 
   try {
-    writeFileSync(tempFile, barsQuery, 'utf-8');
-    const result = execSync(`duckdb -csv -header < ${tempFile}`, {
+    // Pass the query directly to duckdb via stdin
+    const result = execSync('duckdb -csv -header', {
+      input: barsQuery,
       encoding: 'utf-8',
       maxBuffer: 100 * 1024 * 1024, // 100MB buffer
     });
@@ -267,8 +267,6 @@ export const getPriorDayTradingBars = async (
     console.error(`Error fetching bars for prior day ${priorTradingDateStr} for ${ticker}:`, error);
     return [];
   } finally {
-    if (existsSync(tempFile)) {
-      unlinkSync(tempFile);
-    }
+    // No temp file to unlink
   }
 };

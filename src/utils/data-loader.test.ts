@@ -38,14 +38,15 @@ describe('Data Loader Utilities', () => {
       const query = 'SELECT * FROM table';
       const result = fetchTradesFromQuery(query);
 
-      expect(writeFileSync).toHaveBeenCalledWith(mockTempFilePath, query, 'utf-8');
-      expect(execSync).toHaveBeenCalledWith(
-        `duckdb -csv -header < ${mockTempFilePath}`,
-        expect.any(Object)
-      );
-      expect(unlinkSync).toHaveBeenCalledWith(mockTempFilePath);
+      expect(writeFileSync).not.toHaveBeenCalled();
+      expect(execSync).toHaveBeenCalledWith('duckdb -csv -header', {
+        input: query,
+        encoding: 'utf-8',
+        maxBuffer: 100 * 1024 * 1024,
+      });
+      expect(unlinkSync).not.toHaveBeenCalled();
       expect(result).toEqual([
-        { col1: 'val1', col2: 10, col3: 'true' }, // Note: boolean-like strings are kept as strings by current logic
+        { col1: 'val1', col2: 10, col3: 'true' },
         { col1: 'val2', col2: 20, col3: 'false' },
       ]);
     });
@@ -92,21 +93,20 @@ describe('Data Loader Utilities', () => {
       consoleWarnSpy.mockRestore();
     });
 
-    it('should still call unlinkSync if execSync throws an error', () => {
+    it('should not throw or try to unlink if execSync throws an error', () => {
       vi.mocked(execSync).mockImplementation(() => {
         throw new Error('DB error');
       });
       expect(() => fetchTradesFromQuery('SELECT * FROM table')).toThrow('DB error');
-      expect(unlinkSync).toHaveBeenCalledWith(mockTempFilePath);
+      expect(unlinkSync).not.toHaveBeenCalled();
     });
 
-    it('should not call unlinkSync if temp file was not created (e.g. writeFileSync fails)', () => {
-      vi.mocked(writeFileSync).mockImplementation(() => {
-        throw new Error('File system error');
+    it('should propagate errors from execSync if it fails', () => {
+      vi.mocked(execSync).mockImplementation(() => {
+        throw new Error('Exec error');
       });
-      vi.mocked(existsSync).mockReturnValue(false); // Simulate file not existing
-
-      expect(() => fetchTradesFromQuery('SELECT * FROM table')).toThrow('File system error');
+      expect(() => fetchTradesFromQuery('SELECT * FROM table')).toThrow('Exec error');
+      expect(writeFileSync).not.toHaveBeenCalled();
       expect(unlinkSync).not.toHaveBeenCalled();
     });
   });

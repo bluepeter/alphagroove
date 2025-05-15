@@ -115,7 +115,6 @@ const fetchMultiDayData = async (
   signalDate: string, // YYYY-MM-DD format
   numPriorTradingDays: number
 ): Promise<Bar[]> => {
-  const tempFile = path.join(process.cwd(), 'temp_chart_query.sql');
   const dataFilePath = `tickers/${ticker}/${timeframe}.csv`;
   const limitDays = numPriorTradingDays + 1;
 
@@ -150,10 +149,10 @@ const fetchMultiDayData = async (
     ORDER BY timestamp ASC;
   `;
 
-  fs.writeFileSync(tempFile, query, 'utf-8');
-
   try {
-    const result = execSync(`duckdb -csv -header < ${tempFile}`, {
+    // Pass the query directly to duckdb via stdin
+    const result = execSync('duckdb -csv -header', {
+      input: query,
       encoding: 'utf-8',
       maxBuffer: 100 * 1024 * 1024,
     });
@@ -195,9 +194,7 @@ const fetchMultiDayData = async (
     );
     return [];
   } finally {
-    if (fs.existsSync(tempFile)) {
-      fs.unlinkSync(tempFile);
-    }
+    // No temp file to unlink
   }
 };
 
