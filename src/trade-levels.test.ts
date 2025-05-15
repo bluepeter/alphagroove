@@ -34,7 +34,7 @@ vi.mock('commander', () => ({
 }));
 
 // Import the core functions to test - excluding main which has the failing CLI command
-import { parseCSVData, groupBarsByDay, calculateATR, calculateTradeLevels } from './trade-levels';
+import { parseCSVData, calculateATR, calculateTradeLevels } from './trade-levels';
 
 // Mock main function to prevent it from running
 vi.mock('./trade-levels', async importOriginal => {
@@ -88,69 +88,6 @@ describe('Trade Levels Tool', () => {
       expect(result[0].low).toBe(580.39);
       expect(result[0].close).toBe(580.465);
       expect(result[0].volume).toBe(1066648);
-    });
-  });
-
-  describe('groupBarsByDay', () => {
-    it('should group bars by trade_date', () => {
-      const mockBars = [
-        {
-          timestamp: '2025-05-12 9:31',
-          open: 100,
-          high: 101,
-          low: 99,
-          close: 100.5,
-          trade_date: '2025-05-12',
-        },
-        {
-          timestamp: '2025-05-12 9:32',
-          open: 100.5,
-          high: 102,
-          low: 100,
-          close: 101,
-          trade_date: '2025-05-12',
-        },
-        {
-          timestamp: '2025-05-13 9:31',
-          open: 101,
-          high: 102,
-          low: 100,
-          close: 101.5,
-          trade_date: '2025-05-13',
-        },
-      ];
-
-      const result = groupBarsByDay(mockBars);
-
-      expect(Object.keys(result).length).toBe(2);
-      expect(result['2025-05-12'].length).toBe(2);
-      expect(result['2025-05-13'].length).toBe(1);
-    });
-
-    it('should handle undefined trade_dates', () => {
-      const mockBars = [
-        {
-          timestamp: '2025-05-12 9:31',
-          open: 100,
-          high: 101,
-          low: 99,
-          close: 100.5,
-          trade_date: undefined,
-        },
-        {
-          timestamp: '2025-05-12 9:32',
-          open: 100.5,
-          high: 102,
-          low: 100,
-          close: 101,
-          trade_date: undefined,
-        },
-      ];
-
-      const result = groupBarsByDay(mockBars);
-
-      expect(Object.keys(result).length).toBe(1);
-      expect(result['unknown'].length).toBe(2);
     });
   });
 

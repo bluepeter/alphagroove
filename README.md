@@ -543,9 +543,12 @@ pnpm analyze /path/to/chart.png
 ### Trade Levels Calculator
 
 AlphaGroove includes a standalone CLI tool for calculating stop loss, profit target, and trailing
-stop levels based on Average True Range (ATR) from a CSV file with minute bar data. This tool uses
-the same configuration from your `alphagroove.config.yaml` file to ensure that the calculated levels
-match what would be used in a backtest.
+stop levels based on Average True Range (ATR) from a CSV file with minute bar data. This tool
+calculates ATR based on **all data present in the provided CSV file**. Users should ensure the input
+CSV contains only the historical data relevant for the desired ATR calculation period (e.g., only
+the previous trading day's 1-minute bars). It uses the same configuration from your
+`alphagroove.config.yaml` file to ensure that the calculated levels match what would be used in a
+backtest.
 
 **Usage:**
 
@@ -574,8 +577,36 @@ directory.):
 - `Close`: Closing price for the period
 - `Volume`: Trading volume for the period (optional)
 
-The tool calculates the ATR from the prior day's data and applies the exit strategy settings from
-your configuration to determine appropriate exit levels for the current trade.
+The tool calculates the ATR from all data in the provided CSV and applies the exit strategy settings
+from your configuration to determine appropriate exit levels for the current trade.
+
+**Example Output:**
+
+```
+Loading configuration...
+Parsing CSV data...
+Parsed 391 records from CSV
+Sample record: {"Date":"05/14/2025","Time":"9:31 AM","Open":"587.81","High":"588.45","Low":"587.81","Close":"588.3214","Volume":"470449"}
+Calculating ATR from the provided CSV data...
+
+ATR (from entire CSV): 0.2729
+
+Trade Levels for LONG at 587.54
+
+Stop Loss: 586.9942 (2x ATR below entry) [-0.09%]
+Profit Target: 588.6316 (4x ATR above entry) [0.19%]
+Trailing Stop: Immediate activation
+Trailing Amount: 0.5458 (2.0x ATR, 0.09% of price)
+
+Trade Levels for SHORT at 587.54
+
+Stop Loss: 588.0858 (2x ATR above entry) [0.09%]
+Profit Target: 586.4484 (4x ATR below entry) [-0.19%]
+Trailing Stop: Immediate activation
+Trailing Amount: 0.5458 (2.0x ATR, 0.09% of price)
+
+Note: ATR is calculated from all data in the provided CSV. Ensure CSV contains only the desired historical period for ATR.
+```
 
 ### Command Examples
 
