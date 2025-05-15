@@ -15,8 +15,7 @@ default:
   exitStrategies:
     enabled:
       - profitTarget
-      - trailingStop
-      - maxHoldTime
+      - stopLoss
       - endOfDay
     # atrPeriodForEntry: 14 # This specific period is NOT used by the current ATR calculation method (which averages all TRs from the prior day).
     # Remove or keep commented if you plan to use a period-specific ATR calc in the future.

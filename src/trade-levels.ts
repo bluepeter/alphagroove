@@ -121,7 +121,8 @@ export function calculateTradeLevels(
   config: any,
   isLong: boolean
 ) {
-  const exitStrategies = config.exitStrategies || {};
+  // Try root-level exitStrategies first, then default.exitStrategies
+  const exitStrategies = config.exitStrategies || config.default?.exitStrategies || {};
 
   // Calculate stop loss
   let stopLoss: number | undefined;
@@ -276,42 +277,71 @@ export async function main() {
 }
 
 // Helper function to print levels for a given direction
-function printLevelsForDirection(
+export function printLevelsForDirection(
   currentPrice: number,
   atr: number,
   levels: any,
   isLong: boolean,
   config: any
 ) {
+  const effectiveConfigExitStrategies =
+    config.exitStrategies || config.default?.exitStrategies || {};
+
   // Stop Loss
-  const stopLossAtrMulti =
-    levels.stopLossAtrMulti || config.exitStrategies?.stopLoss?.atrMultiplier || 2.0;
-  const stopLoss =
-    levels.stopLoss || calculateATRStopLoss(currentPrice, atr, stopLossAtrMulti, isLong);
+  const actualStopLossAtrMultiUsed = levels.stopLossAtrMulti;
+  let stopLoss: number;
+  let stopLossAtrText: string = '';
+
+  if (levels.stopLoss !== undefined) {
+    stopLoss = levels.stopLoss;
+    if (actualStopLossAtrMultiUsed !== undefined && atr > 0) {
+      const stopText = isLong ? 'below entry' : 'above entry';
+      stopLossAtrText = ` (${actualStopLossAtrMultiUsed.toFixed(1)}x ATR ${stopText})`;
+    }
+  } else if (actualStopLossAtrMultiUsed !== undefined && atr > 0) {
+    // This case should ideally not be hit if calculateTradeLevels always provides levels.stopLoss
+    stopLoss = calculateATRStopLoss(currentPrice, atr, actualStopLossAtrMultiUsed, isLong);
+    const stopText = isLong ? 'below entry' : 'above entry';
+    stopLossAtrText = ` (${actualStopLossAtrMultiUsed.toFixed(1)}x ATR ${stopText})`;
+  } else {
+    // Fallback if no stop loss info at all (should be rare if enabled)
+    stopLoss = isLong ? currentPrice * 0.98 : currentPrice * 1.02; // Default to a 2% stop
+    console.warn('Warning: Stop loss value not found in levels, using default.');
+  }
   const stopLossPct = ((stopLoss - currentPrice) / currentPrice) * 100;
-  const stopText = isLong ? 'below entry' : 'above entry';
-  const atrTextSL = ` (${stopLossAtrMulti}x ATR ${stopText})`;
+
   console.log(
     chalk.cyan('Stop Loss:') +
       ' ' +
       stopLoss.toFixed(4) +
-      atrTextSL +
+      stopLossAtrText +
       ` [${stopLossPct.toFixed(2)}%]`
   );
 
   // Profit Target
-  const profitTargetAtrMulti =
-    levels.profitTargetAtrMulti || config.exitStrategies?.profitTarget?.atrMultiplier || 4.0;
+  const actualProfitTargetAtrMultiUsed = levels.profitTargetAtrMulti;
   let profitTarget: number;
-  if (levels.profitTarget) {
+  let profitTargetAtrText = '';
+
+  if (levels.profitTarget !== undefined) {
     profitTarget = levels.profitTarget;
-  } else {
-    const atrMultiple = atr * profitTargetAtrMulti;
+    if (actualProfitTargetAtrMultiUsed !== undefined && atr > 0) {
+      const targetText = isLong ? 'above entry' : 'below entry';
+      profitTargetAtrText = ` (${actualProfitTargetAtrMultiUsed.toFixed(1)}x ATR ${targetText})`;
+    }
+  } else if (actualProfitTargetAtrMultiUsed !== undefined && atr > 0) {
+    // This case should ideally not be hit if calculateTradeLevels always provides levels.profitTarget
+    const atrMultiple = atr * actualProfitTargetAtrMultiUsed;
     profitTarget = isLong ? currentPrice + atrMultiple : currentPrice - atrMultiple;
+    const targetText = isLong ? 'above entry' : 'below entry'; // Corrected here
+    profitTargetAtrText = ` (${actualProfitTargetAtrMultiUsed.toFixed(1)}x ATR ${targetText})`;
+  } else {
+    // Fallback if no profit target info at all
+    profitTarget = currentPrice; // Default to no change
+    console.warn('Warning: Profit target value not found in levels, using default.');
   }
+
   const profitTargetPct = ((profitTarget - currentPrice) / currentPrice) * 100;
-  const targetText = isLong ? 'above entry' : 'below entry';
-  const profitTargetAtrText = ` (${profitTargetAtrMulti}x ATR ${targetText})`;
   console.log(
     chalk.cyan('Profit Target:') +
       ' ' +
@@ -321,41 +351,61 @@ function printLevelsForDirection(
   );
 
   // Trailing Stop
-  const trailAtrMultiplierDefault =
-    config.exitStrategies?.trailingStop?.trailAtrMultiplier === undefined
-      ? 2.0
-      : config.exitStrategies.trailingStop.trailAtrMultiplier;
-  const trailAtrMultiplier =
-    levels.tsTrailAmount && levels.tsTrailAmount !== atr * trailAtrMultiplierDefault
-      ? levels.tsTrailAmount / atr
-      : trailAtrMultiplierDefault;
+  const trailAtrMultiplierFromEffectiveConfig =
+    effectiveConfigExitStrategies.trailingStop?.trailAtrMultiplier;
+  const trailPercentFromEffectiveConfig = effectiveConfigExitStrategies.trailingStop?.trailPercent;
 
+  // Determine the numeric tsTrailAmount first, using the value from `levels` if available
+  // or calculating it based on config if `levels.tsTrailAmount` is not defined.
   const tsTrailAmount =
-    levels.tsTrailAmount === undefined ? atr * trailAtrMultiplier : levels.tsTrailAmount;
+    levels.tsTrailAmount ?? // Use if already calculated by calculateTradeLevels
+    (atr > 0 && trailAtrMultiplierFromEffectiveConfig !== undefined
+      ? atr * trailAtrMultiplierFromEffectiveConfig // Calculate from ATR if possible
+      : trailPercentFromEffectiveConfig !== undefined
+        ? currentPrice * (trailPercentFromEffectiveConfig / 100) // Calculate from Percent if possible
+        : currentPrice * 0.005); // Absolute fallback
 
-  let trailPct: number;
+  let trailAtrTextPart: string = '';
+  let trailPctText: string;
+
+  // Now format the descriptive text based on how tsTrailAmount relates to config
   if (
-    config.exitStrategies?.trailingStop?.trailPercent &&
-    levels.tsTrailAmount === config.exitStrategies.trailingStop.trailPercent
+    trailAtrMultiplierFromEffectiveConfig !== undefined &&
+    atr > 0 &&
+    Math.abs(tsTrailAmount - atr * trailAtrMultiplierFromEffectiveConfig) < 0.00001 // Check if it matches ATR calc
   ) {
-    trailPct = levels.tsTrailAmount;
+    trailAtrTextPart = `${trailAtrMultiplierFromEffectiveConfig.toFixed(1)}x ATR, `;
+    const trailAmountAsPctOfPrice = (tsTrailAmount / currentPrice) * 100;
+    trailPctText = `${trailAmountAsPctOfPrice.toFixed(2)}% of price`;
+  } else if (
+    trailPercentFromEffectiveConfig !== undefined &&
+    Math.abs(tsTrailAmount - currentPrice * (trailPercentFromEffectiveConfig / 100)) < 0.00001 // Check if it matches Percent calc
+  ) {
+    trailPctText = `${trailPercentFromEffectiveConfig}% of price (fixed %)`;
   } else {
-    trailPct = (tsTrailAmount / currentPrice) * 100;
+    // Fallback: display tsTrailAmount as a raw percentage of current price
+    const trailAmountAsPctOfPrice = (tsTrailAmount / currentPrice) * 100;
+    trailPctText = `${trailAmountAsPctOfPrice.toFixed(2)}% of price`;
   }
 
   let activationText = 'Immediate activation';
-  if (levels.tsActivationLevel && levels.tsActivationLevel !== currentPrice) {
-    const activationDiffPct = ((levels.tsActivationLevel - currentPrice) / currentPrice) * 100;
-    activationText = `Activation at ${levels.tsActivationLevel.toFixed(4)} (${activationDiffPct.toFixed(2)}%)`;
-  }
   if (levels.immediateActivation) {
-    activationText = 'Immediate activation';
+    // Covered
+  } else if (levels.tsActivationLevel && levels.tsActivationLevel !== currentPrice) {
+    const activationDiffPct = ((levels.tsActivationLevel - currentPrice) / currentPrice) * 100;
+    let activationAtrText = '';
+    const activationAtrMultiFromConfig =
+      effectiveConfigExitStrategies.trailingStop?.activationAtrMultiplier;
+    if (activationAtrMultiFromConfig !== undefined && activationAtrMultiFromConfig > 0 && atr > 0) {
+      activationAtrText = ` (${activationAtrMultiFromConfig.toFixed(1)}x ATR)`;
+    }
+    activationText = `Activation at ${levels.tsActivationLevel.toFixed(4)} (${activationDiffPct.toFixed(2)}%)${activationAtrText}`;
   }
 
   console.log(chalk.cyan('Trailing Stop:') + ` ${activationText}`);
   console.log(
     chalk.cyan('Trailing Amount:') +
-      ` ${tsTrailAmount.toFixed(4)} (${trailAtrMultiplier.toFixed(1)}x ATR, ${trailPct.toFixed(2)}% of price)`
+      ` ${tsTrailAmount.toFixed(4)} (${trailAtrTextPart}${trailPctText})`
   );
 }
 
