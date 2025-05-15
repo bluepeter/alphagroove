@@ -14,6 +14,8 @@ dotenv.config(); // Load .env as a fallback if .env.local is not found or for ge
 export interface LLMResponse {
   action: 'long' | 'short' | 'do_nothing';
   rationalization?: string;
+  stopLoss?: number;
+  profitTarget?: number;
   debugRawText?: string; // Added for debugging raw LLM output
   rawResponse?: any;
   error?: string;
@@ -165,6 +167,9 @@ export class LlmApiService {
 
           let parsedAction: 'long' | 'short' | 'do_nothing' = 'do_nothing';
           let parsedRationalization: string | undefined = undefined;
+          let parsedStopLoss: number | undefined = undefined;
+          let parsedProfitTarget: number | undefined = undefined;
+
           try {
             const parsedJson = JSON.parse(messageTextContent);
             if (
@@ -176,6 +181,24 @@ export class LlmApiService {
             if (typeof parsedJson.rationalization === 'string') {
               parsedRationalization = parsedJson.rationalization;
             }
+            if (
+              typeof parsedJson.stopLoss === 'string' ||
+              typeof parsedJson.stopLoss === 'number'
+            ) {
+              const sl = parseFloat(parsedJson.stopLoss);
+              if (!isNaN(sl)) {
+                parsedStopLoss = sl;
+              }
+            }
+            if (
+              typeof parsedJson.profitTarget === 'string' ||
+              typeof parsedJson.profitTarget === 'number'
+            ) {
+              const pt = parseFloat(parsedJson.profitTarget);
+              if (!isNaN(pt)) {
+                parsedProfitTarget = pt;
+              }
+            }
           } catch (parseError: any) {
             console.warn(
               `[DEBUG LlmApiService] JSON.parse failed for raw text. Error: ${parseError.message}`
@@ -185,6 +208,8 @@ export class LlmApiService {
           return {
             action: parsedAction,
             rationalization: parsedRationalization,
+            stopLoss: parsedStopLoss,
+            profitTarget: parsedProfitTarget,
             cost: callCost,
             debugRawText: messageTextContent,
             rawResponse: response,

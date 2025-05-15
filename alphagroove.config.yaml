@@ -79,10 +79,23 @@ llmConfirmationScreen:
       of your class at MIT and Stanford.
   #   - You are a YOLO trader that is super-savvy and has exceptional intuition. Your rationale must be in WSB lingo.
   commonPromptSuffixForJson: >-
-    Based on the provided chart, what action would you take: go long, go short, or do nothing?
-    Provide a one-sentence rationalization for your decision.
+    Based on the provided chart: 
 
-    Your response MUST be a valid JSON object and nothing else.  For example: `{"action": "long",
-    "rationalization": "<would appear here>"}` or  `{"action": "short", "rationalization": "<would
-    appear here>"}` or  `{"action": "do_nothing", "rationalization": "<would appear here>"}`
+    - What day trade action would you take: go long, go short, or do_nothing?  
+    - Provide a one-sentence rationalization for your decision.  
+    - Provide target stop loss and profit target prices (only provide if action is long or short)
+
+    Your response MUST be a valid JSON object and nothing else.  JSON in the following format:
+
+    `{"action": "long", "rationalization": "<here>", "stopLoss": "<here>", "profitTarget":
+    "<here>"}` 
+
+    or  
+
+    `{"action": "short", "rationalization": "<here>", "stopLoss": "<here>", "profitTarget":
+    "<here>"}` 
+
+    or  
+
+    `{"action": "do_nothing", "rationalization": "<here>"}`
   maxOutputTokens: 150

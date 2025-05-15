@@ -145,6 +145,15 @@ export async function main(imagePath?: string, cmdOptions?: any) {
           chalk.cyan(`Response #${index + 1}: ${actionEmoji} ${response.action.toUpperCase()}`)
         );
 
+        if (response.action === 'long' || response.action === 'short') {
+          if (typeof response.stopLoss === 'number') {
+            console.log(chalk.magenta(`  Stop Loss: ${response.stopLoss.toFixed(2)}`));
+          }
+          if (typeof response.profitTarget === 'number') {
+            console.log(chalk.magenta(`  Profit Target: ${response.profitTarget.toFixed(2)}`));
+          }
+        }
+
         if (response.rationalization) {
           console.log(`"${response.rationalization}"`);
         }
@@ -164,6 +173,12 @@ export async function main(imagePath?: string, cmdOptions?: any) {
       console.log(chalk.bold('\nDetailed LLM Response Data:'));
 
       decision._debug.responses.forEach((response, index) => {
+        console.log(chalk.cyan(`\n--- Response #${index + 1} Raw Data ---`));
+        if (response.debugRawText) {
+          console.log(chalk.gray(response.debugRawText));
+        } else {
+          console.log(chalk.gray('Raw text not available.'));
+        }
         if (typeof response.cost === 'number') {
           console.log(chalk.dim(`Response #${index + 1} Cost: $${response.cost.toFixed(6)}`));
         }
