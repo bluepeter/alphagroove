@@ -376,10 +376,11 @@ can be set to `long`, `short`, or the new `llm_decides` option.
     trade is executed.
   - This allows the LLM to dynamically decide whether to go long or short on a pattern that might
     otherwise have a fixed interpretation.
-  - The initial SQL query for fetching trade data will assume a base direction (e.g., 'long') for
-    calculating `return_pct`. If the LLM chooses the opposite direction, this `return_pct` is
-    automatically inverted by the system to reflect the correct profit/loss for the LLM-chosen
-    direction.
+  - The initial SQL query for fetching trade data identifies entry candidates and their entry
+    prices. If `llm_decides` is active, the query may assume a base direction (e.g., 'long') for
+    context, but it does not calculate a preliminary `return_pct`. The actual `return_pct` for the
+    trade is calculated in JavaScript after the LLM's consensus determines the final trade direction
+    ('long' or 'short'), using the standard formula appropriate for that chosen direction.
 
 **Metrics Reporting with Dynamic Direction:**
 
