@@ -15,10 +15,14 @@ vi.mock('csv-parse/sync', () => ({
   parse: vi.fn(),
 }));
 
-vi.mock('./utils/calculations', () => ({
-  calculateAverageTrueRangeForDay: vi.fn(),
-  calculateATRStopLoss: vi.fn(),
-}));
+vi.mock('./utils/calculations', async () => {
+  const actual = (await vi.importActual('./utils/calculations')) as any;
+  return {
+    ...actual,
+    calculateAverageTrueRangeForDay: vi.fn(),
+    calculateATRStopLoss: vi.fn(),
+  };
+});
 
 // Mock commander to prevent parse argv errors
 vi.mock('commander', () => ({
@@ -210,12 +214,10 @@ describe('Trade Levels Tool', () => {
       expect(consoleLogSpy).toHaveBeenCalled();
 
       // Check specific output for profit target
-      const profitTargetCall = consoleLogSpy.mock.calls.find((call: string[]) =>
+      const profitTargetCall = consoleLogSpy.mock.calls.find((call: any[]) =>
         call[0].includes('Profit Target:')
       );
-      expect(profitTargetCall[0]).toContain('105.0000');
-      expect(profitTargetCall[0]).toContain('(5.0x ATR above entry)');
-      expect(profitTargetCall[0]).toContain('[5.00%]');
+      expect(profitTargetCall[0]).toContain('ATR PT [5.0x]: $105.00 (+$5.00, 5.00%)');
     });
 
     it('should display correct profit target ATR multiplier (2.5x) for short position', () => {
@@ -240,12 +242,10 @@ describe('Trade Levels Tool', () => {
 
       printLevelsForDirection(currentPrice, atr, levels, false, config); // isLong = false
 
-      const profitTargetCall = consoleLogSpy.mock.calls.find((call: string[]) =>
+      const profitTargetCall = consoleLogSpy.mock.calls.find((call: any[]) =>
         call[0].includes('Profit Target:')
       );
-      expect(profitTargetCall[0]).toContain('195.0000');
-      expect(profitTargetCall[0]).toContain('(2.5x ATR below entry)');
-      expect(profitTargetCall[0]).toContain('[-2.50%]');
+      expect(profitTargetCall[0]).toContain('ATR PT [2.5x]: $195.00 (-$5.00, -2.50%)');
     });
 
     it('should display profit target based on percentFromEntry if atrMultiplier is not provided in levels', () => {
@@ -264,12 +264,11 @@ describe('Trade Levels Tool', () => {
 
       printLevelsForDirection(currentPrice, atr, levels, true, config);
 
-      const profitTargetCall = consoleLogSpy.mock.calls.find((call: string[]) =>
+      const profitTargetCall = consoleLogSpy.mock.calls.find((call: any[]) =>
         call[0].includes('Profit Target:')
       );
-      expect(profitTargetCall[0]).toContain('103.0000');
-      expect(profitTargetCall[0]).not.toContain('x ATR'); // Should not show ATR text
-      expect(profitTargetCall[0]).toContain('[3.00%]');
+      expect(profitTargetCall[0]).toContain('PT: $103.00 (+$3.00, 3.00%)');
+      expect(profitTargetCall[0]).not.toContain('x ATR');
     });
 
     it('should display stop loss correctly with ATR and percent', () => {
@@ -285,38 +284,36 @@ describe('Trade Levels Tool', () => {
       };
 
       printLevelsForDirection(currentPrice, atr, levels, true, config);
-      const slCall = consoleLogSpy.mock.calls.find((call: string[]) =>
-        call[0].includes('Stop Loss:')
-      );
-      expect(slCall[0]).toContain('98.0000');
-      expect(slCall[0]).toContain('(2.0x ATR below entry)');
-      expect(slCall[0]).toContain('[-2.00%]');
+      const slCall = consoleLogSpy.mock.calls.find((call: any[]) => call[0].includes('Stop Loss:'));
+      expect(slCall[0]).toContain('ATR SL [2.0x]: $98.00 (-$2.00, -2.00%)');
     });
 
     it('should display trailing stop correctly with immediate ATR activation and ATR trail', () => {
       const currentPrice = 100;
       const atr = 1.0;
       const levels = {
-        tsActivationLevel: 100,
-        immediateActivation: true,
+        // For immediate activation, tsActivationLevel might be entry price or not explicitly set if immediateActivation is true
+        tsActivationLevel: currentPrice, // Explicitly setting to currentPrice for clarity that it would be immediate
+        immediateActivation: true, // This is key for this test path
         tsTrailAmount: 1.5, // Derived from atr * trailAtrMultiplier
       };
       const config = {
+        // Config to ensure immediateActivation is true and trail is ATR based
         exitStrategies: {
           trailingStop: { activationAtrMultiplier: 0, trailAtrMultiplier: 1.5 },
         },
       };
       printLevelsForDirection(currentPrice, atr, levels, true, config);
-      const tsActivationCall = consoleLogSpy.mock.calls.find((call: string[]) =>
+      const tsActivationCall = consoleLogSpy.mock.calls.find((call: any[]) =>
         call[0].includes('Trailing Stop:')
       );
-      expect(tsActivationCall[0]).toContain('Immediate activation');
+      // Corrected: If immediateActivation is true, this is the expected output
+      expect(tsActivationCall[0]).toContain('Trailing Stop: Immediate activation');
 
-      const tsAmountCall = consoleLogSpy.mock.calls.find((call: string[]) =>
+      const tsAmountCall = consoleLogSpy.mock.calls.find((call: any[]) =>
         call[0].includes('Trailing Amount:')
       );
-      expect(tsAmountCall[0]).toContain('1.5000');
-      expect(tsAmountCall[0]).toContain('(1.5x ATR, 1.50% of price)');
+      expect(tsAmountCall[0]).toContain('TS Trail [1.5x ATR]: $1.50 (1.50% of price)');
     });
   });
 });

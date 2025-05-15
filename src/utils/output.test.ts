@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import chalk from 'chalk';
+// import chalk from 'chalk'; // Unused
 import {
   printHeader,
   printYearHeader,
@@ -12,7 +12,7 @@ import {
   type OverallTradeStats,
   calculatePortfolioGrowth,
 } from './output';
-import { formatDate, formatTime, formatDollar, formatPercent } from './calculations';
+// import { formatDate, formatTime, formatDollar, formatPercent } from './calculations'; // Unused
 
 // Mock chalk to prevent styling in tests
 vi.mock('chalk', () => ({

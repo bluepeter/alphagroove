@@ -17,7 +17,13 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 import { parse } from 'csv-parse/sync';
 import { loadConfig } from './utils/config';
-import { Bar, calculateAverageTrueRangeForDay, calculateATRStopLoss } from './utils/calculations';
+import {
+  Bar,
+  calculateAverageTrueRangeForDay,
+  calculateATRStopLoss,
+  formatDollar,
+  formatPercent,
+} from './utils/calculations';
 
 // Initialize command line interface
 const program = new Command();
@@ -290,64 +296,60 @@ export function printLevelsForDirection(
   // Stop Loss
   const actualStopLossAtrMultiUsed = levels.stopLossAtrMulti;
   let stopLoss: number;
-  let stopLossAtrText: string = '';
+  let slDetail = 'SL';
 
   if (levels.stopLoss !== undefined) {
     stopLoss = levels.stopLoss;
     if (actualStopLossAtrMultiUsed !== undefined && atr > 0) {
-      const stopText = isLong ? 'below entry' : 'above entry';
-      stopLossAtrText = ` (${actualStopLossAtrMultiUsed.toFixed(1)}x ATR ${stopText})`;
+      slDetail = 'ATR SL';
+      slDetail += ` [${actualStopLossAtrMultiUsed.toFixed(1)}x]`;
     }
   } else if (actualStopLossAtrMultiUsed !== undefined && atr > 0) {
-    // This case should ideally not be hit if calculateTradeLevels always provides levels.stopLoss
     stopLoss = calculateATRStopLoss(currentPrice, atr, actualStopLossAtrMultiUsed, isLong);
-    const stopText = isLong ? 'below entry' : 'above entry';
-    stopLossAtrText = ` (${actualStopLossAtrMultiUsed.toFixed(1)}x ATR ${stopText})`;
+    slDetail = 'ATR SL';
+    slDetail += ` [${actualStopLossAtrMultiUsed.toFixed(1)}x]`;
   } else {
-    // Fallback if no stop loss info at all (should be rare if enabled)
-    stopLoss = isLong ? currentPrice * 0.98 : currentPrice * 1.02; // Default to a 2% stop
+    stopLoss = isLong ? currentPrice * 0.98 : currentPrice * 1.02;
     console.warn('Warning: Stop loss value not found in levels, using default.');
   }
-  const stopLossPct = ((stopLoss - currentPrice) / currentPrice) * 100;
-
+  const slOffset = stopLoss - currentPrice;
+  const slOffsetPct = slOffset / currentPrice;
+  const slSign = slOffset < 0 ? '-' : '+';
+  const slAbsOffsetFormatted = formatDollar(Math.abs(slOffset));
+  // Format: TYPE [Nx ATR]: $PriceLevel ($Offset, %Offset)
   console.log(
     chalk.cyan('Stop Loss:') +
-      ' ' +
-      stopLoss.toFixed(4) +
-      stopLossAtrText +
-      ` [${stopLossPct.toFixed(2)}%]`
+      ` ${slDetail}: ${formatDollar(stopLoss)} (${slSign}${slAbsOffsetFormatted}, ${formatPercent(slOffsetPct)})`
   );
 
   // Profit Target
   const actualProfitTargetAtrMultiUsed = levels.profitTargetAtrMulti;
   let profitTarget: number;
-  let profitTargetAtrText = '';
+  let ptDetail = 'PT';
 
   if (levels.profitTarget !== undefined) {
     profitTarget = levels.profitTarget;
     if (actualProfitTargetAtrMultiUsed !== undefined && atr > 0) {
-      const targetText = isLong ? 'above entry' : 'below entry';
-      profitTargetAtrText = ` (${actualProfitTargetAtrMultiUsed.toFixed(1)}x ATR ${targetText})`;
+      ptDetail = 'ATR PT';
+      ptDetail += ` [${actualProfitTargetAtrMultiUsed.toFixed(1)}x]`;
     }
   } else if (actualProfitTargetAtrMultiUsed !== undefined && atr > 0) {
-    // This case should ideally not be hit if calculateTradeLevels always provides levels.profitTarget
     const atrMultiple = atr * actualProfitTargetAtrMultiUsed;
     profitTarget = isLong ? currentPrice + atrMultiple : currentPrice - atrMultiple;
-    const targetText = isLong ? 'above entry' : 'below entry'; // Corrected here
-    profitTargetAtrText = ` (${actualProfitTargetAtrMultiUsed.toFixed(1)}x ATR ${targetText})`;
+    ptDetail = 'ATR PT';
+    ptDetail += ` [${actualProfitTargetAtrMultiUsed.toFixed(1)}x]`;
   } else {
-    // Fallback if no profit target info at all
-    profitTarget = currentPrice; // Default to no change
+    profitTarget = currentPrice;
     console.warn('Warning: Profit target value not found in levels, using default.');
   }
-
-  const profitTargetPct = ((profitTarget - currentPrice) / currentPrice) * 100;
+  const ptOffset = profitTarget - currentPrice;
+  const ptOffsetPct = ptOffset / currentPrice;
+  const ptSign = ptOffset < 0 ? '-' : '+';
+  const ptAbsOffsetFormatted = formatDollar(Math.abs(ptOffset));
+  // Format: TYPE [Nx ATR]: $PriceLevel ($Offset, %Offset)
   console.log(
     chalk.cyan('Profit Target:') +
-      ' ' +
-      profitTarget.toFixed(4) +
-      profitTargetAtrText +
-      ` [${profitTargetPct.toFixed(2)}%]`
+      ` ${ptDetail}: ${formatDollar(profitTarget)} (${ptSign}${ptAbsOffsetFormatted}, ${formatPercent(ptOffsetPct)})`
   );
 
   // Trailing Stop
@@ -355,37 +357,34 @@ export function printLevelsForDirection(
     effectiveConfigExitStrategies.trailingStop?.trailAtrMultiplier;
   const trailPercentFromEffectiveConfig = effectiveConfigExitStrategies.trailingStop?.trailPercent;
 
-  // Determine the numeric tsTrailAmount first, using the value from `levels` if available
-  // or calculating it based on config if `levels.tsTrailAmount` is not defined.
   const tsTrailAmount =
-    levels.tsTrailAmount ?? // Use if already calculated by calculateTradeLevels
+    levels.tsTrailAmount ??
     (atr > 0 && trailAtrMultiplierFromEffectiveConfig !== undefined
-      ? atr * trailAtrMultiplierFromEffectiveConfig // Calculate from ATR if possible
+      ? atr * trailAtrMultiplierFromEffectiveConfig
       : trailPercentFromEffectiveConfig !== undefined
-        ? currentPrice * (trailPercentFromEffectiveConfig / 100) // Calculate from Percent if possible
-        : currentPrice * 0.005); // Absolute fallback
+        ? currentPrice * (trailPercentFromEffectiveConfig / 100)
+        : currentPrice * 0.005);
 
-  let trailAtrTextPart: string = '';
   let trailPctText: string;
+  let tsDetailPrefix = 'TS Trail';
 
-  // Now format the descriptive text based on how tsTrailAmount relates to config
   if (
     trailAtrMultiplierFromEffectiveConfig !== undefined &&
     atr > 0 &&
-    Math.abs(tsTrailAmount - atr * trailAtrMultiplierFromEffectiveConfig) < 0.00001 // Check if it matches ATR calc
+    Math.abs(tsTrailAmount - atr * trailAtrMultiplierFromEffectiveConfig) < 0.00001
   ) {
-    trailAtrTextPart = `${trailAtrMultiplierFromEffectiveConfig.toFixed(1)}x ATR, `;
+    tsDetailPrefix += ` [${trailAtrMultiplierFromEffectiveConfig.toFixed(1)}x ATR]`;
     const trailAmountAsPctOfPrice = (tsTrailAmount / currentPrice) * 100;
-    trailPctText = `${trailAmountAsPctOfPrice.toFixed(2)}% of price`;
+    trailPctText = `${formatDollar(tsTrailAmount)} (${trailAmountAsPctOfPrice.toFixed(2)}% of price)`;
   } else if (
     trailPercentFromEffectiveConfig !== undefined &&
-    Math.abs(tsTrailAmount - currentPrice * (trailPercentFromEffectiveConfig / 100)) < 0.00001 // Check if it matches Percent calc
+    Math.abs(tsTrailAmount - currentPrice * (trailPercentFromEffectiveConfig / 100)) < 0.00001
   ) {
-    trailPctText = `${trailPercentFromEffectiveConfig}% of price (fixed %)`;
+    tsDetailPrefix += ` [${trailPercentFromEffectiveConfig}%]`; // Indicate it's percent based
+    trailPctText = `${formatDollar(tsTrailAmount)} (${trailPercentFromEffectiveConfig}% of price)`;
   } else {
-    // Fallback: display tsTrailAmount as a raw percentage of current price
     const trailAmountAsPctOfPrice = (tsTrailAmount / currentPrice) * 100;
-    trailPctText = `${trailAmountAsPctOfPrice.toFixed(2)}% of price`;
+    trailPctText = `${formatDollar(tsTrailAmount)} (${trailAmountAsPctOfPrice.toFixed(2)}% of price)`;
   }
 
   let activationText = 'Immediate activation';
@@ -397,16 +396,16 @@ export function printLevelsForDirection(
     const activationAtrMultiFromConfig =
       effectiveConfigExitStrategies.trailingStop?.activationAtrMultiplier;
     if (activationAtrMultiFromConfig !== undefined && activationAtrMultiFromConfig > 0 && atr > 0) {
-      activationAtrText = ` (${activationAtrMultiFromConfig.toFixed(1)}x ATR)`;
+      activationAtrText = ` [${activationAtrMultiFromConfig.toFixed(1)}x ATR]`;
     }
-    activationText = `Activation at ${levels.tsActivationLevel.toFixed(4)} (${activationDiffPct.toFixed(2)}%)${activationAtrText}`;
+    const actOffset = levels.tsActivationLevel - currentPrice;
+    const actSign = actOffset < 0 ? '-' : '+';
+    const actAbsOffsetFormatted = formatDollar(Math.abs(actOffset));
+    activationText = `Activation at ${formatDollar(levels.tsActivationLevel)}${activationAtrText} (${actSign}${actAbsOffsetFormatted}, ${formatPercent(activationDiffPct)})`;
   }
 
   console.log(chalk.cyan('Trailing Stop:') + ` ${activationText}`);
-  console.log(
-    chalk.cyan('Trailing Amount:') +
-      ` ${tsTrailAmount.toFixed(4)} (${trailAtrTextPart}${trailPctText})`
-  );
+  console.log(chalk.cyan('Trailing Amount:') + ` ${tsDetailPrefix}: ${trailPctText}`);
 }
 
 // Run only if executed directly (not when imported)
