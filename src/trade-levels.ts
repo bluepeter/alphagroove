@@ -22,9 +22,10 @@ const program = new Command();
 
 program
   .name('trade-levels')
-  .description("Calculate trade levels using AlphaGroove's configuration and ATR")
+  .description(
+    "Calculate trade levels for both LONG and SHORT directions using AlphaGroove's configuration and ATR"
+  )
   .argument('<csvPath>', 'Path to the CSV file with minute bar data')
-  .option('-d, --direction <direction>', 'Trade direction (long or short)', 'long')
   .option('-p, --price <price>', 'Current execution price', parseFloat)
   .option('-c, --config <path>', 'Path to configuration file (default: alphagroove.config.yaml)');
 
@@ -343,8 +344,8 @@ export async function main() {
     }
 
     const currentPrice = options.price;
-    const direction = options.direction === 'short' ? 'short' : 'long';
-    const isLong = direction === 'long';
+    // const direction = options.direction === 'short' ? 'short' : 'long'; // Direction will be handled for both. CLI option removed.
+    // const isLong = direction === 'long';
 
     // Load config
     console.log(chalk.dim('Loading configuration...'));
@@ -388,67 +389,17 @@ export async function main() {
       process.exit(1);
     }
 
-    // Calculate trade levels
-    const levels = calculateTradeLevels(currentPrice, atr, config, isLong);
+    console.log('\n' + chalk.cyan('Prior Day ATR:') + ' ' + atr.toFixed(4));
 
-    // Print results
-    console.log(
-      '\n' +
-        chalk.bold.underline(`Trade Levels for ${direction.toUpperCase()} at ${currentPrice}`) +
-        '\n'
-    );
+    // Calculate and print for LONG direction
+    const longLevels = calculateTradeLevels(currentPrice, atr, config, true);
+    console.log('\n' + chalk.bold.underline(`Trade Levels for LONG at ${currentPrice}`) + '\n');
+    printLevelsForDirection(currentPrice, atr, longLevels, true, config);
 
-    console.log(chalk.cyan('Prior Day ATR:') + ' ' + atr.toFixed(4));
-
-    // Calculate default levels even if config doesn't have them
-    // Stop Loss (default: 2x ATR)
-    const stopLossAtrMulti = levels.stopLossAtrMulti || 2.0;
-    const stopLoss =
-      levels.stopLoss || calculateATRStopLoss(currentPrice, atr, stopLossAtrMulti, isLong);
-    const stopLossPct = ((stopLoss - currentPrice) / currentPrice) * 100;
-
-    const stopText = isLong ? 'below entry' : 'above entry';
-    const atrText = ` (${stopLossAtrMulti}x ATR ${stopText})`;
-    console.log(
-      chalk.cyan('Stop Loss:') +
-        ' ' +
-        stopLoss.toFixed(4) +
-        atrText +
-        ` [${stopLossPct.toFixed(2)}%]`
-    );
-
-    // Profit Target (default: 4x ATR)
-    const profitTargetAtrMulti = levels.profitTargetAtrMulti || 4.0;
-    let profitTarget: number;
-
-    if (levels.profitTarget) {
-      profitTarget = levels.profitTarget;
-    } else {
-      const atrMultiple = atr * profitTargetAtrMulti;
-      profitTarget = isLong ? currentPrice + atrMultiple : currentPrice - atrMultiple;
-    }
-
-    const profitTargetPct = ((profitTarget - currentPrice) / currentPrice) * 100;
-    const targetText = isLong ? 'above entry' : 'below entry';
-    const profitTargetAtrText = ` (${profitTargetAtrMulti}x ATR ${targetText})`;
-    console.log(
-      chalk.cyan('Profit Target:') +
-        ' ' +
-        profitTarget.toFixed(4) +
-        profitTargetAtrText +
-        ` [${profitTargetPct.toFixed(2)}%]`
-    );
-
-    // Trailing Stop (default: immediate activation, 2x ATR trail)
-    const trailAtrMultiplier = config.exitStrategies?.trailingStop?.trailAtrMultiplier || 2.0;
-    const tsTrailAmount = levels.tsTrailAmount || atr * trailAtrMultiplier;
-    const trailPct = (tsTrailAmount / currentPrice) * 100;
-
-    console.log(chalk.cyan('Trailing Stop:') + ' Immediate activation');
-    console.log(
-      chalk.cyan('Trailing Amount:') +
-        ` ${tsTrailAmount.toFixed(4)} (${trailAtrMultiplier}x ATR, ${trailPct.toFixed(2)}% of price)`
-    );
+    // Calculate and print for SHORT direction
+    const shortLevels = calculateTradeLevels(currentPrice, atr, config, false);
+    console.log('\n' + chalk.bold.underline(`Trade Levels for SHORT at ${currentPrice}`) + '\n');
+    printLevelsForDirection(currentPrice, atr, shortLevels, false, config);
 
     console.log(
       '\n' + chalk.dim('Note: All calculations are based on configuration and prior day ATR.')
@@ -457,6 +408,90 @@ export async function main() {
     console.error(chalk.red('Error calculating trade levels:'), error);
     process.exit(1);
   }
+}
+
+// Helper function to print levels for a given direction
+function printLevelsForDirection(
+  currentPrice: number,
+  atr: number,
+  levels: any, // Type this better if possible based on calculateTradeLevels return type
+  isLong: boolean,
+  config: any
+) {
+  // Stop Loss
+  const stopLossAtrMulti =
+    levels.stopLossAtrMulti || config.exitStrategies?.stopLoss?.atrMultiplier || 2.0;
+  const stopLoss =
+    levels.stopLoss || calculateATRStopLoss(currentPrice, atr, stopLossAtrMulti, isLong);
+  const stopLossPct = ((stopLoss - currentPrice) / currentPrice) * 100;
+  const stopText = isLong ? 'below entry' : 'above entry';
+  const atrTextSL = ` (${stopLossAtrMulti}x ATR ${stopText})`;
+  console.log(
+    chalk.cyan('Stop Loss:') +
+      ' ' +
+      stopLoss.toFixed(4) +
+      atrTextSL +
+      ` [${stopLossPct.toFixed(2)}%]`
+  );
+
+  // Profit Target
+  const profitTargetAtrMulti =
+    levels.profitTargetAtrMulti || config.exitStrategies?.profitTarget?.atrMultiplier || 4.0;
+  let profitTarget: number;
+  if (levels.profitTarget) {
+    profitTarget = levels.profitTarget;
+  } else {
+    const atrMultiple = atr * profitTargetAtrMulti;
+    profitTarget = isLong ? currentPrice + atrMultiple : currentPrice - atrMultiple;
+  }
+  const profitTargetPct = ((profitTarget - currentPrice) / currentPrice) * 100;
+  const targetText = isLong ? 'above entry' : 'below entry';
+  const profitTargetAtrText = ` (${profitTargetAtrMulti}x ATR ${targetText})`;
+  console.log(
+    chalk.cyan('Profit Target:') +
+      ' ' +
+      profitTarget.toFixed(4) +
+      profitTargetAtrText +
+      ` [${profitTargetPct.toFixed(2)}%]`
+  );
+
+  // Trailing Stop
+  const trailAtrMultiplierDefault =
+    config.exitStrategies?.trailingStop?.trailAtrMultiplier === undefined
+      ? 2.0
+      : config.exitStrategies.trailingStop.trailAtrMultiplier;
+  const trailAtrMultiplier =
+    levels.tsTrailAmount && levels.tsTrailAmount !== atr * trailAtrMultiplierDefault
+      ? levels.tsTrailAmount / atr
+      : trailAtrMultiplierDefault;
+
+  const tsTrailAmount =
+    levels.tsTrailAmount === undefined ? atr * trailAtrMultiplier : levels.tsTrailAmount;
+  // If tsTrailAmount was directly from config.trailPercent (absolute value), need to handle that case for % display
+  let trailPct: number;
+  if (
+    config.exitStrategies?.trailingStop?.trailPercent &&
+    levels.tsTrailAmount === config.exitStrategies.trailingStop.trailPercent
+  ) {
+    trailPct = levels.tsTrailAmount; // it is already a percentage
+  } else {
+    trailPct = (tsTrailAmount / currentPrice) * 100;
+  }
+
+  let activationText = 'Immediate activation';
+  if (levels.tsActivationLevel && levels.tsActivationLevel !== currentPrice) {
+    const activationDiffPct = ((levels.tsActivationLevel - currentPrice) / currentPrice) * 100;
+    activationText = `Activation at ${levels.tsActivationLevel.toFixed(4)} (${activationDiffPct.toFixed(2)}%)`;
+  }
+  if (levels.immediateActivation) {
+    activationText = 'Immediate activation';
+  }
+
+  console.log(chalk.cyan('Trailing Stop:') + ` ${activationText}`);
+  console.log(
+    chalk.cyan('Trailing Amount:') +
+      ` ${tsTrailAmount.toFixed(4)} (${trailAtrMultiplier.toFixed(1)}x ATR, ${trailPct.toFixed(2)}% of price)`
+  );
 }
 
 // Run only if executed directly (not when imported)

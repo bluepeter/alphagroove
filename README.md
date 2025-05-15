@@ -551,19 +551,20 @@ match what would be used in a backtest.
 
 ```bash
 # Basic usage
-pnpm levels /path/to/minute-bars.csv --price 420.69
+pnpm levels charts/adhoc/recent-data-from-fidelity.csv --price 587.54 > PRICE.txt
 ```
 
 **Options:**
 
 - `<csvPath>`: Path to the CSV file with minute bar data (required)
 - `-p, --price <price>`: Current execution price (required)
-- `-d, --direction <direction>`: Trade direction (`long` or `short`, default: `long`)
 - `-c, --config <path>`: Path to configuration file (default: `alphagroove.config.yaml`)
 
 **CSV Format:**
 
-The minute bars CSV file should have the following columns:
+The minute bars CSV file should have the following columns (this format is geared towards manual
+download from Fidelity which differs from the data source we use for backtesting in the `tickers/`
+directory.):
 
 - `Date`: Date in MM/DD/YYYY format
 - `Time`: Time in HH:MM AM/PM format
