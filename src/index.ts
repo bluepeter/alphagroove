@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { join } from 'path';
+// import chalk from 'chalk'; // Removed as it's no longer used after deleting debug logs
 
 import {
   getAvailableEntryPatterns,
@@ -419,20 +420,6 @@ export const processTradesLoop = async (
         ? (exitPrice - finalEntryPriceForPAndL) / finalEntryPriceForPAndL
         : (finalEntryPriceForPAndL - exitPrice) / finalEntryPriceForPAndL;
 
-    const validateReturn = () => {
-      const recalculatedReturn =
-        actualTradeDirection === 'long'
-          ? (exitPrice - finalEntryPriceForPAndL) / finalEntryPriceForPAndL
-          : (finalEntryPriceForPAndL - exitPrice) / finalEntryPriceForPAndL;
-      if (Math.abs(returnPct - recalculatedReturn) > 0.000001) {
-        console.error(
-          `CRITICAL ERROR in return calculation for ${tradeDate}. ` +
-            `First calculation: ${returnPct.toFixed(8)}, Second calculation: ${recalculatedReturn.toFixed(8)}`
-        );
-      }
-    };
-    validateReturn();
-
     const trade = mapRawDataToTrade(
       {
         ...rawTradeData,
@@ -468,7 +455,7 @@ export const processTradesLoop = async (
       if (Math.abs(trade.return_pct - finalCalculatedReturn) > 0.000001) {
         console.error(
           `CRITICAL ERROR: Trade return_pct (${trade.return_pct.toFixed(8)}) does not match ` +
-            `final calculation (${finalCalculatedReturn.toFixed(8)}) for ${tradeDate}`
+            `final calculation (${finalCalculatedReturn.toFixed(8)}) for ${trade.trade_date}`
         );
       }
     };

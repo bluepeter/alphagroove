@@ -36,10 +36,23 @@ export const fetchTradesFromQuery = (query: string): Array<Record<string, string
         return columns.reduce(
           (obj, col, i) => {
             const value = values[i];
-            // Attempt to convert to number if possible, otherwise keep as string
-            // Ensure that empty strings or strings that are not numbers are kept as strings
-            obj[col.trim()] =
-              value && value.trim() !== '' && !isNaN(Number(value)) ? Number(value) : value;
+            let processedValue: string | number = value;
+            if (value && value.trim() !== '' && !isNaN(Number(value))) {
+              const num = Number(value);
+              // Round OHLC and price-like columns to 4 decimal places
+              if (
+                ['open', 'high', 'low', 'close', 'price', 'entry_price', 'exit_price'].includes(
+                  col.trim().toLowerCase()
+                )
+              ) {
+                processedValue = parseFloat(num.toFixed(4));
+              } else {
+                processedValue = num;
+              }
+            } else {
+              processedValue = value; // Keep as string if not a valid number or empty
+            }
+            obj[col.trim()] = processedValue;
             return obj;
           },
           {} as Record<string, string | number>
