@@ -16,6 +16,7 @@ export interface LLMResponse {
   rationalization?: string;
   stopLoss?: number;
   profitTarget?: number;
+  confidence?: number;
   debugRawText?: string; // Added for debugging raw LLM output
   rawResponse?: any;
   error?: string;
@@ -169,6 +170,7 @@ export class LlmApiService {
           let parsedRationalization: string | undefined = undefined;
           let parsedStopLoss: number | undefined = undefined;
           let parsedProfitTarget: number | undefined = undefined;
+          let parsedConfidence: number | undefined = undefined;
 
           try {
             const parsedJson = JSON.parse(messageTextContent);
@@ -199,6 +201,12 @@ export class LlmApiService {
                 parsedProfitTarget = pt;
               }
             }
+            if (typeof parsedJson.confidence === 'number') {
+              parsedConfidence = parsedJson.confidence;
+            } else if (typeof parsedJson.confidence === 'string') {
+              const conf = parseFloat(parsedJson.confidence);
+              if (!isNaN(conf)) parsedConfidence = conf;
+            }
           } catch (parseError: any) {
             console.warn(
               `[DEBUG LlmApiService] JSON.parse failed for raw text. Error: ${parseError.message}`
@@ -210,6 +218,7 @@ export class LlmApiService {
             rationalization: parsedRationalization,
             stopLoss: parsedStopLoss,
             profitTarget: parsedProfitTarget,
+            confidence: parsedConfidence,
             cost: callCost,
             debugRawText: messageTextContent,
             rawResponse: response,

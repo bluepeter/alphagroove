@@ -133,6 +133,10 @@ export async function main(imagePath?: string, cmdOptions?: any) {
       console.log(`\nRationale: ${chalk.italic(decision.rationale)}`);
     }
 
+    if (decision.confidence !== undefined) {
+      console.log(`Average confidence: ${decision.confidence.toFixed(2)}`);
+    }
+
     // Show individual LLM responses always
     if (decision._debug?.responses) {
       console.log(chalk.bold('\nIndividual LLM Responses:'));
@@ -152,6 +156,10 @@ export async function main(imagePath?: string, cmdOptions?: any) {
           if (typeof response.profitTarget === 'number') {
             console.log(chalk.magenta(`  Profit Target: ${response.profitTarget.toFixed(2)}`));
           }
+        }
+
+        if (response.confidence !== undefined) {
+          console.log(`Confidence: ${response.confidence}`);
         }
 
         if (response.rationalization) {

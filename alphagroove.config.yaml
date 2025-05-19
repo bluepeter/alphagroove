@@ -1,6 +1,6 @@
 default:
   date:
-    from: '2017-01-01'
+    from: '2016-01-01'
     to: '2025-12-31'
   ticker: 'SPY'
   timeframe: '1min'
@@ -15,7 +15,8 @@ default:
   exitStrategies:
     enabled:
       - profitTarget
-      - stopLoss
+      #- stopLoss
+      - trailingStop
       - endOfDay
     # atrPeriodForEntry: 14 # This specific period is NOT used by the current ATR calculation method (which averages all TRs from the prior day).
     # Remove or keep commented if you plan to use a period-specific ATR calc in the future.
@@ -24,11 +25,11 @@ default:
     stopLoss:
       # percentFromEntry: 0.5 # Fallback, commented out to prioritize ATR
       atrMultiplier: 2.0 # Default: Stop at 2.0 * Prior Day's Average TR
-      useLlmProposedPrice: true
+      useLlmProposedPrice: false
     profitTarget:
       # percentFromEntry: 0.5 # Fallback, commented out to prioritize ATR
       atrMultiplier: 5.0 # Default: Target 3.0 * Prior Day's Average TR
-      useLlmProposedPrice: true
+      useLlmProposedPrice: false
     trailingStop:
       # activationPercent: 0 # Fallback, commented out to prioritize ATR
       # trailPercent: 0.3      # Fallback, commented out to prioritize ATR (0.3 for 0.3% of price)
@@ -49,7 +50,7 @@ patterns:
       fall-pct: 0.3
       within-minutes: 5
     fixed-time-entry:
-      entry-time: '13:00'
+      entry-time: '14:00'
 
 llmConfirmationScreen:
   enabled: true
@@ -84,22 +85,26 @@ llmConfirmationScreen:
     Based on the provided chart: 
 
     - What day trade action would you take: go long, go short, or do_nothing?  
+
     - Provide a one-sentence rationalization for your decision.  
+
+    - Provide a 1-10 confidence score for your decision. 
+
     - Provide target stop loss and profit target prices (only provide if action is long or short)
     that are realistic exit prices given today's range, remaining time in the day, and the current
     price.
 
     Your response MUST be a valid JSON object and nothing else.  JSON in the following format:
 
-    `{"action": "long", "rationalization": "<here>", "stopLoss": "<here>", "profitTarget":
-    "<here>"}` 
+    `{"action": "long", "rationalization": "<here>", "confidence": "<here>", "stopLoss": "<here>",
+    "profitTarget": "<here>"}` 
 
     or  
 
-    `{"action": "short", "rationalization": "<here>", "stopLoss": "<here>", "profitTarget":
-    "<here>"}` 
+    `{"action": "short", "rationalization": "<here>", "confidence": "<here>", "stopLoss": "<here>",
+    "profitTarget": "<here>"}` 
 
     or  
 
-    `{"action": "do_nothing", "rationalization": "<here>"}`
-  maxOutputTokens: 150
+    `{"action": "do_nothing", "rationalization": "<here>", "confidence": "<here>"}`
+  maxOutputTokens: 250
