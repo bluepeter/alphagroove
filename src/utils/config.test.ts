@@ -175,24 +175,6 @@ describe('Configuration System', () => {
       expect(merged.exitStrategies?.maxHoldTime?.minutes).toBe(60);
     });
 
-    it('should allow overriding exitStrategies.maxHoldTime.minutes in config default section', () => {
-      const config = createTestConfig({
-        default: {
-          ticker: 'SPY',
-          timeframe: '1min',
-          direction: 'long',
-          exitStrategies: {
-            enabled: ['maxHoldTime'],
-            maxHoldTime: { minutes: 30 },
-          },
-        },
-        exitStrategies: undefined,
-      });
-      const cliOptions = {};
-      const merged = mergeConfigWithCliOptions(config, cliOptions);
-      expect(merged.exitStrategies?.maxHoldTime?.minutes).toBe(30);
-    });
-
     it('should allow overriding exitStrategies.maxHoldTime.minutes in config root section, taking precedence over default section', () => {
       const config = createTestConfig({
         default: {

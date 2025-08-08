@@ -280,6 +280,30 @@ pnpm dev:start init
 **Note:** The configuration file must be named exactly `alphagroove.config.yaml` and placed in the
 project root directory for the application to find it.
 
+### Exit Strategies Location
+
+Configure exit strategies at the root of the YAML under `exit` (legacy alias: `exitStrategies`).
+Example:
+
+```yaml
+exit:
+  enabled: [maxHoldTime, profitTarget, trailingStop, endOfDay]
+  maxHoldTime:
+    minutes: 60
+  strategyOptions:
+    profitTarget:
+      atrMultiplier: 5.0
+    trailingStop:
+      activationAtrMultiplier: 0
+      trailAtrMultiplier: 2.5
+    endOfDay:
+      time: '16:00'
+  # Slippage is configured at the same level (not in strategyOptions)
+  slippage:
+    model: fixed
+    value: 0.01
+```
+
 ## Usage Examples
 
 ### Using Configuration File Only
@@ -293,17 +317,27 @@ default:
     to: '2025-05-02'
   ticker: 'SPY'
   direction: 'long'
-  patterns:
-    entry: 'quick-rise'
-    exit: 'fixed-time'
-patterns:
-  entry:
-    quick-rise:
-      rise-pct: 0.3
-      within-minutes: 5
-  exit:
-    fixed-time:
-      hold-minutes: 10
+entry:
+  enabled: [quickRise]
+  strategyOptions:
+    quickRise:
+      risePct: 0.3
+      withinMinutes: 5
+exit:
+  enabled: [maxHoldTime, profitTarget, trailingStop, endOfDay]
+  maxHoldTime:
+    minutes: 60
+  strategyOptions:
+    profitTarget:
+      atrMultiplier: 5.0
+    trailingStop:
+      activationAtrMultiplier: 0
+      trailAtrMultiplier: 2.5
+    endOfDay:
+      time: '16:00'
+  slippage:
+    model: fixed
+    value: 0.01
 ```
 
 Then simply run:
@@ -320,11 +354,11 @@ Override config file settings or run without a config file:
 # Override specific settings
 pnpm dev:start --from 2023-01-01 --to 2023-12-31 --direction short
 
-# Override pattern parameters
-pnpm dev:start --quick-rise.rise-pct=0.5 --fixed-time.hold-minutes=15
+# Override entry pattern parameters
+pnpm dev:start --quick-rise.rise-pct=0.5 --fixed-time-entry.entry-time=13:00
 
 # Use different patterns
-pnpm dev:start --entry-pattern quick-fall --exit-pattern fixed-time
+pnpm dev:start --entry-pattern quick-fall
 ```
 
 ### Command Line Priority
@@ -335,14 +369,13 @@ Command line arguments always override config file settings. The hierarchy is:
 2. **Config file settings**
 3. **System defaults** (lowest priority)
 
-### Pattern-Specific Options
+### Entry Pattern Options
 
-Each pattern can have its own set of configuration options. You can specify these in the config file
-or using the CLI with dot notation:
+Entry patterns can be configured under root `entry` in the YAML (preferred) with `enabled` and
+`strategyOptions`, or overridden via CLI dot notation:
 
 ```bash
-# Using dot notation for pattern-specific options
-pnpm dev:start --quick-rise.rise-pct=0.5 --fixed-time.hold-minutes=15
+pnpm dev:start --quick-rise.rise-pct=0.5 --fixed-time-entry.entry-time=13:00
 
 # Combining standard and pattern-specific options
 pnpm dev:start --from 2023-01-01 --to 2023-12-31 --direction short --quick-rise.rise-pct=0.7
@@ -357,7 +390,6 @@ CLI options override values from the configuration file.
 | `--from <YYYY-MM-DD>`       | Start date (inclusive)                         | From config               |
 | `--to <YYYY-MM-DD>`         | End date (inclusive)                           | From config               |
 | `--entry-pattern <pattern>` | Entry pattern to use                           | quick-rise                |
-| `--exit-pattern <pattern>`  | Exit pattern to use                            | fixed-time                |
 | `--ticker <symbol>`         | Ticker to analyze                              | SPY                       |
 | `--timeframe <period>`      | Data resolution                                | 1min                      |
 | `--direction <direction>`   | Trading direction for position (long or short) | long                      |
@@ -381,11 +413,7 @@ CLI options override values from the configuration file.
 | `--quick-fall.fall-pct`       | Minimum percentage fall to trigger pattern | 0.3                 |
 | `--quick-fall.within-minutes` | Number of minutes to look for the fall     | 5                   |
 
-#### Fixed Time Pattern Options
-
-| Option                      | Description                                    | Default from Config |
-| --------------------------- | ---------------------------------------------- | ------------------- |
-| `--fixed-time.hold-minutes` | Number of minutes to hold position before exit | 10                  |
+<!-- Exit pattern CLI options removed; exit strategies are configured in YAML under root `exit`. -->
 
 #### Fixed Time Entry Pattern Options
 
@@ -419,9 +447,7 @@ Common timeframes include:
 
 - `fixed-time-entry`: Triggers an entry at a specific configured time of day (e.g., "13:00").
 
-#### Exit Patterns
-
-- `fixed-time`: Exits the trade after a configurable number of minutes from entry (default: 10)
+<!-- Exit patterns CLI/options removed; configure exit strategies under root `exit`. -->
 
 ### Trading Direction
 

@@ -76,7 +76,7 @@ const MaxHoldTimeConfigSchema = z.object({
 // Define schema for ExitStrategies configuration
 const ExitStrategiesConfigSchema = z
   .object({
-    enabled: z.array(z.string()).default(['maxHoldTime']),
+    enabled: z.array(z.string()).default([]),
     maxHoldTime: MaxHoldTimeConfigSchema.optional(),
     stopLoss: StopLossConfigSchema.optional(),
     profitTarget: ProfitTargetConfigSchema.optional(),
@@ -84,15 +84,55 @@ const ExitStrategiesConfigSchema = z
     endOfDay: EndOfDayConfigSchema.optional(),
     slippage: SlippageConfigSchema.optional(),
   })
-  .default({
-    enabled: ['maxHoldTime'],
-  });
+  .default({ enabled: [] });
 
-// Define schema for pattern configurations
-const PatternsConfigSchema = z.object({
-  entry: EntryPatternsConfigSchema,
-  // exit: ExitPatternsConfigSchema, // Removed
-});
+// Optional root-level Entry configuration (preferred going forward)
+const EntryRootConfigSchema = z
+  .object({
+    // New unified format
+    enabled: z.array(z.enum(['quickRise', 'quickFall', 'fixedTimeEntry'])).optional(),
+    pattern: z
+      .enum(['quick-rise', 'quick-fall', 'fixed-time-entry'])
+      .or(z.enum(['quickRise', 'quickFall', 'fixedTimeEntry']))
+      .optional(),
+    strategyOptions: z
+      .object({
+        quickRise: z
+          .object({
+            risePct: z.number().optional(),
+            withinMinutes: z.number().optional(),
+          })
+          .optional(),
+        quickFall: z
+          .object({
+            fallPct: z.number().optional(),
+            withinMinutes: z.number().optional(),
+          })
+          .optional(),
+        fixedTimeEntry: z
+          .object({
+            entryTime: z
+              .string()
+              .regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Time must be in HH:MM format')
+              .optional(),
+          })
+          .optional(),
+      })
+      .optional(),
+
+    // Legacy inline options (back-compat)
+    'quick-rise': QuickRiseConfigSchema.optional(),
+    'quick-fall': QuickFallConfigSchema.optional(),
+    'fixed-time-entry': FixedTimeEntryConfigSchema.optional(),
+  })
+  .optional();
+
+// Define schema for pattern configurations (legacy structure kept for compatibility)
+const PatternsConfigSchema = z
+  .object({
+    entry: EntryPatternsConfigSchema,
+  })
+  .default({ entry: {} });
 
 // Schema for date range
 const DateRangeSchema = z.object({
@@ -103,7 +143,6 @@ const DateRangeSchema = z.object({
 // Schema for default pattern selection
 const DefaultPatternsSchema = z.object({
   entry: z.string().default('quick-rise'),
-  // exit: z.string().default('fixed-time'), // Removed
 });
 
 // Schema for chart options
@@ -171,9 +210,11 @@ const ConfigSchema = z
       // NEW: Add exitStrategies to default config
       exitStrategies: ExitStrategiesConfigSchema.optional(),
     }),
-    patterns: PatternsConfigSchema,
+    entry: EntryRootConfigSchema, // root-level entry configuration (optional)
+    patterns: PatternsConfigSchema, // legacy; defaults to { entry: {} } if missing
     llmConfirmationScreen: LLMScreenConfigSchema.optional(),
-    // NEW: Add exitStrategies to root config
+    // Prefer 'exit' but accept legacy 'exitStrategies'
+    exit: ExitStrategiesConfigSchema.optional(),
     exitStrategies: ExitStrategiesConfigSchema.optional(),
   })
   .refine(
@@ -469,16 +510,30 @@ export const mergeConfigWithCliOptions = (
   loadedConfig: Config,
   cliOptions: Record<string, any>
 ): MergedConfig => {
-  const defaultEntryPattern = loadedConfig.default.patterns?.entry || 'quick-rise';
+  const normalizeEntryName = (name: string | undefined): string | undefined => {
+    if (!name) return undefined;
+    const map: Record<string, string> = {
+      quickRise: 'quick-rise',
+      quickFall: 'quick-fall',
+      fixedTimeEntry: 'fixed-time-entry',
+      'quick-rise': 'quick-rise',
+      'quick-fall': 'quick-fall',
+      'fixed-time-entry': 'fixed-time-entry',
+    };
+    return map[name] || name;
+  };
 
-  // Get exit strategies configurations from different sources
-  const defaultFromLoaded = loadedConfig.default.exitStrategies;
-  const rootFromLoaded = loadedConfig.exitStrategies;
-  const schemaDefaultFromZod = ExitStrategiesConfigSchema.parse({});
+  const defaultEntryPattern =
+    normalizeEntryName((loadedConfig.entry as any)?.enabled?.[0] as string | undefined) ||
+    normalizeEntryName(loadedConfig.entry?.pattern as string | undefined) ||
+    loadedConfig.default.patterns?.entry ||
+    'quick-rise';
 
-  // Determine which enabled array to use with precedence: root > default > schema
-  const enabledArray =
-    rootFromLoaded?.enabled || defaultFromLoaded?.enabled || schemaDefaultFromZod.enabled;
+  // Get exit strategies configurations from different sources (prefer new 'exit')
+  const rootFromLoaded = (loadedConfig as any).exit || loadedConfig.exitStrategies;
+
+  // Exit strategies are configured at the ROOT level only
+  const enabledArray = rootFromLoaded?.enabled || [];
 
   // Create merged exit strategies with all configurations merged properly
   const mergedExitStrategies: ExitStrategiesConfig = {
@@ -486,75 +541,70 @@ export const mergeConfigWithCliOptions = (
     maxHoldTime: enabledArray?.includes('maxHoldTime')
       ? {
           minutes:
-            rootFromLoaded?.maxHoldTime?.minutes ??
-            defaultFromLoaded?.maxHoldTime?.minutes ??
+            (rootFromLoaded as any)?.strategyOptions?.maxHoldTime?.minutes ??
+            (rootFromLoaded as any)?.maxHoldTime?.minutes ??
             MaxHoldTimeConfigSchema.parse({}).minutes,
         }
       : undefined,
     stopLoss: enabledArray?.includes('stopLoss')
       ? {
           percentFromEntry:
-            rootFromLoaded?.stopLoss?.percentFromEntry ??
-            defaultFromLoaded?.stopLoss?.percentFromEntry ??
+            (rootFromLoaded as any)?.strategyOptions?.stopLoss?.percentFromEntry ??
+            (rootFromLoaded as any)?.stopLoss?.percentFromEntry ??
             StopLossConfigSchema.parse({}).percentFromEntry,
           atrMultiplier:
-            rootFromLoaded?.stopLoss?.atrMultiplier ?? defaultFromLoaded?.stopLoss?.atrMultiplier,
+            (rootFromLoaded as any)?.strategyOptions?.stopLoss?.atrMultiplier ??
+            (rootFromLoaded as any)?.stopLoss?.atrMultiplier,
           useLlmProposedPrice:
-            rootFromLoaded?.stopLoss?.useLlmProposedPrice ??
-            defaultFromLoaded?.stopLoss?.useLlmProposedPrice ??
+            (rootFromLoaded as any)?.strategyOptions?.stopLoss?.useLlmProposedPrice ??
+            (rootFromLoaded as any)?.stopLoss?.useLlmProposedPrice ??
             false,
         }
       : undefined,
     profitTarget: enabledArray?.includes('profitTarget')
       ? {
           percentFromEntry:
-            rootFromLoaded?.profitTarget?.percentFromEntry ??
-            defaultFromLoaded?.profitTarget?.percentFromEntry ??
+            (rootFromLoaded as any)?.strategyOptions?.profitTarget?.percentFromEntry ??
+            (rootFromLoaded as any)?.profitTarget?.percentFromEntry ??
             ProfitTargetConfigSchema.parse({}).percentFromEntry,
           atrMultiplier:
-            rootFromLoaded?.profitTarget?.atrMultiplier ??
-            defaultFromLoaded?.profitTarget?.atrMultiplier,
+            (rootFromLoaded as any)?.strategyOptions?.profitTarget?.atrMultiplier ??
+            (rootFromLoaded as any)?.profitTarget?.atrMultiplier,
           useLlmProposedPrice:
-            rootFromLoaded?.profitTarget?.useLlmProposedPrice ??
-            defaultFromLoaded?.profitTarget?.useLlmProposedPrice ??
+            (rootFromLoaded as any)?.strategyOptions?.profitTarget?.useLlmProposedPrice ??
+            (rootFromLoaded as any)?.profitTarget?.useLlmProposedPrice ??
             false,
         }
       : undefined,
     trailingStop: enabledArray?.includes('trailingStop')
       ? {
           activationPercent:
-            rootFromLoaded?.trailingStop?.activationPercent ??
-            defaultFromLoaded?.trailingStop?.activationPercent ??
+            (rootFromLoaded as any)?.strategyOptions?.trailingStop?.activationPercent ??
+            (rootFromLoaded as any)?.trailingStop?.activationPercent ??
             TrailingStopConfigSchema.parse({}).activationPercent,
           trailPercent:
-            rootFromLoaded?.trailingStop?.trailPercent ??
-            defaultFromLoaded?.trailingStop?.trailPercent ??
+            (rootFromLoaded as any)?.strategyOptions?.trailingStop?.trailPercent ??
+            (rootFromLoaded as any)?.trailingStop?.trailPercent ??
             TrailingStopConfigSchema.parse({}).trailPercent,
           activationAtrMultiplier:
-            rootFromLoaded?.trailingStop?.activationAtrMultiplier ??
-            defaultFromLoaded?.trailingStop?.activationAtrMultiplier, // Optional, so can be undefined
+            (rootFromLoaded as any)?.strategyOptions?.trailingStop?.activationAtrMultiplier ??
+            (rootFromLoaded as any)?.trailingStop?.activationAtrMultiplier,
           trailAtrMultiplier:
-            rootFromLoaded?.trailingStop?.trailAtrMultiplier ??
-            defaultFromLoaded?.trailingStop?.trailAtrMultiplier, // Optional, so can be undefined
+            (rootFromLoaded as any)?.strategyOptions?.trailingStop?.trailAtrMultiplier ??
+            (rootFromLoaded as any)?.trailingStop?.trailAtrMultiplier,
         }
       : undefined,
     endOfDay: enabledArray?.includes('endOfDay')
       ? {
           time:
-            rootFromLoaded?.endOfDay?.time ??
-            defaultFromLoaded?.endOfDay?.time ??
+            (rootFromLoaded as any)?.strategyOptions?.endOfDay?.time ??
+            (rootFromLoaded as any)?.endOfDay?.time ??
             EndOfDayConfigSchema.parse({}).time,
         }
       : undefined,
     slippage: {
-      model:
-        rootFromLoaded?.slippage?.model ??
-        defaultFromLoaded?.slippage?.model ??
-        SlippageConfigSchema.parse({}).model,
-      value:
-        rootFromLoaded?.slippage?.value ??
-        defaultFromLoaded?.slippage?.value ??
-        SlippageConfigSchema.parse({}).value,
+      model: rootFromLoaded?.slippage?.model ?? SlippageConfigSchema.parse({}).model,
+      value: rootFromLoaded?.slippage?.value ?? SlippageConfigSchema.parse({}).value,
     },
   };
 
@@ -596,6 +646,7 @@ export const mergeConfigWithCliOptions = (
     }
   });
 
+  // Seed with legacy patterns.entry configs
   if (loadedConfig.patterns.entry['quick-rise']) {
     mergedConfig['quick-rise'] = { ...loadedConfig.patterns.entry['quick-rise'] };
   }
@@ -604,6 +655,28 @@ export const mergeConfigWithCliOptions = (
   }
   if (loadedConfig.patterns.entry['fixed-time-entry']) {
     mergedConfig['fixed-time-entry'] = { ...loadedConfig.patterns.entry['fixed-time-entry'] };
+  }
+
+  // Overlay root-level entry options if provided
+  if (loadedConfig.entry) {
+    if ((loadedConfig.entry as any)['quick-rise']) {
+      mergedConfig['quick-rise'] = {
+        ...(mergedConfig['quick-rise'] || {}),
+        ...(loadedConfig.entry as any)['quick-rise'],
+      };
+    }
+    if ((loadedConfig.entry as any)['quick-fall']) {
+      mergedConfig['quick-fall'] = {
+        ...(mergedConfig['quick-fall'] || {}),
+        ...(loadedConfig.entry as any)['quick-fall'],
+      };
+    }
+    if ((loadedConfig.entry as any)['fixed-time-entry']) {
+      mergedConfig['fixed-time-entry'] = {
+        ...(mergedConfig['fixed-time-entry'] || {}),
+        ...(loadedConfig.entry as any)['fixed-time-entry'],
+      };
+    }
   }
 
   Object.entries(patternOptions).forEach(([pattern, options]) => {

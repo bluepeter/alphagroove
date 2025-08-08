@@ -8,50 +8,54 @@ default:
   # direction can be 'long', 'short', or 'llm_decides'.
   # If 'llm_decides', llmConfirmationScreen.enabled must be true.
   direction: 'llm_decides'
-  patterns:
-    entry: 'fixed-time-entry'
   charts:
     generate: true
     outputDir: './charts'
-  exitStrategies:
-    enabled:
-      - profitTarget
-      #- stopLoss
-      - trailingStop
-      - endOfDay
-    # atrPeriodForEntry: 14 # This specific period is NOT used by the current ATR calculation method (which averages all TRs from the prior day).
-    # Remove or keep commented if you plan to use a period-specific ATR calc in the future.
-    maxHoldTime:
-      minutes: 500
+
+entry:
+  enabled: [fixedTimeEntry]
+  strategyOptions:
+    quickRise:
+      risePct: 0.3
+      withinMinutes: 5
+    quickFall:
+      fallPct: 0.3
+      withinMinutes: 5
+    fixedTimeEntry:
+      entryTime: '13:00'
+
+exit:
+  enabled:
+    - maxHoldTime
+    #- stopLoss
+    - profitTarget
+    - trailingStop
+    - endOfDay
+  # atrPeriodForEntry: 14 # This specific period is NOT used by the current ATR calculation method (which averages all TRs from the prior day).
+  # Remove or keep commented if you plan to use a period-specific ATR calc in the future.
+  maxHoldTime:
+    minutes: 500
+  strategyOptions:
+    # maxHoldTime:
+    #   minutes: 500
     stopLoss:
       # percentFromEntry: 0.5 # Fallback, commented out to prioritize ATR
-      atrMultiplier: 2.0 # Default: Stop at 2.0 * Prior Day's Average TR
+      atrMultiplier: 2.0
       useLlmProposedPrice: false
     profitTarget:
       # percentFromEntry: 0.5 # Fallback, commented out to prioritize ATR
-      atrMultiplier: 5.0 # Default: Target 3.0 * Prior Day's Average TR
+      atrMultiplier: 5.0
       useLlmProposedPrice: false
     trailingStop:
       # activationPercent: 0 # Fallback, commented out to prioritize ATR
       # trailPercent: 0.3      # Fallback, commented out to prioritize ATR (0.3 for 0.3% of price)
-      activationAtrMultiplier: 0 # Activate immediately (no favorable movement required)
-      trailAtrMultiplier: 2.5 # Default: Trail by 1.0 * Prior Day's Average TR
+      activationAtrMultiplier: 0
+      trailAtrMultiplier: 2.5
     endOfDay:
       time: '16:00'
-    slippage:
-      model: 'fixed'
-      value: 0.01
-
-patterns:
-  entry:
-    quick-rise:
-      rise-pct: 0.3
-      within-minutes: 5
-    quick-fall:
-      fall-pct: 0.3
-      within-minutes: 5
-    fixed-time-entry:
-      entry-time: '13:00'
+  slippage:
+    model: 'fixed'
+    value: 0.01
 
 llmConfirmationScreen:
   enabled: true
