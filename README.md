@@ -554,7 +554,7 @@ This feature is configured within the `alphagroove.config.yaml` file under the
 - `enabled`: (boolean) Set to `true` to enable this screen. Default: `false`.
 - `llmProvider`: (string) The LLM provider to use (e.g., `'anthropic'`, `'openai'`). Default:
   `'anthropic'`.
-- `modelName`: (string) The specific model to use (e.g., `'claude-3-7-sonnet-latest'`).
+- `modelName`: (string) The specific model to use (e.g., `'claude-sonnet-4-20250514'`).
 - `apiKeyEnvVar`: (string) The name of the environment variable that holds the API key for the LLM
   provider (e.g., `'ANTHROPIC_API_KEY'`).
 - `numCalls`: (number) The number of parallel calls to make to the LLM for each signal. Default:

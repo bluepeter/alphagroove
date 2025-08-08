@@ -35,7 +35,7 @@ describe('initializeAnalysis', () => {
   const mockLlmScreenConfig: LLMScreenConfig = {
     enabled: false,
     llmProvider: 'anthropic',
-    modelName: 'claude-3-7-sonnet-latest',
+    modelName: 'claude-sonnet-4-20250514',
     apiKeyEnvVar: 'ANTHROPIC_API_KEY',
     numCalls: 3,
     agreementThreshold: 2,

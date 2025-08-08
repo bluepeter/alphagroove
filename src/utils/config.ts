@@ -119,7 +119,7 @@ const LLMScreenConfigSchema = z
   .object({
     enabled: z.boolean().default(false),
     llmProvider: z.enum(['anthropic', 'openai']).default('anthropic'),
-    modelName: z.string().default('claude-3-7-sonnet-latest'),
+    modelName: z.string().default('claude-sonnet-4-20250514'),
     apiKeyEnvVar: z.string().default('ANTHROPIC_API_KEY'),
     numCalls: z.number().int().min(1).default(3),
     agreementThreshold: z.number().int().min(1).default(2),
