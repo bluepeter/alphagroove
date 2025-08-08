@@ -247,5 +247,86 @@ describe('Configuration System', () => {
       expect(merged.exitStrategies?.maxHoldTime).toBeDefined();
       expect(merged.exitStrategies?.maxHoldTime?.minutes).toBe(60);
     });
+
+    it('should prefer root exit over exitStrategies when both provided (alias handling)', () => {
+      const config = createTestConfig({
+        exitStrategies: {
+          enabled: ['maxHoldTime'],
+          maxHoldTime: { minutes: 60 },
+        },
+        exit: {
+          enabled: ['profitTarget'],
+          strategyOptions: {
+            profitTarget: { atrMultiplier: 7.0 },
+          },
+        } as any,
+      });
+
+      const merged = mergeConfigWithCliOptions(config, {});
+
+      expect(merged.exitStrategies?.enabled).toEqual(['profitTarget']);
+      expect(merged.exitStrategies?.profitTarget?.atrMultiplier).toBe(7.0);
+      expect(merged.exitStrategies?.maxHoldTime).toBeUndefined();
+    });
+
+    it('should read maxHoldTime from root exit when enabled and not specified (default minutes=60)', () => {
+      const config = createTestConfig({
+        exit: {
+          enabled: ['maxHoldTime'],
+        } as any,
+      });
+
+      const merged = mergeConfigWithCliOptions(config, {});
+      expect(merged.exitStrategies?.enabled).toEqual(['maxHoldTime']);
+      expect(merged.exitStrategies?.maxHoldTime?.minutes).toBe(60);
+    });
+
+    it('should read maxHoldTime from exit.strategyOptions as a fallback', () => {
+      const config = createTestConfig({
+        exit: {
+          enabled: ['maxHoldTime'],
+          strategyOptions: {
+            maxHoldTime: { minutes: 500 },
+          },
+        } as any,
+      });
+
+      const merged = mergeConfigWithCliOptions(config, {});
+      expect(merged.exitStrategies?.maxHoldTime?.minutes).toBe(500);
+    });
+
+    it('should merge slippage from root exit (outside strategyOptions)', () => {
+      const config = createTestConfig({
+        exit: {
+          enabled: [],
+          slippage: { model: 'fixed', value: 0.01 },
+        } as any,
+      });
+
+      const merged = mergeConfigWithCliOptions(config, {});
+      expect(merged.exitStrategies?.slippage).toEqual({ model: 'fixed', value: 0.01 });
+    });
+
+    it('should set entryPattern from entry.enabled[0] with camelCase names', () => {
+      const config = createTestConfig({
+        entry: {
+          enabled: ['fixedTimeEntry'],
+        } as any,
+      });
+
+      const merged = mergeConfigWithCliOptions(config, {});
+      expect(merged.entryPattern).toBe('fixed-time-entry');
+    });
+
+    it('should fall back to entry.pattern if entry.enabled is not set', () => {
+      const config = createTestConfig({
+        entry: {
+          pattern: 'quickRise',
+        } as any,
+      });
+
+      const merged = mergeConfigWithCliOptions(config, {});
+      expect(merged.entryPattern).toBe('quick-rise');
+    });
   });
 });
