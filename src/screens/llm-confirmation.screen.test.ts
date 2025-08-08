@@ -2,7 +2,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 // import type { Mock } from 'vitest'; // Removed to avoid generic type issues with linter
 import fsPromises from 'node:fs/promises';
-import path from 'node:path';
 import crypto from 'node:crypto';
 
 import { type LLMResponse } from '../services/llm-api.service';

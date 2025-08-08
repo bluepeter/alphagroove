@@ -1,6 +1,6 @@
 default:
   date:
-    from: '2016-01-01'
+    from: '2017-01-01'
     to: '2025-12-31'
   ticker: 'SPY'
   timeframe: '1min'
@@ -50,7 +50,7 @@ patterns:
       fall-pct: 0.3
       within-minutes: 5
     fixed-time-entry:
-      entry-time: '14:00'
+      entry-time: '13:00'
 
 llmConfirmationScreen:
   enabled: true
