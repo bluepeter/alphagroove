@@ -2,3 +2,7 @@ ignoredBuiltDependencies:
   - canvas
   - duckdb
   - puppeteer
+
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
