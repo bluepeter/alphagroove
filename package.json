@@ -27,7 +27,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
-    "start": "node dist/index.js",
+    "start": "node --import ./scripts/register-esm-loader.mjs dist/index.js",
     "dev:start": "tsx src/index.ts",
     "analyze": "tsx src/llm-analyze.ts",
     "levels": "tsx src/trade-levels.ts",

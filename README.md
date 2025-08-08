@@ -193,28 +193,29 @@ the Node.js package.
    ```bash
    pnpm install
    ```
-3. Run the application:
+3. **Required:** Create a configuration file named `alphagroove.config.yaml` in the project root
+   directory (see Configuration section below)
+
+4. Run the application:
 
    ```bash
-   # Run with specific date range and patterns
-   pnpm dev:start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise --exit-pattern fixed-time
+   # Run with development mode (recommended)
+   pnpm dev:start
 
-   # Example output:
-   # SPY Analysis (2020-01-01 to 2025-05-02):
-   # Entry Pattern: Quick Rise
-   # Exit Pattern: Fixed Time Exit
-   # ...
+   # Or run with specific parameters
+   pnpm dev:start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise
    ```
 
-For production use, build and run:
+### Running Production Build
 
-```bash
-# Build the project
-pnpm build
+- Development (recommended during iteration):
+  - `pnpm dev:start`
 
-# Run the built version
-pnpm start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise --exit-pattern fixed-time
-```
+- Production build and run:
+  - `pnpm build && pnpm start`
+
+The production start registers a tiny Node ESM loader via `--import` that appends .js at runtime for
+extensionless relative imports. No source edits, no post-build rewriting, ESM preserved.
 
 ## Configuration
 
@@ -224,7 +225,8 @@ the application.
 
 ### Configuration File
 
-Create a file named `alphagroove.config.yaml` in the project root:
+**Required:** Create a file named `alphagroove.config.yaml` in the project root directory (same
+level as `package.json`):
 
 ```yaml
 default:
@@ -274,6 +276,64 @@ You can generate a default config file by running:
 ```bash
 pnpm dev:start init
 ```
+
+**Note:** The configuration file must be named exactly `alphagroove.config.yaml` and placed in the
+project root directory for the application to find it.
+
+## Usage Examples
+
+### Using Configuration File Only
+
+Create `alphagroove.config.yaml` with your desired settings:
+
+```yaml
+default:
+  date:
+    from: '2020-01-01'
+    to: '2025-05-02'
+  ticker: 'SPY'
+  direction: 'long'
+  patterns:
+    entry: 'quick-rise'
+    exit: 'fixed-time'
+patterns:
+  entry:
+    quick-rise:
+      rise-pct: 0.3
+      within-minutes: 5
+  exit:
+    fixed-time:
+      hold-minutes: 10
+```
+
+Then simply run:
+
+```bash
+pnpm dev:start
+```
+
+### Using Command Line Arguments
+
+Override config file settings or run without a config file:
+
+```bash
+# Override specific settings
+pnpm dev:start --from 2023-01-01 --to 2023-12-31 --direction short
+
+# Override pattern parameters
+pnpm dev:start --quick-rise.rise-pct=0.5 --fixed-time.hold-minutes=15
+
+# Use different patterns
+pnpm dev:start --entry-pattern quick-fall --exit-pattern fixed-time
+```
+
+### Command Line Priority
+
+Command line arguments always override config file settings. The hierarchy is:
+
+1. **Command line arguments** (highest priority)
+2. **Config file settings**
+3. **System defaults** (lowest priority)
 
 ### Pattern-Specific Options
 
@@ -369,7 +429,6 @@ The `--direction` parameter (and its corresponding `default.direction` in `alpha
 can be set to `long`, `short`, or the new `llm_decides` option.
 
 - **`long` or `short`**:
-
   - The system identifies market setups (like a quick rise in price).
   - If `direction: long`, it takes buy positions, profiting from price increases.
   - If `direction: short`, it takes sell positions, profiting from price decreases.
