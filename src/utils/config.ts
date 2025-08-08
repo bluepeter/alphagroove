@@ -139,7 +139,20 @@ const LLMScreenConfigSchema = z
     maxOutputTokens: z.number().int().min(1).default(150),
     timeoutMs: z.number().int().optional(),
   })
-  .default({});
+  .default({
+    enabled: false,
+    llmProvider: 'anthropic',
+    modelName: 'claude-sonnet-4-20250514',
+    apiKeyEnvVar: 'ANTHROPIC_API_KEY',
+    numCalls: 3,
+    agreementThreshold: 2,
+    temperatures: [0.2, 0.5, 0.8],
+    prompts:
+      'You are an experienced day trader. Based on this chart, what action would you take: go long, short, or do nothing? Provide a brief one-sentence rationalization for your decision.',
+    commonPromptSuffixForJson:
+      'Your response MUST be a valid JSON object and nothing else. For example: `{"action": "long", "rationalization": "Price broke resistance with volume.", "proposedStopLoss": 123.45, "proposedProfitTarget": 125.67}`',
+    maxOutputTokens: 150,
+  });
 
 // Infer the type from Zod schema, this will be our internal LLMScreenConfig type
 // This ensures consistency between Zod validation and TypeScript types.
@@ -297,9 +310,17 @@ export const loadConfig = (configPath?: string): Config => {
   } catch (error) {
     if (error instanceof z.ZodError) {
       console.error('Invalid configuration file:');
-      error.errors.forEach(err => {
-        console.error(`- ${err.path.join('.')}: ${err.message}`);
-      });
+      const issues = (
+        error as unknown as { issues?: Array<{ path: Array<string | number>; message: string }> }
+      ).issues;
+      if (issues && Array.isArray(issues)) {
+        issues.forEach(err => {
+          const path = Array.isArray(err.path) ? err.path.join('.') : '';
+          console.error(`- ${path}: ${err.message}`);
+        });
+      } else {
+        console.error(String(error));
+      }
     } else {
       console.error(
         `Error loading config file: ${error instanceof Error ? error.message : String(error)}`

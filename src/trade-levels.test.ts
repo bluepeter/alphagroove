@@ -78,7 +78,7 @@ describe('Trade Levels Tool', () => {
           Volume: '1066648',
         },
       ];
-      vi.mocked(parse).mockReturnValue(mockRecords);
+      vi.mocked(parse).mockReturnValue(mockRecords as any);
 
       // Bypass the day detection logic for this test
       vi.spyOn(Object, 'keys').mockReturnValue(['05/12/2025']);

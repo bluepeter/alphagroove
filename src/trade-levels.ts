@@ -51,7 +51,15 @@ export function parseCSVData(csvPath: string): Bar[] {
     const records = parse(csvData, {
       columns: true,
       skip_empty_lines: true,
-    });
+    }) as Array<{
+      Date?: string;
+      Time?: string;
+      Open: string;
+      High: string;
+      Low: string;
+      Close: string;
+      Volume?: string;
+    }>;
 
     console.log(`Parsed ${records.length} records from CSV`);
     if (records.length > 0) {
@@ -60,9 +68,17 @@ export function parseCSVData(csvPath: string): Bar[] {
 
     const bars: Bar[] = [];
     for (let i = 0; i < records.length; i++) {
-      const record = records[i];
-      const date = record.Date;
-      const time = record.Time;
+      const record = records[i] as {
+        Date?: string;
+        Time?: string;
+        Open: string;
+        High: string;
+        Low: string;
+        Close: string;
+        Volume?: string;
+      };
+      const date = record.Date ?? '';
+      const time = record.Time ?? '';
 
       const timestamp = date ? `${date} ${time}` : `undefined ${time}`;
 
