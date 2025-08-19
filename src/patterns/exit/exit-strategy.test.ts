@@ -347,6 +347,7 @@ describe('Exit Strategies', () => {
       const strategy = new TrailingStopStrategy({
         activationAtrMultiplier: 0,
         trailAtrMultiplier: 1.0,
+        trailPercent: 0.5, // Required now
       });
       const entryPrice = 100;
       const entryTime = '2023-01-01 10:00:00';
@@ -375,6 +376,7 @@ describe('Exit Strategies', () => {
       const strategy = new TrailingStopStrategy({
         activationAtrMultiplier: 0,
         trailAtrMultiplier: 1.0,
+        trailPercent: 0.5, // Required now
       });
       const entryPrice = 100;
       const entryTime = '2023-01-01 10:00:00';
@@ -818,7 +820,7 @@ describe('Exit Strategies', () => {
       expect(strategies[2]).toBeInstanceOf(TrailingStopStrategy);
     });
 
-    it('should use default values if strategy-specific config is missing', () => {
+    it('should throw error if strategy-specific config is missing', () => {
       const config = {
         exitStrategies: {
           enabled: ['stopLoss', 'maxHoldTime'],
@@ -826,24 +828,20 @@ describe('Exit Strategies', () => {
         },
       };
 
-      const strategies = createExitStrategies(config);
-
-      expect(strategies.length).toBe(2);
-      expect(strategies[0]).toBeInstanceOf(StopLossStrategy);
-      expect(strategies[1]).toBeInstanceOf(MaxHoldTimeStrategy);
+      expect(() => createExitStrategies(config)).toThrow(
+        'stopLoss strategy enabled but no configuration provided'
+      );
     });
 
-    it('should default to MaxHoldTimeStrategy if no exitStrategies config is provided', () => {
+    it('should throw error if no exitStrategies config is provided', () => {
       const config = {}; // No exitStrategies configuration
 
-      const strategies = createExitStrategies(config);
-
-      expect(strategies.length).toBe(1);
-      expect(strategies[0]).toBeInstanceOf(MaxHoldTimeStrategy);
-      expect((strategies[0] as MaxHoldTimeStrategy)['config'].minutes).toBe(60); // Default value
+      expect(() => createExitStrategies(config)).toThrow(
+        'Exit strategies must be configured - no defaults provided to avoid hidden behavior'
+      );
     });
 
-    it('should handle unknown strategy names gracefully', () => {
+    it('should throw error for unknown strategy names', () => {
       const config = {
         exitStrategies: {
           enabled: ['invalidStrategy', 'stopLoss'],
@@ -851,12 +849,7 @@ describe('Exit Strategies', () => {
         },
       };
 
-      const strategies = createExitStrategies(config);
-
-      // Should have two strategies, with the invalid one replaced by MaxHoldTime
-      expect(strategies.length).toBe(2);
-      expect(strategies[0]).toBeInstanceOf(MaxHoldTimeStrategy); // Default for unknown
-      expect(strategies[1]).toBeInstanceOf(StopLossStrategy);
+      expect(() => createExitStrategies(config)).toThrow('Unknown exit strategy: invalidStrategy');
     });
   });
 });

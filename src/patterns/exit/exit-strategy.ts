@@ -276,7 +276,10 @@ export class TrailingStopStrategy implements ExitStrategy {
       trailAmountAbs = atr * this.config.trailAtrMultiplier;
     }
 
-    const trailPct = (this.config.trailPercent ?? 0.5) / 100;
+    if (this.config.trailPercent === undefined) {
+      throw new Error('trailPercent must be configured for trailing stop strategy');
+    }
+    const trailPct = this.config.trailPercent / 100;
     let trailingStopLevel = isLong ? entryPrice : entryPrice;
     // Start activated if immediateActivation is true
     let activated = immediateActivation;
@@ -464,8 +467,9 @@ export class EndOfDayStrategy implements ExitStrategy {
  */
 export const createExitStrategies = (config: any): ExitStrategy[] => {
   if (!config.exitStrategies || !config.exitStrategies.enabled) {
-    // Default to max hold time if no exit strategies are configured
-    return [new MaxHoldTimeStrategy({ minutes: 60 })];
+    throw new Error(
+      'Exit strategies must be configured - no defaults provided to avoid hidden behavior'
+    );
   }
 
   const { enabled, ...strategies } = config.exitStrategies;
@@ -473,33 +477,37 @@ export const createExitStrategies = (config: any): ExitStrategy[] => {
   return enabled.map((strategyName: string) => {
     switch (strategyName) {
       case 'stopLoss':
-        return strategies.stopLoss
-          ? new StopLossStrategy(strategies.stopLoss)
-          : new StopLossStrategy({ percentFromEntry: 1.0, useLlmProposedPrice: false });
+        if (!strategies.stopLoss) {
+          throw new Error('stopLoss strategy enabled but no configuration provided');
+        }
+        return new StopLossStrategy(strategies.stopLoss);
 
       case 'profitTarget':
-        return strategies.profitTarget
-          ? new ProfitTargetStrategy(strategies.profitTarget)
-          : new ProfitTargetStrategy({ percentFromEntry: 2.0, useLlmProposedPrice: false });
+        if (!strategies.profitTarget) {
+          throw new Error('profitTarget strategy enabled but no configuration provided');
+        }
+        return new ProfitTargetStrategy(strategies.profitTarget);
 
       case 'trailingStop':
-        return strategies.trailingStop
-          ? new TrailingStopStrategy(strategies.trailingStop)
-          : new TrailingStopStrategy({ activationPercent: 1.0, trailPercent: 0.5 });
+        if (!strategies.trailingStop) {
+          throw new Error('trailingStop strategy enabled but no configuration provided');
+        }
+        return new TrailingStopStrategy(strategies.trailingStop);
 
       case 'maxHoldTime':
-        return strategies.maxHoldTime
-          ? new MaxHoldTimeStrategy(strategies.maxHoldTime)
-          : new MaxHoldTimeStrategy({ minutes: 60 });
+        if (!strategies.maxHoldTime) {
+          throw new Error('maxHoldTime strategy enabled but no configuration provided');
+        }
+        return new MaxHoldTimeStrategy(strategies.maxHoldTime);
 
       case 'endOfDay':
-        return strategies.endOfDay
-          ? new EndOfDayStrategy(strategies.endOfDay)
-          : new EndOfDayStrategy({ time: '16:00' });
+        if (!strategies.endOfDay) {
+          throw new Error('endOfDay strategy enabled but no configuration provided');
+        }
+        return new EndOfDayStrategy(strategies.endOfDay);
 
       default:
-        console.warn(`Unknown exit strategy: ${strategyName}, defaulting to maxHoldTime`);
-        return new MaxHoldTimeStrategy({ minutes: 60 });
+        throw new Error(`Unknown exit strategy: ${strategyName}`);
     }
   });
 };

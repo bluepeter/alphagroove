@@ -218,6 +218,55 @@ describe('Configuration System', () => {
       expect(merged['fixed-time-entry']?.['entry-time']).toBe('14:30');
     });
 
+    it('should map new strategyOptions.fixedTimeEntry.entryTime format correctly', () => {
+      const config = createTestConfig({
+        default: {
+          ticker: 'SPY',
+          timeframe: '1min',
+          direction: 'long',
+          patterns: { entry: 'fixed-time-entry' },
+        },
+        entry: {
+          strategyOptions: {
+            fixedTimeEntry: {
+              entryTime: '13:00',
+            },
+          },
+        },
+      });
+      const cliOptions = {};
+      const merged = mergeConfigWithCliOptions(config, cliOptions);
+      expect(merged.entryPattern).toBe('fixed-time-entry');
+      expect(merged['fixed-time-entry']?.['entry-time']).toBe('13:00');
+    });
+
+    it('should prioritize strategyOptions over legacy patterns config', () => {
+      const config = createTestConfig({
+        default: {
+          ticker: 'SPY',
+          timeframe: '1min',
+          direction: 'long',
+          patterns: { entry: 'fixed-time-entry' },
+        },
+        patterns: {
+          entry: {
+            'fixed-time-entry': { 'entry-time': '10:00' },
+          },
+        },
+        entry: {
+          strategyOptions: {
+            fixedTimeEntry: {
+              entryTime: '13:00',
+            },
+          },
+        },
+      });
+      const cliOptions = {};
+      const merged = mergeConfigWithCliOptions(config, cliOptions);
+      expect(merged.entryPattern).toBe('fixed-time-entry');
+      expect(merged['fixed-time-entry']?.['entry-time']).toBe('13:00'); // Should use strategyOptions value
+    });
+
     it('should ensure exitStrategies.maxHoldTime is populated with defaults if enabled but not specified', () => {
       const configWithOnlyEnabled: Config = {
         default: {

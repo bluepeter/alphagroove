@@ -20,8 +20,7 @@ const QuickFallConfigSchema = z.object({
 const FixedTimeEntryConfigSchema = z.object({
   'entry-time': z
     .string()
-    .regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Time must be in HH:MM format')
-    .default('12:00'),
+    .regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Time must be in HH:MM format'),
 });
 
 // Define schema for entry pattern configurations
@@ -304,7 +303,7 @@ const DEFAULT_CONFIG: Config = {
         'within-minutes': 5,
       },
       'fixed-time-entry': {
-        'entry-time': '12:00',
+        'entry-time': '13:00', // Default to 1 PM for testing, but should be configurable
       },
     },
   },
@@ -695,6 +694,36 @@ export const mergeConfigWithCliOptions = (
         ...(mergedConfig['fixed-time-entry'] || {}),
         ...(loadedConfig.entry as any)['fixed-time-entry'],
       };
+    }
+
+    // Handle new strategyOptions format
+    const strategyOptions = (loadedConfig.entry as any)?.strategyOptions;
+    if (strategyOptions) {
+      // Map quickRise
+      if (strategyOptions.quickRise) {
+        mergedConfig['quick-rise'] = {
+          ...(mergedConfig['quick-rise'] || {}),
+          'rise-pct': strategyOptions.quickRise.risePct,
+          'within-minutes': strategyOptions.quickRise.withinMinutes,
+        };
+      }
+
+      // Map quickFall
+      if (strategyOptions.quickFall) {
+        mergedConfig['quick-fall'] = {
+          ...(mergedConfig['quick-fall'] || {}),
+          'fall-pct': strategyOptions.quickFall.fallPct,
+          'within-minutes': strategyOptions.quickFall.withinMinutes,
+        };
+      }
+
+      // Map fixedTimeEntry
+      if (strategyOptions.fixedTimeEntry) {
+        mergedConfig['fixed-time-entry'] = {
+          ...(mergedConfig['fixed-time-entry'] || {}),
+          'entry-time': strategyOptions.fixedTimeEntry.entryTime,
+        };
+      }
     }
   }
 

@@ -110,7 +110,7 @@ export const fixedTimeEntryPattern: PatternDefinition & {
   name: 'Fixed Time Entry',
   description: 'Triggers an entry at a specific time of day.',
   config: {
-    time: '12:00',
+    time: '', // No default - must be provided by config
   },
   direction: 'long',
   sql: '',
@@ -119,12 +119,17 @@ export const fixedTimeEntryPattern: PatternDefinition & {
     const updatedConfig = { ...this.config };
 
     // If 'entry-time' exists in the config, use it with priority
-    if ('entry-time' in newConfig) {
+    if ('entry-time' in newConfig && newConfig['entry-time']) {
       updatedConfig.time = newConfig['entry-time'] as string;
     }
     // Otherwise use 'time' if it exists
     else if (newConfig.time) {
       updatedConfig.time = newConfig.time;
+    }
+
+    // Validate that entry time is provided
+    if (!updatedConfig.time) {
+      throw new Error('Fixed Time Entry pattern requires an entry time to be configured');
     }
 
     // Ensure a defined direction for SQL query generation during config update.

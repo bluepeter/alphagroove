@@ -20,6 +20,10 @@ vi.mock('./utils/config.js', async () => {
       llmConfirmationScreen: { enabled: false },
       generateCharts: false,
       debug: true, // Important for dry run logging
+      exitStrategies: {
+        enabled: ['maxHoldTime'],
+        maxHoldTime: { minutes: 60 },
+      },
     })),
   };
 });
@@ -44,6 +48,15 @@ vi.mock('./patterns/pattern-factory.js', async () => {
     getExitPattern: vi.fn(() => ({ name: 'test-exit', apply: vi.fn() })),
   };
 });
+
+vi.mock('./patterns/exit/exit-strategy.js', () => ({
+  createExitStrategies: vi.fn(() => [
+    {
+      name: 'maxHoldTime',
+      evaluate: vi.fn(() => null),
+    },
+  ]),
+}));
 
 vi.mock('./screens/llm-confirmation.screen.js', () => ({
   LlmConfirmationScreen: vi.fn().mockImplementation(() => ({

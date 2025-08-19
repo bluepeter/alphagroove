@@ -31,9 +31,9 @@ describe('Fixed Time Entry Pattern', () => {
   });
 
   describe('pattern configuration', () => {
-    it('should initialize with default time and direction', () => {
+    it('should initialize with empty time and long direction', () => {
       // fixedTimeEntryPattern already has a specific type
-      expect(fixedTimeEntryPattern.config.time).toBe('12:00');
+      expect(fixedTimeEntryPattern.config.time).toBe('');
       expect(fixedTimeEntryPattern.direction).toBe('long');
     });
 
@@ -65,6 +65,18 @@ describe('Fixed Time Entry Pattern', () => {
       const specificUpdatedPattern = updatedPattern as FixedTimeEntryPatternType;
       expect(specificUpdatedPattern.config.time).toBe('13:45');
       expect(specificUpdatedPattern.sql).toContain("WHERE bar_time = '13:45'");
+    });
+
+    it('should throw error if no entry time is provided', () => {
+      expect(() => {
+        fixedTimeEntryPattern.updateConfig({});
+      }).toThrow('Fixed Time Entry pattern requires an entry time to be configured');
+    });
+
+    it('should throw error if entry time is empty string', () => {
+      expect(() => {
+        fixedTimeEntryPattern.updateConfig({ 'entry-time': '' } as any);
+      }).toThrow('Fixed Time Entry pattern requires an entry time to be configured');
     });
 
     it('should update SQL query when configuration is changed', () => {
