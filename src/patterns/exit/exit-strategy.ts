@@ -276,10 +276,14 @@ export class TrailingStopStrategy implements ExitStrategy {
       trailAmountAbs = atr * this.config.trailAtrMultiplier;
     }
 
-    if (this.config.trailPercent === undefined) {
-      throw new Error('trailPercent must be configured for trailing stop strategy');
+    let trailPct: number | null = null;
+    if (this.config.trailPercent !== undefined) {
+      trailPct = this.config.trailPercent / 100;
+    } else if (trailAmountAbs === null) {
+      throw new Error(
+        'Either trailPercent or trailAtrMultiplier must be configured for trailing stop strategy'
+      );
     }
-    const trailPct = this.config.trailPercent / 100;
     let trailingStopLevel = isLong ? entryPrice : entryPrice;
     // Start activated if immediateActivation is true
     let activated = immediateActivation;
@@ -297,7 +301,7 @@ export class TrailingStopStrategy implements ExitStrategy {
             bestPrice = bar.high;
           }
           trailingStopLevel =
-            trailAmountAbs !== null ? bestPrice - trailAmountAbs : bestPrice * (1 - trailPct);
+            trailAmountAbs !== null ? bestPrice - trailAmountAbs : bestPrice * (1 - trailPct!);
           if (bar.low <= trailingStopLevel) {
             if (_testMode) {
               return {
@@ -328,7 +332,7 @@ export class TrailingStopStrategy implements ExitStrategy {
             bestPrice = bar.low;
           }
           trailingStopLevel =
-            trailAmountAbs !== null ? bestPrice + trailAmountAbs : bestPrice * (1 + trailPct);
+            trailAmountAbs !== null ? bestPrice + trailAmountAbs : bestPrice * (1 + trailPct!);
           if (bar.high >= trailingStopLevel) {
             if (_testMode) {
               return {

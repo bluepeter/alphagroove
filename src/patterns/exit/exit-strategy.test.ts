@@ -401,6 +401,33 @@ describe('Exit Strategies', () => {
       expect(result?.timestamp).toBe('2023-01-01 10:02:00');
     });
 
+    it('should work with ATR-only trailing stop (no trailPercent)', () => {
+      const strategy = new TrailingStopStrategy({
+        activationAtrMultiplier: 0,
+        trailAtrMultiplier: 1.0,
+        // No trailPercent - should use ATR only
+      });
+      const entryPrice = 100;
+      const entryTime = '2023-01-01 10:00:00';
+      const atr = 2.0; // ATR value
+
+      const bars = createTestBars(
+        ['2023-01-01 10:00:00', '2023-01-01 10:01:00', '2023-01-01 10:02:00'],
+        [
+          { open: 100, high: 102, low: 100, close: 101 }, // Entry bar
+          { open: 101, high: 103, low: 99, close: 102 }, // Price moves up to 103, then trail stop at 101 (103-2), triggered by low 99
+          { open: 102, high: 102, low: 102, close: 102 }, // This bar won't be reached
+        ]
+      );
+
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, atr, true);
+
+      expect(result).not.toBeNull();
+      expect(result?.reason).toBe('trailingStop');
+      // ATR trail: best price (103) - ATR trail (2.0) = 101, triggered when low hits 99
+      expect(result?.timestamp).toBe('2023-01-01 10:01:00');
+    });
+
     it('should trigger trailing stop for short position after activation', () => {
       const strategy = new TrailingStopStrategy({ activationPercent: 1.0, trailPercent: 0.5 });
       const entryPrice = 100;
