@@ -255,7 +255,7 @@ export class TrailingStopStrategy implements ExitStrategy {
         const activationOffset = atr * this.config.activationAtrMultiplier;
         activationLevel = isLong ? entryPrice + activationOffset : entryPrice - activationOffset;
       }
-    } else {
+    } else if (this.config.activationPercent !== undefined) {
       const activationPct = this.config.activationPercent / 100;
       activationLevel = isLong
         ? entryPrice * (1 + activationPct)
@@ -265,6 +265,10 @@ export class TrailingStopStrategy implements ExitStrategy {
       if (activationPct === 0) {
         immediateActivation = true;
       }
+    } else {
+      // Default fallback - immediate activation
+      activationLevel = entryPrice;
+      immediateActivation = true;
     }
 
     let trailAmountAbs: number | null = null;
@@ -272,7 +276,7 @@ export class TrailingStopStrategy implements ExitStrategy {
       trailAmountAbs = atr * this.config.trailAtrMultiplier;
     }
 
-    const trailPct = this.config.trailPercent / 100;
+    const trailPct = (this.config.trailPercent ?? 0.5) / 100;
     let trailingStopLevel = isLong ? entryPrice : entryPrice;
     // Start activated if immediateActivation is true
     let activated = immediateActivation;

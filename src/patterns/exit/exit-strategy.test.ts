@@ -343,6 +343,62 @@ describe('Exit Strategies', () => {
       expect(result?.reason).toBe('trailingStop');
     });
 
+    it('should trigger trailing stop immediately when activationAtrMultiplier is 0 (long)', () => {
+      const strategy = new TrailingStopStrategy({
+        activationAtrMultiplier: 0,
+        trailAtrMultiplier: 1.0,
+      });
+      const entryPrice = 100;
+      const entryTime = '2023-01-01 10:00:00';
+      const atr = 2.0; // ATR value
+
+      // Price moves up slightly, then down to trigger stop
+      const bars = createTestBars(
+        ['2023-01-01 10:00:00', '2023-01-01 10:01:00', '2023-01-01 10:02:00'],
+        [
+          { open: 100, high: 102, low: 100, close: 101 }, // Entry bar
+          { open: 101, high: 103, low: 101, close: 102 }, // Price moves up
+          { open: 102, high: 102, low: 97, close: 97 }, // Price drops, should trigger stop
+        ]
+      );
+
+      const result = strategy.evaluate(entryPrice, entryTime, bars, true, atr);
+
+      expect(result).not.toBeNull();
+      expect(result?.reason).toBe('trailingStop');
+      // With immediate activation and trail of 1.0 ATR (2.0), trailing stop should be at 100 - 2 = 98
+      // When price drops to 97 (bar low), it should trigger
+      expect(result?.timestamp).toBe('2023-01-01 10:02:00');
+    });
+
+    it('should trigger trailing stop immediately when activationAtrMultiplier is 0 (short)', () => {
+      const strategy = new TrailingStopStrategy({
+        activationAtrMultiplier: 0,
+        trailAtrMultiplier: 1.0,
+      });
+      const entryPrice = 100;
+      const entryTime = '2023-01-01 10:00:00';
+      const atr = 2.0; // ATR value
+
+      // Price moves down slightly, then up to trigger stop
+      const bars = createTestBars(
+        ['2023-01-01 10:00:00', '2023-01-01 10:01:00', '2023-01-01 10:02:00'],
+        [
+          { open: 100, high: 100, low: 98, close: 99 }, // Entry bar
+          { open: 99, high: 99, low: 97, close: 98 }, // Price moves down
+          { open: 98, high: 103, low: 98, close: 103 }, // Price jumps up, should trigger stop
+        ]
+      );
+
+      const result = strategy.evaluate(entryPrice, entryTime, bars, false, atr);
+
+      expect(result).not.toBeNull();
+      expect(result?.reason).toBe('trailingStop');
+      // With immediate activation and trail of 1.0 ATR (2.0), trailing stop should be at 100 + 2 = 102
+      // When price jumps to 103 (bar high), it should trigger
+      expect(result?.timestamp).toBe('2023-01-01 10:02:00');
+    });
+
     it('should trigger trailing stop for short position after activation', () => {
       const strategy = new TrailingStopStrategy({ activationPercent: 1.0, trailPercent: 0.5 });
       const entryPrice = 100;

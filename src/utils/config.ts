@@ -48,8 +48,8 @@ const ProfitTargetConfigSchema = z.object({
 
 // Trailing Stop configuration
 const TrailingStopConfigSchema = z.object({
-  activationPercent: z.number().default(1.0),
-  trailPercent: z.number().default(0.5),
+  activationPercent: z.number().optional(),
+  trailPercent: z.number().optional(),
   activationAtrMultiplier: z.number().optional(),
   trailAtrMultiplier: z.number().optional(),
 });
@@ -83,6 +83,15 @@ const ExitStrategiesConfigSchema = z
     trailingStop: TrailingStopConfigSchema.optional(),
     endOfDay: EndOfDayConfigSchema.optional(),
     slippage: SlippageConfigSchema.optional(),
+    strategyOptions: z
+      .object({
+        maxHoldTime: MaxHoldTimeConfigSchema.optional(),
+        stopLoss: StopLossConfigSchema.optional(),
+        profitTarget: ProfitTargetConfigSchema.optional(),
+        trailingStop: TrailingStopConfigSchema.optional(),
+        endOfDay: EndOfDayConfigSchema.optional(),
+      })
+      .optional(),
   })
   .default({ enabled: [] });
 
@@ -577,22 +586,32 @@ export const mergeConfigWithCliOptions = (
         }
       : undefined,
     trailingStop: enabledArray?.includes('trailingStop')
-      ? {
-          activationPercent:
-            (rootFromLoaded as any)?.strategyOptions?.trailingStop?.activationPercent ??
-            (rootFromLoaded as any)?.trailingStop?.activationPercent ??
-            TrailingStopConfigSchema.parse({}).activationPercent,
-          trailPercent:
-            (rootFromLoaded as any)?.strategyOptions?.trailingStop?.trailPercent ??
-            (rootFromLoaded as any)?.trailingStop?.trailPercent ??
-            TrailingStopConfigSchema.parse({}).trailPercent,
-          activationAtrMultiplier:
+      ? (() => {
+          const configActivationAtr =
             (rootFromLoaded as any)?.strategyOptions?.trailingStop?.activationAtrMultiplier ??
-            (rootFromLoaded as any)?.trailingStop?.activationAtrMultiplier,
-          trailAtrMultiplier:
+            (rootFromLoaded as any)?.trailingStop?.activationAtrMultiplier;
+          const configTrailAtr =
             (rootFromLoaded as any)?.strategyOptions?.trailingStop?.trailAtrMultiplier ??
-            (rootFromLoaded as any)?.trailingStop?.trailAtrMultiplier,
-        }
+            (rootFromLoaded as any)?.trailingStop?.trailAtrMultiplier;
+
+          const configActivationPercent =
+            (rootFromLoaded as any)?.strategyOptions?.trailingStop?.activationPercent ??
+            (rootFromLoaded as any)?.trailingStop?.activationPercent;
+          const configTrailPercent =
+            (rootFromLoaded as any)?.strategyOptions?.trailingStop?.trailPercent ??
+            (rootFromLoaded as any)?.trailingStop?.trailPercent;
+
+          const result = {
+            // Only use percentage-based defaults if ATR-based values aren't specified
+            activationPercent:
+              configActivationPercent ?? (configActivationAtr !== undefined ? undefined : 1.0),
+            trailPercent: configTrailPercent ?? (configTrailAtr !== undefined ? undefined : 0.5),
+            activationAtrMultiplier: configActivationAtr,
+            trailAtrMultiplier: configTrailAtr,
+          };
+
+          return result;
+        })()
       : undefined,
     endOfDay: enabledArray?.includes('endOfDay')
       ? {
