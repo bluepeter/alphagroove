@@ -264,12 +264,16 @@ This configuration structure allows you to:
 3. Configure parameters for each pattern
 4. Set default chart generation options
 
-All pattern configuration lives in this file - there are no hardcoded defaults in the code. The
-system follows a clear hierarchy for configuration:
+All pattern configuration must be explicitly provided - there are no hidden defaults in the code.
+The system follows a clear hierarchy for configuration:
 
 1. Command-line arguments (highest priority)
 2. Values from `alphagroove.config.yaml`
-3. System fallback defaults (used only if a config file doesn't exist)
+3. ⚠️ **No system defaults** - missing configuration will cause clear error messages
+
+**Important**: As of recent updates, all exit strategies and pattern configurations must be
+explicitly provided. The system will throw descriptive errors if required configuration is missing,
+rather than silently using hidden defaults.
 
 You can generate a default config file by running:
 
@@ -279,6 +283,33 @@ pnpm dev:start init
 
 **Note:** The configuration file must be named exactly `alphagroove.config.yaml` and placed in the
 project root directory for the application to find it.
+
+### Configuration Validation & Error Messages
+
+The system now enforces explicit configuration and will provide clear error messages for missing
+settings:
+
+```bash
+# Missing exit strategies
+Error: Exit strategies must be configured - no defaults provided to avoid hidden behavior
+
+# Missing strategy configuration
+Error: stopLoss strategy enabled but no configuration provided
+
+# Missing entry time for fixed-time-entry pattern
+Error: Fixed Time Entry pattern requires an entry time to be configured
+```
+
+These errors guide you to add the required configuration to your `alphagroove.config.yaml` file.
+
+#### Why No Hidden Defaults?
+
+This design choice ensures:
+
+- **Predictable behavior**: No surprise defaults that might not match your intentions
+- **Clear configuration**: You see exactly what settings are being used
+- **Maintainable code**: No hidden behavior to debug or discover later
+- **Explicit intent**: Every configuration choice is deliberate and visible
 
 ### Exit Strategies Location
 
@@ -367,7 +398,10 @@ Command line arguments always override config file settings. The hierarchy is:
 
 1. **Command line arguments** (highest priority)
 2. **Config file settings**
-3. **System defaults** (lowest priority)
+3. ⚠️ **No system defaults** - explicit configuration required
+
+**Note**: The system no longer provides fallback defaults. If required configuration is missing,
+you'll receive clear error messages indicating exactly what needs to be configured.
 
 ### Entry Pattern Options
 
@@ -421,7 +455,10 @@ CLI options override values from the configuration file.
 
 | Option                          | Description                                | Default from Config |
 | ------------------------------- | ------------------------------------------ | ------------------- |
-| `--fixed-time-entry.entry-time` | Entry time in HH:MM format (e.g., "13:00") | "12:00"             |
+| `--fixed-time-entry.entry-time` | Entry time in HH:MM format (e.g., "13:00") | **Required**        |
+
+**Note**: Entry time must be configured - no default provided. Configure in YAML under
+`entry.strategyOptions.fixedTimeEntry.entryTime` or use CLI option.
 
 ### Available Timeframes
 
