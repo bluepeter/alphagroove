@@ -173,7 +173,19 @@ export class LlmApiService {
           let parsedConfidence: number | undefined = undefined;
 
           try {
-            const parsedJson = JSON.parse(messageTextContent);
+            // Try to extract JSON from markdown formatting if present
+            let jsonText = messageTextContent;
+
+            // Remove markdown code blocks if present
+            const codeBlockMatch = messageTextContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+            if (codeBlockMatch) {
+              jsonText = codeBlockMatch[1].trim();
+            }
+
+            // Remove leading/trailing backticks if present
+            jsonText = jsonText.replace(/^`+|`+$/g, '');
+
+            const parsedJson = JSON.parse(jsonText);
             if (
               typeof parsedJson.action === 'string' &&
               ['long', 'short', 'do_nothing'].includes(parsedJson.action)
@@ -184,19 +196,19 @@ export class LlmApiService {
               parsedRationalization = parsedJson.rationalization;
             }
             if (
-              typeof parsedJson.stopLoss === 'string' ||
-              typeof parsedJson.stopLoss === 'number'
+              typeof parsedJson.proposedStopLoss === 'string' ||
+              typeof parsedJson.proposedStopLoss === 'number'
             ) {
-              const sl = parseFloat(parsedJson.stopLoss);
+              const sl = parseFloat(parsedJson.proposedStopLoss);
               if (!isNaN(sl)) {
                 parsedStopLoss = sl;
               }
             }
             if (
-              typeof parsedJson.profitTarget === 'string' ||
-              typeof parsedJson.profitTarget === 'number'
+              typeof parsedJson.proposedProfitTarget === 'string' ||
+              typeof parsedJson.proposedProfitTarget === 'number'
             ) {
-              const pt = parseFloat(parsedJson.profitTarget);
+              const pt = parseFloat(parsedJson.proposedProfitTarget);
               if (!isNaN(pt)) {
                 parsedProfitTarget = pt;
               }

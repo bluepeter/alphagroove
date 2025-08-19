@@ -2,7 +2,7 @@ default:
   date:
     # from: '2017-01-01'
     from: '2025-01-01'
-    to: '2025-01-15'
+    to: '2025-01-30'
   ticker: 'SPY'
   timeframe: '1min'
   # direction can be 'long', 'short', or 'llm_decides'.
@@ -26,7 +26,7 @@ entry:
 
 exit:
   enabled:
-    - maxHoldTime
+    #- maxHoldTime
     #- stopLoss
     - profitTarget
     - trailingStop
@@ -101,13 +101,13 @@ llmConfirmationScreen:
 
     Your response MUST be a valid JSON object and nothing else.  JSON in the following format:
 
-    `{"action": "long", "rationalization": "<here>", "confidence": "<here>", "stopLoss": "<here>",
-    "profitTarget": "<here>"}` 
+    `{"action": "long", "rationalization": "<here>", "confidence": "<here>", "proposedStopLoss":
+    "<here>", "proposedProfitTarget": "<here>"}` 
 
     or  
 
-    `{"action": "short", "rationalization": "<here>", "confidence": "<here>", "stopLoss": "<here>",
-    "profitTarget": "<here>"}` 
+    `{"action": "short", "rationalization": "<here>", "confidence": "<here>", "proposedStopLoss":
+    "<here>", "proposedProfitTarget": "<here>"}` 
 
     or  
 
