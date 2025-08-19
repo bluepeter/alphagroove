@@ -396,6 +396,8 @@ CLI options override values from the configuration file.
 | `--config <path>`           | Path to custom configuration file              | ./alphagroove.config.yaml |
 | `--generate-charts`         | Generate multiday charts for each entry        | false                     |
 | `--charts-dir <path>`       | Directory for chart output                     | ./charts                  |
+| `--debug`                   | Show debug information and SQL queries         | false                     |
+| `--verbose`                 | Show detailed LLM responses and debug info     | false                     |
 
 ### Pattern-Specific Options
 

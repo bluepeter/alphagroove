@@ -192,7 +192,9 @@ describe('LLM Trade Screening Tests', () => {
         mockSignal,
         expectedChartPath,
         screenConfigEnabled,
-        currentAppConfig
+        currentAppConfig,
+        undefined, // context
+        undefined // debug
       );
       expect(resultFalse).toEqual({
         proceed: false,

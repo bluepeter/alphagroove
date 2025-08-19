@@ -92,7 +92,8 @@ export const handleLlmTradeScreeningInternal = async (
   llmScreenInstance: LlmConfirmationScreen | null,
   screenSpecificLLMConfig: ScreenLLMConfig | undefined,
   mergedConfig: MergedConfig,
-  rawConfig: any // Consider typing this better if possible
+  rawConfig: any, // Consider typing this better if possible
+  debug?: boolean
 ): Promise<{
   proceed: boolean;
   direction?: 'long' | 'short';
@@ -113,7 +114,9 @@ export const handleLlmTradeScreeningInternal = async (
     currentSignal,
     chartPathForLLM,
     screenSpecificLLMConfig,
-    rawConfig // Pass the rawConfig which LlmConfirmationScreen expects as AppConfig
+    rawConfig, // Pass the rawConfig which LlmConfirmationScreen expects as AppConfig
+    undefined, // context
+    debug // Pass debug flag
   );
 
   // screenDecision already includes proceed, cost, and optional direction
@@ -176,7 +179,8 @@ export const processTradesLoop = async (
   llmScreenInstance: LlmConfirmationScreen | null,
   screenSpecificLLMConfig: ScreenLLMConfig | undefined,
   rawConfig: any,
-  totalStats: OverallTradeStats
+  totalStats: OverallTradeStats,
+  debug?: boolean
 ) => {
   let currentYear = '';
   let yearLongTrades: Trade[] = [];
@@ -270,7 +274,8 @@ export const processTradesLoop = async (
       llmScreenInstance,
       screenSpecificLLMConfig,
       mergedConfig,
-      rawConfig
+      rawConfig,
+      debug
     );
 
     currentYearLlmCost += screeningCost;
@@ -629,7 +634,8 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
       llmScreenInstance,
       screenSpecificLLMConfig,
       rawConfig,
-      totalStats
+      totalStats,
+      cliOptions.debug || cliOptions.verbose
     );
 
     await finalizeAnalysis(totalStats, entryPattern, mergedConfig);
@@ -662,6 +668,7 @@ const parseCLI = async () => {
     .option('--generate-charts', 'Generate multiday charts for each entry')
     .option('--charts-dir <path>', 'Directory for chart output')
     .option('--debug', 'Show debug information')
+    .option('--verbose', 'Show detailed LLM responses and debug information')
     .option('--dry-run', 'Show query without executing');
 
   program

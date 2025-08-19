@@ -58,7 +58,8 @@ export class LlmConfirmationScreen implements EntryScreen {
     chartPath: string,
     screenConfig: LLMScreenConfig,
     appConfig: AppConfig,
-    _context?: EntryScreenContext
+    _context?: EntryScreenContext,
+    debug?: boolean
   ): Promise<ScreenDecision> {
     const llmConfig = appConfig.llmConfirmationScreen;
     // 1. Check if LLM feature is enabled at the app level
@@ -78,7 +79,7 @@ export class LlmConfirmationScreen implements EntryScreen {
     // If both above checks pass, proceed to use the LLM service
     const llmService = new LlmApiService(llmConfig); // Use llmConfig from appConfig
     let totalCost = 0;
-    const debug = false;
+    const debugMode = debug ?? false;
     let tempChartPath: string | undefined;
     let decision: ScreenDecision = { proceed: false, cost: totalCost }; // Initialize with cost 0
 
@@ -130,7 +131,7 @@ export class LlmConfirmationScreen implements EntryScreen {
             break;
         }
 
-        if (debug) {
+        if (debugMode) {
           console.log(
             chalk.dim(
               `   LLM ${index + 1}: ${actionEmoji} — ${response.error ? 'Error:' + response.error + ' — ' : ''}${rationalizationLog}${costString}`
