@@ -1,0 +1,584 @@
+Pretty good results here.
+
+peterbray@Peter-MacBook-Pro-M4-Max alphagroove % cat alphagroove.config.yaml 
+default:
+  date:
+    # from: '2017-01-01'
+    from: '2020-01-01'
+    to: '2025-01-30'
+  ticker: 'SPY'
+  timeframe: '1min'
+  # direction can be 'long', 'short', or 'llm_decides'.
+  # If 'llm_decides', llmConfirmationScreen.enabled must be true.
+  direction: 'llm_decides'
+  charts:
+    generate: true
+    outputDir: './charts'
+
+entry:
+  enabled: [fixedTimeEntry]
+  strategyOptions:
+    quickRise:
+      risePct: 0.3
+      withinMinutes: 5
+    quickFall:
+      fallPct: 0.3
+      withinMinutes: 5
+    fixedTimeEntry:
+      entryTime: '13:00'
+
+exit:
+  enabled:
+    #- maxHoldTime
+    #- stopLoss
+    - profitTarget
+    - trailingStop
+    - endOfDay
+  # atrPeriodForEntry: 14 # This specific period is NOT used by the current ATR calculation method (which averages all TRs from the prior day).
+  # Remove or keep commented if you plan to use a period-specific ATR calc in the future.
+  maxHoldTime:
+    minutes: 500
+  strategyOptions:
+    # maxHoldTime:
+    #   minutes: 500
+    stopLoss:
+      # percentFromEntry: 0.5 # Fallback, commented out to prioritize ATR
+      atrMultiplier: 2.0
+      useLlmProposedPrice: false
+    profitTarget:
+      # percentFromEntry: 0.5 # Fallback, commented out to prioritize ATR
+      atrMultiplier: 5.0
+      useLlmProposedPrice: false
+    trailingStop:
+      # activationPercent: 0 # Fallback, commented out to prioritize ATR
+      # trailPercent: 0.3      # Fallback, commented out to prioritize ATR (0.3 for 0.3% of price)
+      activationAtrMultiplier: 0
+      trailAtrMultiplier: 2.5
+    endOfDay:
+      time: '16:00'
+  slippage:
+    model: 'fixed'
+    value: 0.01
+
+llmConfirmationScreen:
+  enabled: true
+  llmProvider: 'anthropic'
+  modelName: 'claude-sonnet-4-20250514'
+  apiKeyEnvVar: 'ANTHROPIC_API_KEY'
+  numCalls: 2
+  agreementThreshold: 2
+  temperatures: [0.1, 1.0]
+  systemPrompt: >-
+    You are a seasoned day trader. You know when to save your powder and wait. You don't assume you
+    always need to be in the market. Only when you're sure will you go long or short.
+
+    You will be provided with a stock chart for the previous trading day and the current day. Note
+    the x-axis dates and times to find the close of the prior day and the open of the current day:
+    it is plotted continuously so the day end/start may not be immediately apparent. The current day
+    will be incomplete as the trading day is still in progress. Pay careful attention to the current
+    day as that is what we are trading. The chart will use candlesticks and volume bars. These are
+    key items to pay attention to. Ignore the ticker symbol, current date, etc. We are backtesting a
+    strategy so you must focus on generating an action based solely on chart mechanics, not any
+    historical knowledge you have of that particular day.
+
+    You strictly follow user instructions for output format. Respond ONLY with the valid JSON object
+    described by the user. Do not include any other text, narration, or explanations.
+  prompts:
+    - You are a seasoned but conservative day trader. You are mindful of sudden reversals,
+      continuations, and other interesting patterns.
+    - You are a quant trader that still has a knack for spotting patterns and trends. You were top
+      of your class at MIT and Stanford.
+  #   - You are a YOLO trader that is super-savvy and has exceptional intuition. Your rationale must be in WSB lingo.
+  commonPromptSuffixForJson: >-
+    Based on the provided chart: 
+
+    - What day trade action would you take: go long, go short, or do_nothing?  
+
+    - Provide a one-sentence rationalization for your decision.  
+
+    - Provide a 1-10 confidence score for your decision. 
+
+    - Provide target stop loss and profit target prices (only provide if action is long or short)
+    that are realistic exit prices given today's range, remaining time in the day, and the current
+    price.
+
+    Your response MUST be a valid JSON object and nothing else.  JSON in the following format:
+
+    `{"action": "long", "rationalization": "<here>", "confidence": "<here>", "proposedStopLoss":
+    "<here>", "proposedProfitTarget": "<here>"}` 
+
+    or  
+
+    `{"action": "short", "rationalization": "<here>", "confidence": "<here>", "proposedStopLoss":
+    "<here>", "proposedProfitTarget": "<here>"}` 
+
+    or  
+
+    `{"action": "do_nothing", "rationalization": "<here>", "confidence": "<here>"}`
+  maxOutputTokens: 250
+peterbray@Peter-MacBook-Pro-M4-Max alphagroove % 
+peterbray@Peter-MacBook-Pro-M4-Max alphagroove % pnpm dev:start                           
+
+> alphagroove@0.1.0 dev:start /Users/peterbray/repos/alphagroove
+> tsx src/index.ts
+
+[dotenv@17.2.1] injecting env (2) from .env.local -- tip: 📡 auto-backup env with Radar: https://dotenvx.com/radar
+[dotenv@17.2.1] injecting env (0) from .env -- tip: 🛠️  run anywhere with `dotenvx run -- yourcommand`
+
+SPY Analysis (2020-01-01 to 2025-01-30):
+Entry Pattern: Fixed Time Entry
+Exit Strategies: Profit Target (ATR), Trailing Stop, End of Day
+Direction Strategy: LLM Decides 🧠
+
+═══════════════════════════════════════════════════════════════════════
+
+
+2020 Trades:
+↗️ 2020-01-13 ⏰ 13:01 → 15:54 Entry: $327.30 Adj Entry: $327.31 Adj Exit: $327.78 ✅ 0.14% [profitTarget] ATR: $0.09; ATR PT [5.0x]: $327.75 (+$0.44, 0.14%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.22 (0.07%)
+↗️ 2020-01-14 ⏰ 13:01 → 13:37 Entry: $328.36 Adj Entry: $328.37 Adj Exit: $327.77 ❌ -0.18% [trailingStop] ATR: $0.07; ATR PT [5.0x]: $328.71 (+$0.34, 0.10%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.17 (0.05%)
+↘️ 2020-01-15 ⏰ 13:01 → 15:27 Entry: $328.19 Adj Entry: $328.19 Adj Exit: $327.59 ✅ 0.18% [profitTarget] ATR: $0.11; ATR PT [5.0x]: $327.64 (-$0.54, -0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.27 (0.08%)
+↗️ 2020-01-21 ⏰ 13:01 → 13:18 Entry: $332.05 Adj Entry: $332.06 Adj Exit: $331.88 ❌ -0.05% [trailingStop] ATR: $0.07; ATR PT [5.0x]: $332.40 (+$0.34, 0.10%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.17 (0.05%)
+↗️ 2020-02-04 ⏰ 13:01 → 13:16 Entry: $329.78 Adj Entry: $329.79 Adj Exit: $329.43 ❌ -0.11% [trailingStop] ATR: $0.14; ATR PT [5.0x]: $330.48 (+$0.69, 0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.35 (0.11%)
+↗️ 2020-02-18 ⏰ 13:01 → 14:26 Entry: $336.31 Adj Entry: $336.32 Adj Exit: $336.81 ✅ 0.14% [profitTarget] ATR: $0.09; ATR PT [5.0x]: $336.78 (+$0.45, 0.13%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.23 (0.07%)
+↘️ 2020-02-24 ⏰ 13:01 → 13:09 Entry: $322.04 Adj Entry: $322.03 Adj Exit: $322.08 ❌ -0.02% [trailingStop] ATR: $0.17; ATR PT [5.0x]: $321.18 (-$0.85, -0.26%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.42 (0.13%)
+↘️ 2020-02-25 ⏰ 13:01 → 14:00 Entry: $316.75 Adj Entry: $316.74 Adj Exit: $315.10 ✅ 0.52% [profitTarget] ATR: $0.30; ATR PT [5.0x]: $315.23 (-$1.51, -0.48%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.76 (0.24%)
+↘️ 2020-02-27 ⏰ 13:01 → 13:43 Entry: $307.37 Adj Entry: $307.36 Adj Exit: $304.22 ✅ 1.02% [profitTarget] ATR: $0.39; ATR PT [5.0x]: $305.42 (-$1.94, -0.63%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.97 (0.31%)
+↗️ 2020-03-04 ⏰ 13:01 → 15:35 Entry: $307.79 Adj Entry: $307.80 Adj Exit: $311.92 ✅ 1.34% [profitTarget] ATR: $0.82; ATR PT [5.0x]: $311.88 (+$4.08, 1.33%); TS Act: Immediate; TS Trail [2.5x ATR]: $2.04 (0.66%)
+↘️ 2020-03-05 ⏰ 13:01 → 15:12 Entry: $302.94 Adj Entry: $302.93 Adj Exit: $300.93 ✅ 0.66% [profitTarget] ATR: $0.40; ATR PT [5.0x]: $300.92 (-$2.01, -0.66%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.00 (0.33%)
+↗️ 2020-03-12 ⏰ 13:01 → 13:05 Entry: $261.66 Adj Entry: $261.67 Adj Exit: $264.36 ✅ 1.03% [profitTarget] ATR: $0.62; ATR PT [5.0x]: $264.75 (+$3.08, 1.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.54 (0.59%)
+↘️ 2020-03-16 ⏰ 13:01 → 14:26 Entry: $249.53 Adj Entry: $249.52 Adj Exit: $245.02 ✅ 1.80% [profitTarget] ATR: $0.91; ATR PT [5.0x]: $244.97 (-$4.55, -1.82%); TS Act: Immediate; TS Trail [2.5x ATR]: $2.28 (0.91%)
+↗️ 2020-03-20 ⏰ 13:01 → 13:25 Entry: $238.66 Adj Entry: $238.67 Adj Exit: $237.42 ❌ -0.52% [trailingStop] ATR: $0.91; ATR PT [5.0x]: $243.20 (+$4.53, 1.90%); TS Act: Immediate; TS Trail [2.5x ATR]: $2.26 (0.95%)
+↗️ 2020-03-23 ⏰ 13:01 → 13:18 Entry: $226.29 Adj Entry: $226.30 Adj Exit: $227.75 ✅ 0.64% [trailingStop] ATR: $0.79; ATR PT [5.0x]: $230.24 (+$3.93, 1.74%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.97 (0.87%)
+↘️ 2020-03-24 ⏰ 13:01 → 14:08 Entry: $240.49 Adj Entry: $240.48 Adj Exit: $236.16 ✅ 1.80% [profitTarget] ATR: $0.90; ATR PT [5.0x]: $235.96 (-$4.52, -1.88%); TS Act: Immediate; TS Trail [2.5x ATR]: $2.26 (0.94%)
+↗️ 2020-03-30 ⏰ 13:01 → 13:42 Entry: $259.80 Adj Entry: $259.81 Adj Exit: $258.99 ❌ -0.32% [trailingStop] ATR: $0.54; ATR PT [5.0x]: $262.52 (+$2.71, 1.04%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.35 (0.52%)
+↘️ 2020-04-01 ⏰ 13:01 → 15:40 Entry: $246.34 Adj Entry: $246.33 Adj Exit: $244.29 ✅ 0.83% [profitTarget] ATR: $0.42; ATR PT [5.0x]: $244.24 (-$2.09, -0.85%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.05 (0.42%)
+↗️ 2020-04-09 ⏰ 13:01 → 13:37 Entry: $280.36 Adj Entry: $280.37 Adj Exit: $280.16 ❌ -0.07% [trailingStop] ATR: $0.35; ATR PT [5.0x]: $282.12 (+$1.75, 0.63%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.88 (0.31%)
+↗️ 2020-04-30 ⏰ 13:01 → 15:23 Entry: $289.68 Adj Entry: $289.69 Adj Exit: $290.86 ✅ 0.40% [profitTarget] ATR: $0.21; ATR PT [5.0x]: $290.73 (+$1.04, 0.36%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.52 (0.18%)
+↘️ 2020-05-01 ⏰ 13:01 → 13:33 Entry: $282.51 Adj Entry: $282.50 Adj Exit: $282.30 ✅ 0.07% [trailingStop] ATR: $0.27; ATR PT [5.0x]: $281.15 (-$1.35, -0.48%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.68 (0.24%)
+↗️ 2020-05-14 ⏰ 13:01 → 15:27 Entry: $282.46 Adj Entry: $282.47 Adj Exit: $284.05 ✅ 0.56% [profitTarget] ATR: $0.32; ATR PT [5.0x]: $284.09 (+$1.62, 0.57%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.81 (0.29%)
+↗️ 2020-05-26 ⏰ 13:01 → 14:01 Entry: $301.09 Adj Entry: $301.10 Adj Exit: $301.21 ✅ 0.04% [trailingStop] ATR: $0.16; ATR PT [5.0x]: $301.90 (+$0.80, 0.27%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.40 (0.13%)
+↗️ 2020-05-29 ⏰ 13:01 → 14:11 Entry: $301.61 Adj Entry: $301.62 Adj Exit: $302.50 ✅ 0.29% [profitTarget] ATR: $0.21; ATR PT [5.0x]: $302.65 (+$1.03, 0.34%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.51 (0.17%)
+↘️ 2020-06-04 ⏰ 13:01 → 15:08 Entry: $310.56 Adj Entry: $310.55 Adj Exit: $309.78 ✅ 0.25% [profitTarget] ATR: $0.13; ATR PT [5.0x]: $309.91 (-$0.64, -0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.32 (0.10%)
+↘️ 2020-06-11 ⏰ 13:01 → 13:48 Entry: $305.13 Adj Entry: $305.12 Adj Exit: $304.00 ✅ 0.37% [profitTarget] ATR: $0.27; ATR PT [5.0x]: $303.78 (-$1.34, -0.44%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.67 (0.22%)
+↗️ 2020-06-15 ⏰ 13:01 → 14:05 Entry: $304.22 Adj Entry: $304.23 Adj Exit: $306.57 ✅ 0.77% [profitTarget] ATR: $0.49; ATR PT [5.0x]: $306.70 (+$2.47, 0.81%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.24 (0.41%)
+↗️ 2020-06-19 ⏰ 13:01 → 13:07 Entry: $310.24 Adj Entry: $310.25 Adj Exit: $309.87 ❌ -0.12% [trailingStop] ATR: $0.20; ATR PT [5.0x]: $311.27 (+$1.02, 0.33%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.51 (0.17%)
+↗️ 2020-06-24 ⏰ 13:01 → 13:07 Entry: $305.12 Adj Entry: $305.13 Adj Exit: $305.10 ❌ -0.01% [trailingStop] ATR: $0.18; ATR PT [5.0x]: $306.02 (+$0.89, 0.29%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.45 (0.15%)
+↗️ 2020-07-08 ⏰ 13:01 → 15:25 Entry: $314.87 Adj Entry: $314.88 Adj Exit: $315.80 ✅ 0.29% [profitTarget] ATR: $0.16; ATR PT [5.0x]: $315.67 (+$0.79, 0.25%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.40 (0.13%)
+↘️ 2020-07-23 ⏰ 13:01 → 13:24 Entry: $325.41 Adj Entry: $325.40 Adj Exit: $324.74 ✅ 0.20% [profitTarget] ATR: $0.14; ATR PT [5.0x]: $324.72 (-$0.68, -0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.34 (0.10%)
+↗️ 2020-07-27 ⏰ 13:01 → 14:56 Entry: $322.46 Adj Entry: $322.47 Adj Exit: $322.36 ❌ -0.03% [trailingStop] ATR: $0.20; ATR PT [5.0x]: $323.46 (+$0.99, 0.31%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.50 (0.15%)
+↗️ 2020-07-29 ⏰ 13:01 → 14:32 Entry: $323.93 Adj Entry: $323.94 Adj Exit: $324.72 ✅ 0.24% [profitTarget] ATR: $0.15; ATR PT [5.0x]: $324.69 (+$0.75, 0.23%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.38 (0.12%)
+↘️ 2020-07-31 ⏰ 13:01 → 13:21 Entry: $321.89 Adj Entry: $321.88 Adj Exit: $322.29 ❌ -0.13% [trailingStop] ATR: $0.19; ATR PT [5.0x]: $320.91 (-$0.97, -0.30%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.49 (0.15%)
+↗️ 2020-08-06 ⏰ 13:01 → 14:02 Entry: $332.42 Adj Entry: $332.43 Adj Exit: $333.10 ✅ 0.20% [profitTarget] ATR: $0.10; ATR PT [5.0x]: $332.92 (+$0.49, 0.15%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.25 (0.07%)
+↗️ 2020-08-10 ⏰ 13:01 → 13:19 Entry: $335.14 Adj Entry: $335.15 Adj Exit: $335.10 ❌ -0.01% [trailingStop] ATR: $0.17; ATR PT [5.0x]: $335.99 (+$0.84, 0.25%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.42 (0.13%)
+↗️ 2020-08-13 ⏰ 13:01 → 13:06 Entry: $338.18 Adj Entry: $338.19 Adj Exit: $337.91 ❌ -0.08% [trailingStop] ATR: $0.14; ATR PT [5.0x]: $338.87 (+$0.68, 0.20%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.34 (0.10%)
+↘️ 2020-08-27 ⏰ 13:01 → 13:03 Entry: $346.83 Adj Entry: $346.82 Adj Exit: $347.11 ❌ -0.08% [trailingStop] ATR: $0.11; ATR PT [5.0x]: $346.26 (-$0.56, -0.16%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.28 (0.08%)
+↗️ 2020-08-28 ⏰ 13:01 → 15:41 Entry: $349.62 Adj Entry: $349.63 Adj Exit: $350.63 ✅ 0.29% [profitTarget] ATR: $0.21; ATR PT [5.0x]: $350.67 (+$1.04, 0.30%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.52 (0.15%)
+↗️ 2020-09-02 ⏰ 13:01 → 13:16 Entry: $355.50 Adj Entry: $355.51 Adj Exit: $356.11 ✅ 0.17% [profitTarget] ATR: $0.13; ATR PT [5.0x]: $356.15 (+$0.64, 0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.32 (0.09%)
+↗️ 2020-09-04 ⏰ 13:01 → 14:40 Entry: $340.30 Adj Entry: $340.31 Adj Exit: $342.79 ✅ 0.73% [profitTarget] ATR: $0.48; ATR PT [5.0x]: $342.69 (+$2.38, 0.70%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.19 (0.35%)
+↗️ 2020-09-09 ⏰ 13:01 → 13:48 Entry: $341.40 Adj Entry: $341.41 Adj Exit: $341.28 ❌ -0.04% [trailingStop] ATR: $0.41; ATR PT [5.0x]: $343.48 (+$2.07, 0.61%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.03 (0.30%)
+↘️ 2020-09-11 ⏰ 13:01 → 13:32 Entry: $333.38 Adj Entry: $333.37 Adj Exit: $331.26 ✅ 0.63% [profitTarget] ATR: $0.37; ATR PT [5.0x]: $331.50 (-$1.87, -0.56%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.94 (0.28%)
+↗️ 2020-09-17 ⏰ 13:01 → 15:41 Entry: $334.43 Adj Entry: $334.44 Adj Exit: $335.45 ✅ 0.30% [profitTarget] ATR: $0.21; ATR PT [5.0x]: $335.48 (+$1.04, 0.31%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.52 (0.16%)
+↘️ 2020-09-18 ⏰ 13:01 → 13:30 Entry: $330.84 Adj Entry: $330.83 Adj Exit: $329.10 ✅ 0.52% [profitTarget] ATR: $0.29; ATR PT [5.0x]: $329.40 (-$1.43, -0.43%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.72 (0.22%)
+↗️ 2020-09-24 ⏰ 13:01 → 13:32 Entry: $325.14 Adj Entry: $325.15 Adj Exit: $326.54 ✅ 0.43% [profitTarget] ATR: $0.27; ATR PT [5.0x]: $326.53 (+$1.37, 0.42%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.69 (0.21%)
+↗️ 2020-09-29 ⏰ 13:01 → 13:54 Entry: $332.51 Adj Entry: $332.52 Adj Exit: $333.46 ✅ 0.28% [profitTarget] ATR: $0.18; ATR PT [5.0x]: $333.44 (+$0.92, 0.28%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.46 (0.14%)
+↗️ 2020-10-06 ⏰ 13:01 → 13:23 Entry: $340.37 Adj Entry: $340.38 Adj Exit: $340.95 ✅ 0.17% [profitTarget] ATR: $0.12; ATR PT [5.0x]: $340.98 (+$0.60, 0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.30 (0.09%)
+↗️ 2020-10-22 ⏰ 13:01 → 13:54 Entry: $343.23 Adj Entry: $343.24 Adj Exit: $344.49 ✅ 0.36% [profitTarget] ATR: $0.23; ATR PT [5.0x]: $344.37 (+$1.13, 0.33%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.56 (0.16%)
+↘️ 2020-10-26 ⏰ 13:01 → 13:24 Entry: $337.25 Adj Entry: $337.24 Adj Exit: $336.40 ✅ 0.25% [profitTarget] ATR: $0.16; ATR PT [5.0x]: $336.43 (-$0.82, -0.24%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.41 (0.12%)
+↗️ 2020-11-05 ⏰ 13:01 → 14:37 Entry: $350.94 Adj Entry: $350.95 Adj Exit: $351.03 ✅ 0.02% [trailingStop] ATR: $0.35; ATR PT [5.0x]: $352.69 (+$1.74, 0.50%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.87 (0.25%)
+↗️ 2020-11-09 ⏰ 13:01 → 13:05 Entry: $361.81 Adj Entry: $361.82 Adj Exit: $361.53 ❌ -0.08% [trailingStop] ATR: $0.22; ATR PT [5.0x]: $362.91 (+$1.09, 0.30%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.55 (0.15%)
+↘️ 2020-11-12 ⏰ 13:01 → 13:14 Entry: $353.04 Adj Entry: $353.03 Adj Exit: $352.36 ✅ 0.19% [profitTarget] ATR: $0.17; ATR PT [5.0x]: $352.17 (-$0.86, -0.24%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.43 (0.12%)
+↗️ 2020-11-13 ⏰ 13:01 → 15:31 Entry: $356.68 Adj Entry: $356.69 Adj Exit: $357.84 ✅ 0.32% [profitTarget] ATR: $0.23; ATR PT [5.0x]: $357.86 (+$1.17, 0.33%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.59 (0.16%)
+↗️ 2020-11-23 ⏰ 13:01 → 14:54 Entry: $356.56 Adj Entry: $356.57 Adj Exit: $357.41 ✅ 0.24% [profitTarget] ATR: $0.14; ATR PT [5.0x]: $357.28 (+$0.71, 0.20%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.36 (0.10%)
+↗️ 2020-11-25 ⏰ 13:01 → 13:16 Entry: $362.85 Adj Entry: $362.86 Adj Exit: $362.56 ❌ -0.08% [trailingStop] ATR: $0.15; ATR PT [5.0x]: $363.59 (+$0.73, 0.20%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.37 (0.10%)
+↗️ 2020-11-30 ⏰ 13:01 → 14:58 Entry: $361.31 Adj Entry: $361.31 Adj Exit: $362.02 ✅ 0.20% [profitTarget] ATR: $0.08; ATR PT [5.0x]: $361.73 (+$0.41, 0.11%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.21 (0.06%)
+↘️ 2020-12-09 ⏰ 13:01 → 13:26 Entry: $368.19 Adj Entry: $368.19 Adj Exit: $367.58 ✅ 0.16% [profitTarget] ATR: $0.11; ATR PT [5.0x]: $367.64 (-$0.55, -0.15%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.27 (0.07%)
+↗️ 2020-12-11 ⏰ 13:01 → 13:40 Entry: $364.30 Adj Entry: $364.31 Adj Exit: $365.16 ✅ 0.23% [profitTarget] ATR: $0.19; ATR PT [5.0x]: $365.26 (+$0.95, 0.26%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.48 (0.13%)
+↘️ 2020-12-14 ⏰ 13:01 → 14:33 Entry: $367.12 Adj Entry: $367.11 Adj Exit: $366.30 ✅ 0.22% [profitTarget] ATR: $0.18; ATR PT [5.0x]: $366.23 (-$0.88, -0.24%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.44 (0.12%)
+↗️ 2020-12-15 ⏰ 13:01 → 14:14 Entry: $368.44 Adj Entry: $368.45 Adj Exit: $369.36 ✅ 0.25% [profitTarget] ATR: $0.17; ATR PT [5.0x]: $369.29 (+$0.84, 0.23%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.42 (0.11%)
+↗️ 2020-12-21 ⏰ 13:01 → 13:26 Entry: $367.20 Adj Entry: $367.21 Adj Exit: $367.45 ✅ 0.06% [profitTarget] ATR: $0.19; ATR PT [5.0x]: $368.18 (+$0.97, 0.26%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.48 (0.13%)
+↗️ 2020-12-24 ⏰ 13:01 → 13:50 Entry: $368.93 Adj Entry: $368.94 Adj Exit: $369.37 ✅ 0.12% [profitTarget] ATR: $0.11; ATR PT [5.0x]: $369.48 (+$0.54, 0.15%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.27 (0.07%)
+
+📊 2020 Long Trades ↗️: 43 trades (17.0% of days) | Return Range: -0.52% to 1.34% | Mean: 0.20% | Median: 0.17% | StdDev: 0.34% | Win Rate: 67.4%
+📊 2020 Short Trades ↘️: 20 trades (7.9% of days) | Return Range: -0.13% to 1.80% | Mean: 0.47% | Median: 0.25% | StdDev: 0.54% | Win Rate: 85.0%
+📊 2020 Combined: 63 trades (24.9% of days) | Return Range: -0.52% to 1.80% | Mean: 0.29% | Median: 0.20% | StdDev: 0.43% | Win Rate: 73.0%
+  Compounded Growth ($10k Start): $1959.82 (19.60%)
+  2020 LLM Cost: $3.6933
+
+
+2021 Trades:
+↗️ 2021-01-12 ⏰ 13:01 → 13:34 Entry: $377.84 Adj Entry: $377.85 Adj Exit: $379.08 ✅ 0.33% [profitTarget] ATR: $0.18; ATR PT [5.0x]: $378.76 (+$0.91, 0.24%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.45 (0.12%)
+↗️ 2021-01-14 ⏰ 13:01 → 13:16 Entry: $380.65 Adj Entry: $380.66 Adj Exit: $380.38 ❌ -0.07% [trailingStop] ATR: $0.13; ATR PT [5.0x]: $381.30 (+$0.64, 0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.32 (0.08%)
+↗️ 2021-01-19 ⏰ 13:01 → 14:35 Entry: $378.71 Adj Entry: $378.72 Adj Exit: $378.83 ✅ 0.03% [trailingStop] ATR: $0.20; ATR PT [5.0x]: $379.74 (+$1.02, 0.27%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.51 (0.13%)
+↗️ 2021-01-20 ⏰ 13:01 → 14:51 Entry: $383.74 Adj Entry: $383.75 Adj Exit: $384.31 ✅ 0.15% [profitTarget] ATR: $0.13; ATR PT [5.0x]: $384.41 (+$0.67, 0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.33 (0.09%)
+↗️ 2021-01-25 ⏰ 13:01 → 13:16 Entry: $382.90 Adj Entry: $382.91 Adj Exit: $383.48 ✅ 0.15% [profitTarget] ATR: $0.12; ATR PT [5.0x]: $383.50 (+$0.59, 0.15%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.30 (0.08%)
+↗️ 2021-01-27 ⏰ 13:01 → 13:06 Entry: $378.77 Adj Entry: $378.78 Adj Exit: $378.50 ❌ -0.07% [trailingStop] ATR: $0.15; ATR PT [5.0x]: $379.52 (+$0.74, 0.19%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.37 (0.10%)
+↘️ 2021-01-29 ⏰ 13:01 → 13:16 Entry: $370.10 Adj Entry: $370.09 Adj Exit: $368.71 ✅ 0.37% [profitTarget] ATR: $0.27; ATR PT [5.0x]: $368.73 (-$1.36, -0.37%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.68 (0.18%)
+↗️ 2021-02-01 ⏰ 13:01 → 15:24 Entry: $376.36 Adj Entry: $376.37 Adj Exit: $376.32 ❌ -0.01% [trailingStop] ATR: $0.38; ATR PT [5.0x]: $378.29 (+$1.92, 0.51%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.96 (0.25%)
+↗️ 2021-02-03 ⏰ 13:01 → 14:09 Entry: $382.86 Adj Entry: $382.87 Adj Exit: $383.51 ✅ 0.17% [profitTarget] ATR: $0.14; ATR PT [5.0x]: $383.59 (+$0.72, 0.19%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.36 (0.09%)
+↗️ 2021-02-05 ⏰ 13:01 → 13:06 Entry: $388.35 Adj Entry: $388.36 Adj Exit: $388.12 ❌ -0.06% [trailingStop] ATR: $0.11; ATR PT [5.0x]: $388.91 (+$0.55, 0.14%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.28 (0.07%)
+↗️ 2021-02-09 ⏰ 13:01 → 13:18 Entry: $390.62 Adj Entry: $390.63 Adj Exit: $390.42 ❌ -0.05% [trailingStop] ATR: $0.10; ATR PT [5.0x]: $391.12 (+$0.49, 0.13%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.25 (0.06%)
+↘️ 2021-02-19 ⏰ 13:01 → 14:30 Entry: $390.63 Adj Entry: $390.63 Adj Exit: $389.78 ✅ 0.22% [profitTarget] ATR: $0.18; ATR PT [5.0x]: $389.75 (-$0.88, -0.22%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.44 (0.11%)
+↗️ 2021-02-22 ⏰ 13:01 → 13:56 Entry: $388.75 Adj Entry: $388.76 Adj Exit: $389.49 ✅ 0.19% [profitTarget] ATR: $0.16; ATR PT [5.0x]: $389.56 (+$0.80, 0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.40 (0.10%)
+↘️ 2021-02-25 ⏰ 13:01 → 15:32 Entry: $382.86 Adj Entry: $382.85 Adj Exit: $381.88 ✅ 0.25% [profitTarget] ATR: $0.22; ATR PT [5.0x]: $381.73 (-$1.12, -0.29%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.56 (0.15%)
+↘️ 2021-03-04 ⏰ 13:01 → 13:12 Entry: $377.46 Adj Entry: $377.45 Adj Exit: $375.92 ✅ 0.41% [profitTarget] ATR: $0.31; ATR PT [5.0x]: $375.91 (-$1.54, -0.41%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.77 (0.20%)
+↗️ 2021-03-05 ⏰ 13:01 → 13:41 Entry: $378.95 Adj Entry: $378.96 Adj Exit: $381.73 ✅ 0.73% [profitTarget] ATR: $0.52; ATR PT [5.0x]: $381.57 (+$2.61, 0.69%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.30 (0.34%)
+↘️ 2021-03-09 ⏰ 13:01 → 15:51 Entry: $389.26 Adj Entry: $389.25 Adj Exit: $387.36 ✅ 0.49% [profitTarget] ATR: $0.36; ATR PT [5.0x]: $387.45 (-$1.80, -0.46%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.90 (0.23%)
+↗️ 2021-03-15 ⏰ 13:01 → 14:18 Entry: $394.16 Adj Entry: $394.17 Adj Exit: $395.00 ✅ 0.21% [profitTarget] ATR: $0.17; ATR PT [5.0x]: $395.04 (+$0.87, 0.22%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.43 (0.11%)
+↘️ 2021-03-18 ⏰ 13:01 → 14:29 Entry: $394.98 Adj Entry: $394.97 Adj Exit: $393.96 ✅ 0.26% [profitTarget] ATR: $0.21; ATR PT [5.0x]: $393.91 (-$1.06, -0.27%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.53 (0.13%)
+↗️ 2021-03-22 ⏰ 13:01 → 15:19 Entry: $393.00 Adj Entry: $393.01 Adj Exit: $393.46 ✅ 0.11% [trailingStop] ATR: $0.22; ATR PT [5.0x]: $394.11 (+$1.10, 0.28%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.55 (0.14%)
+↗️ 2021-03-25 ⏰ 13:01 → 13:16 Entry: $387.61 Adj Entry: $387.62 Adj Exit: $388.66 ✅ 0.27% [profitTarget] ATR: $0.21; ATR PT [5.0x]: $388.67 (+$1.05, 0.27%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.53 (0.14%)
+↗️ 2021-03-29 ⏰ 13:01 → 13:16 Entry: $395.96 Adj Entry: $395.97 Adj Exit: $396.06 ✅ 0.02% [trailingStop] ATR: $0.19; ATR PT [5.0x]: $396.90 (+$0.93, 0.24%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.47 (0.12%)
+↗️ 2021-03-31 ⏰ 13:01 → 13:43 Entry: $397.68 Adj Entry: $397.69 Adj Exit: $397.53 ❌ -0.04% [trailingStop] ATR: $0.18; ATR PT [5.0x]: $398.59 (+$0.90, 0.23%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.45 (0.11%)
+↗️ 2021-04-01 ⏰ 13:01 → 15:58 Entry: $399.75 Adj Entry: $399.76 Adj Exit: $400.41 ✅ 0.16% [profitTarget] ATR: $0.13; ATR PT [5.0x]: $400.39 (+$0.63, 0.16%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.32 (0.08%)
+↗️ 2021-04-12 ⏰ 13:01 → 13:12 Entry: $411.69 Adj Entry: $411.70 Adj Exit: $411.48 ❌ -0.05% [trailingStop] ATR: $0.09; ATR PT [5.0x]: $412.16 (+$0.46, 0.11%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.23 (0.06%)
+↘️ 2021-04-13 ⏰ 13:01 → 13:03 Entry: $411.60 Adj Entry: $411.59 Adj Exit: $411.74 ❌ -0.04% [trailingStop] ATR: $0.11; ATR PT [5.0x]: $411.06 (-$0.53, -0.13%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.27 (0.06%)
+↗️ 2021-04-15 ⏰ 13:01 → 13:08 Entry: $415.55 Adj Entry: $415.56 Adj Exit: $415.21 ❌ -0.08% [trailingStop] ATR: $0.15; ATR PT [5.0x]: $416.31 (+$0.75, 0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.37 (0.09%)
+↗️ 2021-04-22 ⏰ 13:01 → 13:07 Entry: $416.68 Adj Entry: $416.69 Adj Exit: $416.20 ❌ -0.12% [trailingStop] ATR: $0.12; ATR PT [5.0x]: $417.27 (+$0.58, 0.14%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.29 (0.07%)
+↗️ 2021-04-23 ⏰ 13:01 → 15:36 Entry: $417.13 Adj Entry: $417.14 Adj Exit: $418.19 ✅ 0.25% [profitTarget] ATR: $0.21; ATR PT [5.0x]: $418.21 (+$1.07, 0.26%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.53 (0.13%)
+↗️ 2021-04-29 ⏰ 13:01 → 13:45 Entry: $417.98 Adj Entry: $417.99 Adj Exit: $418.64 ✅ 0.16% [profitTarget] ATR: $0.12; ATR PT [5.0x]: $418.61 (+$0.62, 0.15%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.31 (0.07%)
+↗️ 2021-05-14 ⏰ 13:01 → 15:04 Entry: $416.40 Adj Entry: $416.41 Adj Exit: $416.72 ✅ 0.07% [trailingStop] ATR: $0.28; ATR PT [5.0x]: $417.82 (+$1.41, 0.34%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.70 (0.17%)
+↗️ 2021-05-19 ⏰ 13:01 → 14:24 Entry: $409.56 Adj Entry: $409.57 Adj Exit: $410.35 ✅ 0.19% [profitTarget] ATR: $0.15; ATR PT [5.0x]: $410.33 (+$0.76, 0.19%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.38 (0.09%)
+↘️ 2021-05-21 ⏰ 13:01 → 13:23 Entry: $414.98 Adj Entry: $414.97 Adj Exit: $415.32 ❌ -0.08% [trailingStop] ATR: $0.16; ATR PT [5.0x]: $414.19 (-$0.78, -0.19%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.39 (0.09%)
+↗️ 2021-06-17 ⏰ 13:01 → 13:34 Entry: $421.37 Adj Entry: $421.38 Adj Exit: $422.34 ✅ 0.23% [profitTarget] ATR: $0.18; ATR PT [5.0x]: $422.30 (+$0.92, 0.22%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.46 (0.11%)
+↗️ 2021-07-02 ⏰ 13:01 → 15:40 Entry: $433.30 Adj Entry: $433.31 Adj Exit: $433.69 ✅ 0.09% [profitTarget] ATR: $0.08; ATR PT [5.0x]: $433.72 (+$0.42, 0.10%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.21 (0.05%)
+↗️ 2021-07-06 ⏰ 13:01 → 13:17 Entry: $430.95 Adj Entry: $430.96 Adj Exit: $431.32 ✅ 0.08% [profitTarget] ATR: $0.07; ATR PT [5.0x]: $431.33 (+$0.37, 0.09%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.19 (0.04%)
+↗️ 2021-07-08 ⏰ 13:01 → 16:00 Entry: $431.49 Adj Entry: $431.50 Adj Exit: $430.64 ❌ -0.20% [profitTarget] ATR: $0.14; ATR PT [5.0x]: $432.21 (+$0.72, 0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.36 (0.08%)
+↗️ 2021-07-14 ⏰ 13:01 → 13:10 Entry: $436.54 Adj Entry: $436.55 Adj Exit: $436.18 ❌ -0.08% [trailingStop] ATR: $0.14; ATR PT [5.0x]: $437.23 (+$0.68, 0.15%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.34 (0.08%)
+↗️ 2021-07-23 ⏰ 13:01 → 13:27 Entry: $439.38 Adj Entry: $439.39 Adj Exit: $439.98 ✅ 0.13% [profitTarget] ATR: $0.12; ATR PT [5.0x]: $440.01 (+$0.62, 0.14%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.31 (0.07%)
+↗️ 2021-08-03 ⏰ 13:01 → 15:06 Entry: $439.92 Adj Entry: $439.93 Adj Exit: $440.73 ✅ 0.18% [profitTarget] ATR: $0.15; ATR PT [5.0x]: $440.66 (+$0.73, 0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.36 (0.08%)
+↗️ 2021-08-12 ⏰ 13:01 → 14:39 Entry: $444.27 Adj Entry: $444.28 Adj Exit: $444.68 ✅ 0.09% [profitTarget] ATR: $0.09; ATR PT [5.0x]: $444.72 (+$0.44, 0.10%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.22 (0.05%)
+↗️ 2021-08-16 ⏰ 13:01 → 13:28 Entry: $444.82 Adj Entry: $444.83 Adj Exit: $445.19 ✅ 0.08% [profitTarget] ATR: $0.07; ATR PT [5.0x]: $445.18 (+$0.35, 0.08%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.18 (0.04%)
+↘️ 2021-08-17 ⏰ 13:01 → 13:06 Entry: $441.47 Adj Entry: $441.46 Adj Exit: $441.11 ✅ 0.08% [trailingStop] ATR: $0.12; ATR PT [5.0x]: $440.88 (-$0.58, -0.13%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.29 (0.07%)
+↗️ 2021-08-23 ⏰ 13:01 → 13:26 Entry: $448.10 Adj Entry: $448.11 Adj Exit: $447.84 ❌ -0.06% [trailingStop] ATR: $0.14; ATR PT [5.0x]: $448.81 (+$0.70, 0.16%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.35 (0.08%)
+↗️ 2021-08-25 ⏰ 13:01 → 13:28 Entry: $449.22 Adj Entry: $449.23 Adj Exit: $449.06 ❌ -0.04% [trailingStop] ATR: $0.08; ATR PT [5.0x]: $449.63 (+$0.40, 0.09%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.20 (0.04%)
+↗️ 2021-08-27 ⏰ 13:01 → 14:05 Entry: $450.21 Adj Entry: $450.22 Adj Exit: $450.06 ❌ -0.04% [trailingStop] ATR: $0.15; ATR PT [5.0x]: $450.98 (+$0.75, 0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.38 (0.08%)
+↗️ 2021-09-01 ⏰ 13:01 → 14:19 Entry: $452.93 Adj Entry: $452.94 Adj Exit: $452.88 ❌ -0.01% [trailingStop] ATR: $0.11; ATR PT [5.0x]: $453.49 (+$0.55, 0.12%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.28 (0.06%)
+↗️ 2021-09-07 ⏰ 13:01 → 13:05 Entry: $452.29 Adj Entry: $452.30 Adj Exit: $452.04 ❌ -0.06% [trailingStop] ATR: $0.10; ATR PT [5.0x]: $452.81 (+$0.51, 0.11%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.25 (0.06%)
+↗️ 2021-09-10 ⏰ 13:01 → 13:23 Entry: $449.19 Adj Entry: $449.20 Adj Exit: $448.92 ❌ -0.06% [trailingStop] ATR: $0.15; ATR PT [5.0x]: $449.96 (+$0.76, 0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.38 (0.08%)
+↗️ 2021-09-15 ⏰ 13:01 → 13:47 Entry: $446.96 Adj Entry: $446.97 Adj Exit: $447.89 ✅ 0.21% [profitTarget] ATR: $0.18; ATR PT [5.0x]: $447.89 (+$0.92, 0.20%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.46 (0.10%)
+↘️ 2021-09-20 ⏰ 13:01 → 14:15 Entry: $431.71 Adj Entry: $431.70 Adj Exit: $430.62 ✅ 0.25% [profitTarget] ATR: $0.22; ATR PT [5.0x]: $430.61 (-$1.09, -0.25%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.55 (0.13%)
+↘️ 2021-09-27 ⏰ 13:01 → 13:06 Entry: $442.40 Adj Entry: $442.39 Adj Exit: $442.77 ❌ -0.09% [trailingStop] ATR: $0.15; ATR PT [5.0x]: $441.63 (-$0.76, -0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.38 (0.09%)
+↘️ 2021-09-30 ⏰ 13:01 → 15:58 Entry: $430.84 Adj Entry: $430.83 Adj Exit: $429.70 ✅ 0.26% [profitTarget] ATR: $0.25; ATR PT [5.0x]: $429.59 (-$1.24, -0.29%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.62 (0.14%)
+↘️ 2021-10-11 ⏰ 13:01 → 13:24 Entry: $437.73 Adj Entry: $437.72 Adj Exit: $436.80 ✅ 0.21% [profitTarget] ATR: $0.21; ATR PT [5.0x]: $436.69 (-$1.03, -0.24%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.52 (0.12%)
+↗️ 2021-10-14 ⏰ 13:01 → 13:05 Entry: $442.19 Adj Entry: $442.19 Adj Exit: $441.65 ❌ -0.12% [trailingStop] ATR: $0.23; ATR PT [5.0x]: $443.33 (+$1.14, 0.26%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.57 (0.13%)
+↗️ 2021-10-19 ⏰ 13:01 → 13:04 Entry: $450.53 Adj Entry: $450.54 Adj Exit: $450.27 ❌ -0.06% [trailingStop] ATR: $0.13; ATR PT [5.0x]: $451.17 (+$0.63, 0.14%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.32 (0.07%)
+↗️ 2021-10-25 ⏰ 13:01 → 13:25 Entry: $455.48 Adj Entry: $455.49 Adj Exit: $455.49 ❌ 0.00% [trailingStop] ATR: $0.18; ATR PT [5.0x]: $456.38 (+$0.89, 0.20%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.45 (0.10%)
+↗️ 2021-11-01 ⏰ 13:01 → 13:21 Entry: $459.97 Adj Entry: $459.98 Adj Exit: $459.68 ❌ -0.07% [trailingStop] ATR: $0.14; ATR PT [5.0x]: $460.66 (+$0.68, 0.15%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.34 (0.07%)
+↘️ 2021-11-05 ⏰ 13:01 → 13:12 Entry: $468.93 Adj Entry: $468.92 Adj Exit: $468.34 ✅ 0.12% [profitTarget] ATR: $0.14; ATR PT [5.0x]: $468.24 (-$0.68, -0.14%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.34 (0.07%)
+↘️ 2021-11-12 ⏰ 13:01 → 13:13 Entry: $466.48 Adj Entry: $466.47 Adj Exit: $466.69 ❌ -0.05% [trailingStop] ATR: $0.12; ATR PT [5.0x]: $465.86 (-$0.61, -0.13%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.31 (0.07%)
+↘️ 2021-11-18 ⏰ 13:01 → 13:06 Entry: $469.00 Adj Entry: $468.99 Adj Exit: $469.28 ❌ -0.06% [trailingStop] ATR: $0.13; ATR PT [5.0x]: $468.34 (-$0.65, -0.14%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.32 (0.07%)
+↗️ 2021-11-24 ⏰ 13:01 → 14:04 Entry: $468.64 Adj Entry: $468.65 Adj Exit: $468.28 ❌ -0.08% [trailingStop] ATR: $0.29; ATR PT [5.0x]: $470.12 (+$1.47, 0.31%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.73 (0.16%)
+↗️ 2021-11-29 ⏰ 13:01 → 13:22 Entry: $466.21 Adj Entry: $466.22 Adj Exit: $465.95 ❌ -0.06% [trailingStop] ATR: $0.29; ATR PT [5.0x]: $467.67 (+$1.45, 0.31%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.72 (0.16%)
+↘️ 2021-12-01 ⏰ 13:01 → 13:14 Entry: $461.01 Adj Entry: $461.00 Adj Exit: $459.15 ✅ 0.40% [profitTarget] ATR: $0.38; ATR PT [5.0x]: $459.09 (-$1.91, -0.41%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.95 (0.21%)
+↗️ 2021-12-06 ⏰ 13:01 → 14:43 Entry: $459.46 Adj Entry: $459.47 Adj Exit: $459.51 ✅ 0.01% [trailingStop] ATR: $0.48; ATR PT [5.0x]: $461.88 (+$2.41, 0.52%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.20 (0.26%)
+↘️ 2021-12-16 ⏰ 13:01 → 14:37 Entry: $468.01 Adj Entry: $468.00 Adj Exit: $466.97 ✅ 0.22% [profitTarget] ATR: $0.30; ATR PT [5.0x]: $466.48 (-$1.52, -0.32%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.76 (0.16%)
+↗️ 2021-12-21 ⏰ 13:01 → 14:40 Entry: $461.67 Adj Entry: $461.68 Adj Exit: $461.74 ✅ 0.01% [trailingStop] ATR: $0.33; ATR PT [5.0x]: $463.31 (+$1.63, 0.35%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.81 (0.18%)
+↗️ 2021-12-27 ⏰ 13:01 → 13:59 Entry: $475.67 Adj Entry: $475.68 Adj Exit: $476.24 ✅ 0.12% [profitTarget] ATR: $0.12; ATR PT [5.0x]: $476.26 (+$0.58, 0.12%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.29 (0.06%)
+↗️ 2021-12-29 ⏰ 13:01 → 15:18 Entry: $476.92 Adj Entry: $476.93 Adj Exit: $477.79 ✅ 0.18% [profitTarget] ATR: $0.17; ATR PT [5.0x]: $477.77 (+$0.84, 0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.42 (0.09%)
+↗️ 2021-12-31 ⏰ 13:01 → 13:18 Entry: $476.18 Adj Entry: $476.19 Adj Exit: $476.04 ❌ -0.03% [trailingStop] ATR: $0.12; ATR PT [5.0x]: $476.78 (+$0.59, 0.12%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.29 (0.06%)
+
+📊 2021 Long Trades ↗️: 52 trades (20.6% of days) | Return Range: -0.20% to 0.73% | Mean: 0.06% | Median: 0.02% | StdDev: 0.15% | Win Rate: 55.8%
+📊 2021 Short Trades ↘️: 18 trades (7.1% of days) | Return Range: -0.09% to 0.49% | Mean: 0.18% | Median: 0.22% | StdDev: 0.18% | Win Rate: 72.2%
+📊 2021 Combined: 70 trades (27.8% of days) | Return Range: -0.20% to 0.73% | Mean: 0.09% | Median: 0.08% | StdDev: 0.17% | Win Rate: 58.6%
+  Compounded Growth ($10k Start): $647.17 (6.47%)
+  2021 LLM Cost: $3.6889
+
+
+2022 Trades:
+↘️ 2022-01-04 ⏰ 13:01 → 13:57 Entry: $476.81 Adj Entry: $476.80 Adj Exit: $475.73 ✅ 0.22% [profitTarget] ATR: $0.21; ATR PT [5.0x]: $475.76 (-$1.04, -0.22%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.52 (0.11%)
+↘️ 2022-01-05 ⏰ 13:01 → 14:06 Entry: $476.03 Adj Entry: $476.02 Adj Exit: $474.90 ✅ 0.24% [profitTarget] ATR: $0.20; ATR PT [5.0x]: $475.02 (-$1.00, -0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.50 (0.10%)
+↘️ 2022-01-14 ⏰ 13:01 → 13:15 Entry: $460.77 Adj Entry: $460.76 Adj Exit: $460.91 ❌ -0.03% [trailingStop] ATR: $0.30; ATR PT [5.0x]: $459.28 (-$1.48, -0.32%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.74 (0.16%)
+↘️ 2022-01-18 ⏰ 13:01 → 13:14 Entry: $455.68 Adj Entry: $455.67 Adj Exit: $456.40 ❌ -0.16% [trailingStop] ATR: $0.36; ATR PT [5.0x]: $453.89 (-$1.78, -0.39%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.89 (0.20%)
+↗️ 2022-01-24 ⏰ 13:01 → 13:09 Entry: $424.87 Adj Entry: $424.88 Adj Exit: $427.64 ✅ 0.65% [profitTarget] ATR: $0.55; ATR PT [5.0x]: $427.61 (+$2.73, 0.64%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.37 (0.32%)
+↗️ 2022-01-31 ⏰ 13:01 → 15:51 Entry: $446.96 Adj Entry: $446.97 Adj Exit: $449.67 ✅ 0.60% [profitTarget] ATR: $0.53; ATR PT [5.0x]: $449.62 (+$2.65, 0.59%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.32 (0.30%)
+↗️ 2022-02-02 ⏰ 13:01 → 13:11 Entry: $456.76 Adj Entry: $456.77 Adj Exit: $456.00 ❌ -0.17% [trailingStop] ATR: $0.35; ATR PT [5.0x]: $458.50 (+$1.73, 0.38%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.86 (0.19%)
+↗️ 2022-02-04 ⏰ 13:01 → 13:44 Entry: $449.06 Adj Entry: $449.07 Adj Exit: $450.74 ✅ 0.37% [profitTarget] ATR: $0.35; ATR PT [5.0x]: $450.81 (+$1.74, 0.39%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.87 (0.19%)
+↘️ 2022-02-18 ⏰ 13:01 → 13:23 Entry: $432.46 Adj Entry: $432.45 Adj Exit: $432.62 ❌ -0.04% [trailingStop] ATR: $0.26; ATR PT [5.0x]: $431.13 (-$1.32, -0.30%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.66 (0.15%)
+↘️ 2022-02-22 ⏰ 13:01 → 13:51 Entry: $429.31 Adj Entry: $429.30 Adj Exit: $427.41 ✅ 0.44% [profitTarget] ATR: $0.38; ATR PT [5.0x]: $427.39 (-$1.91, -0.44%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.96 (0.22%)
+↗️ 2022-03-01 ⏰ 13:01 → 13:08 Entry: $431.45 Adj Entry: $431.46 Adj Exit: $430.57 ❌ -0.21% [trailingStop] ATR: $0.46; ATR PT [5.0x]: $433.75 (+$2.29, 0.53%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.15 (0.27%)
+↗️ 2022-03-02 ⏰ 13:01 → 14:26 Entry: $438.23 Adj Entry: $438.24 Adj Exit: $438.21 ❌ -0.01% [trailingStop] ATR: $0.47; ATR PT [5.0x]: $440.59 (+$2.35, 0.54%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.18 (0.27%)
+↗️ 2022-03-03 ⏰ 13:01 → 13:33 Entry: $437.53 Adj Entry: $437.54 Adj Exit: $437.93 ✅ 0.09% [trailingStop] ATR: $0.39; ATR PT [5.0x]: $439.51 (+$1.96, 0.45%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.98 (0.22%)
+↗️ 2022-03-04 ⏰ 13:01 → 13:17 Entry: $432.86 Adj Entry: $432.87 Adj Exit: $432.25 ❌ -0.14% [trailingStop] ATR: $0.39; ATR PT [5.0x]: $434.80 (+$1.93, 0.45%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.97 (0.22%)
+↗️ 2022-03-08 ⏰ 13:01 → 13:19 Entry: $426.00 Adj Entry: $426.01 Adj Exit: $426.15 ✅ 0.03% [trailingStop] ATR: $0.43; ATR PT [5.0x]: $428.15 (+$2.14, 0.50%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.07 (0.25%)
+↗️ 2022-03-09 ⏰ 13:01 → 13:47 Entry: $428.05 Adj Entry: $428.06 Adj Exit: $426.68 ❌ -0.32% [trailingStop] ATR: $0.63; ATR PT [5.0x]: $431.19 (+$3.13, 0.73%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.57 (0.37%)
+↘️ 2022-03-14 ⏰ 13:01 → 13:50 Entry: $417.79 Adj Entry: $417.78 Adj Exit: $416.29 ✅ 0.36% [profitTarget] ATR: $0.32; ATR PT [5.0x]: $416.16 (-$1.62, -0.39%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.81 (0.19%)
+↗️ 2022-03-18 ⏰ 13:01 → 15:10 Entry: $441.59 Adj Entry: $441.60 Adj Exit: $443.18 ✅ 0.36% [profitTarget] ATR: $0.28; ATR PT [5.0x]: $443.02 (+$1.42, 0.32%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.71 (0.16%)
+↘️ 2022-03-21 ⏰ 13:01 → 13:19 Entry: $442.23 Adj Entry: $442.22 Adj Exit: $440.94 ✅ 0.29% [profitTarget] ATR: $0.25; ATR PT [5.0x]: $440.95 (-$1.27, -0.29%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.63 (0.14%)
+↗️ 2022-03-24 ⏰ 13:01 → 15:24 Entry: $448.10 Adj Entry: $448.11 Adj Exit: $449.35 ✅ 0.28% [profitTarget] ATR: $0.26; ATR PT [5.0x]: $449.40 (+$1.29, 0.29%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.65 (0.14%)
+↗️ 2022-03-28 ⏰ 13:01 → 14:34 Entry: $451.69 Adj Entry: $451.70 Adj Exit: $452.86 ✅ 0.26% [profitTarget] ATR: $0.26; ATR PT [5.0x]: $452.99 (+$1.29, 0.29%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.64 (0.14%)
+↘️ 2022-03-31 ⏰ 13:01 → 15:22 Entry: $456.85 Adj Entry: $456.84 Adj Exit: $455.78 ✅ 0.23% [profitTarget] ATR: $0.20; ATR PT [5.0x]: $455.82 (-$1.02, -0.22%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.51 (0.11%)
+↘️ 2022-04-21 ⏰ 13:01 → 14:02 Entry: $442.57 Adj Entry: $442.56 Adj Exit: $441.15 ✅ 0.32% [profitTarget] ATR: $0.26; ATR PT [5.0x]: $441.26 (-$1.30, -0.29%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.65 (0.15%)
+↗️ 2022-04-28 ⏰ 13:01 → 14:44 Entry: $425.61 Adj Entry: $425.62 Adj Exit: $428.29 ✅ 0.63% [profitTarget] ATR: $0.52; ATR PT [5.0x]: $428.20 (+$2.58, 0.61%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.29 (0.30%)
+↘️ 2022-04-29 ⏰ 13:01 → 14:39 Entry: $418.04 Adj Entry: $418.03 Adj Exit: $416.04 ✅ 0.48% [profitTarget] ATR: $0.37; ATR PT [5.0x]: $416.17 (-$1.86, -0.45%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.93 (0.22%)
+↘️ 2022-05-02 ⏰ 13:01 → 13:48 Entry: $409.13 Adj Entry: $409.12 Adj Exit: $407.33 ✅ 0.44% [profitTarget] ATR: $0.38; ATR PT [5.0x]: $407.22 (-$1.90, -0.46%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.95 (0.23%)
+↗️ 2022-05-04 ⏰ 13:01 → 14:46 Entry: $418.42 Adj Entry: $418.43 Adj Exit: $420.34 ✅ 0.46% [profitTarget] ATR: $0.45; ATR PT [5.0x]: $420.69 (+$2.26, 0.54%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.13 (0.27%)
+↗️ 2022-05-05 ⏰ 13:01 → 13:13 Entry: $415.18 Adj Entry: $415.19 Adj Exit: $414.95 ❌ -0.06% [trailingStop] ATR: $0.48; ATR PT [5.0x]: $417.57 (+$2.38, 0.57%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.19 (0.29%)
+↘️ 2022-05-11 ⏰ 13:01 → 13:59 Entry: $396.66 Adj Entry: $396.65 Adj Exit: $393.38 ✅ 0.82% [profitTarget] ATR: $0.62; ATR PT [5.0x]: $393.54 (-$3.11, -0.78%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.55 (0.39%)
+↘️ 2022-05-20 ⏰ 13:01 → 13:34 Entry: $382.19 Adj Entry: $382.18 Adj Exit: $382.26 ❌ -0.02% [trailingStop] ATR: $0.56; ATR PT [5.0x]: $379.39 (-$2.79, -0.73%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.40 (0.37%)
+↗️ 2022-05-26 ⏰ 13:01 → 13:23 Entry: $406.38 Adj Entry: $406.39 Adj Exit: $405.88 ❌ -0.13% [trailingStop] ATR: $0.41; ATR PT [5.0x]: $408.44 (+$2.05, 0.50%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.03 (0.25%)
+↗️ 2022-06-02 ⏰ 13:01 → 15:46 Entry: $414.29 Adj Entry: $414.30 Adj Exit: $416.18 ✅ 0.45% [profitTarget] ATR: $0.38; ATR PT [5.0x]: $416.22 (+$1.92, 0.46%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.96 (0.23%)
+↗️ 2022-06-03 ⏰ 13:01 → 13:14 Entry: $412.55 Adj Entry: $412.56 Adj Exit: $412.41 ❌ -0.04% [trailingStop] ATR: $0.33; ATR PT [5.0x]: $414.18 (+$1.63, 0.39%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.81 (0.20%)
+↗️ 2022-06-14 ⏰ 13:01 → 13:23 Entry: $374.06 Adj Entry: $374.07 Adj Exit: $376.34 ✅ 0.61% [profitTarget] ATR: $0.46; ATR PT [5.0x]: $376.37 (+$2.30, 0.61%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.15 (0.31%)
+↘️ 2022-06-15 ⏰ 13:01 → 14:07 Entry: $376.35 Adj Entry: $376.34 Adj Exit: $373.94 ✅ 0.64% [profitTarget] ATR: $0.42; ATR PT [5.0x]: $374.26 (-$2.08, -0.55%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.04 (0.28%)
+↘️ 2022-06-23 ⏰ 13:01 → 13:07 Entry: $373.07 Adj Entry: $373.06 Adj Exit: $373.84 ❌ -0.21% [trailingStop] ATR: $0.34; ATR PT [5.0x]: $371.38 (-$1.68, -0.45%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.84 (0.23%)
+↗️ 2022-06-30 ⏰ 13:01 → 13:07 Entry: $379.83 Adj Entry: $379.84 Adj Exit: $379.13 ❌ -0.19% [trailingStop] ATR: $0.35; ATR PT [5.0x]: $381.57 (+$1.73, 0.46%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.87 (0.23%)
+↘️ 2022-07-08 ⏰ 13:01 → 13:06 Entry: $387.21 Adj Entry: $387.20 Adj Exit: $387.20 ❌ 0.00% [trailingStop] ATR: $0.20; ATR PT [5.0x]: $386.21 (-$0.99, -0.26%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.50 (0.13%)
+↗️ 2022-07-13 ⏰ 13:01 → 13:03 Entry: $380.45 Adj Entry: $380.46 Adj Exit: $381.61 ✅ 0.30% [profitTarget] ATR: $0.27; ATR PT [5.0x]: $381.79 (+$1.33, 0.35%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.66 (0.17%)
+↘️ 2022-07-18 ⏰ 13:01 → 13:38 Entry: $387.21 Adj Entry: $387.20 Adj Exit: $386.08 ✅ 0.29% [profitTarget] ATR: $0.23; ATR PT [5.0x]: $386.05 (-$1.15, -0.30%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.58 (0.15%)
+↗️ 2022-07-19 ⏰ 13:01 → 14:00 Entry: $390.41 Adj Entry: $390.42 Adj Exit: $391.59 ✅ 0.30% [profitTarget] ATR: $0.23; ATR PT [5.0x]: $391.56 (+$1.14, 0.29%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.57 (0.15%)
+↗️ 2022-07-21 ⏰ 13:01 → 15:57 Entry: $397.15 Adj Entry: $397.16 Adj Exit: $398.55 ✅ 0.35% [profitTarget] ATR: $0.27; ATR PT [5.0x]: $398.49 (+$1.33, 0.34%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.67 (0.17%)
+↘️ 2022-07-22 ⏰ 13:01 → 13:36 Entry: $394.79 Adj Entry: $394.78 Adj Exit: $393.40 ✅ 0.35% [profitTarget] ATR: $0.29; ATR PT [5.0x]: $393.31 (-$1.47, -0.37%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.73 (0.19%)
+↘️ 2022-07-27 ⏰ 13:01 → 13:33 Entry: $396.06 Adj Entry: $396.05 Adj Exit: $396.39 ❌ -0.09% [trailingStop] ATR: $0.23; ATR PT [5.0x]: $394.91 (-$1.14, -0.29%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.57 (0.14%)
+↗️ 2022-07-29 ⏰ 13:01 → 14:20 Entry: $410.28 Adj Entry: $410.29 Adj Exit: $411.56 ✅ 0.31% [profitTarget] ATR: $0.26; ATR PT [5.0x]: $411.57 (+$1.28, 0.31%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.64 (0.16%)
+↗️ 2022-08-03 ⏰ 13:01 → 13:22 Entry: $414.48 Adj Entry: $414.49 Adj Exit: $414.02 ❌ -0.11% [trailingStop] ATR: $0.30; ATR PT [5.0x]: $416.01 (+$1.52, 0.37%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.76 (0.18%)
+↗️ 2022-08-05 ⏰ 13:01 → 13:38 Entry: $412.26 Adj Entry: $412.27 Adj Exit: $413.24 ✅ 0.23% [profitTarget] ATR: $0.24; ATR PT [5.0x]: $413.46 (+$1.19, 0.29%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.59 (0.14%)
+↗️ 2022-08-12 ⏰ 13:01 → 14:32 Entry: $424.19 Adj Entry: $424.20 Adj Exit: $425.37 ✅ 0.28% [profitTarget] ATR: $0.23; ATR PT [5.0x]: $425.34 (+$1.14, 0.27%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.57 (0.13%)
+↗️ 2022-08-15 ⏰ 13:01 → 13:16 Entry: $428.73 Adj Entry: $428.74 Adj Exit: $428.64 ❌ -0.02% [trailingStop] ATR: $0.18; ATR PT [5.0x]: $429.62 (+$0.88, 0.20%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.44 (0.10%)
+↗️ 2022-08-23 ⏰ 13:01 → 13:07 Entry: $413.20 Adj Entry: $413.21 Adj Exit: $412.75 ❌ -0.11% [trailingStop] ATR: $0.20; ATR PT [5.0x]: $414.19 (+$0.98, 0.24%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.49 (0.12%)
+↘️ 2022-08-24 ⏰ 13:01 → 13:10 Entry: $413.00 Adj Entry: $412.99 Adj Exit: $413.50 ❌ -0.12% [trailingStop] ATR: $0.24; ATR PT [5.0x]: $411.77 (-$1.22, -0.30%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.61 (0.15%)
+↘️ 2022-09-02 ⏰ 13:01 → 13:24 Entry: $395.42 Adj Entry: $395.41 Adj Exit: $393.75 ✅ 0.42% [profitTarget] ATR: $0.33; ATR PT [5.0x]: $393.78 (-$1.63, -0.41%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.82 (0.21%)
+↗️ 2022-09-07 ⏰ 13:01 → 14:02 Entry: $394.81 Adj Entry: $394.82 Adj Exit: $396.96 ✅ 0.54% [profitTarget] ATR: $0.38; ATR PT [5.0x]: $396.72 (+$1.90, 0.48%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.95 (0.24%)
+↗️ 2022-09-12 ⏰ 13:01 → 13:28 Entry: $409.64 Adj Entry: $409.65 Adj Exit: $410.86 ✅ 0.30% [profitTarget] ATR: $0.23; ATR PT [5.0x]: $410.80 (+$1.15, 0.28%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.58 (0.14%)
+↗️ 2022-09-15 ⏰ 13:01 → 13:33 Entry: $393.30 Adj Entry: $393.31 Adj Exit: $393.90 ✅ 0.15% [trailingStop] ATR: $0.33; ATR PT [5.0x]: $394.96 (+$1.65, 0.42%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.83 (0.21%)
+↗️ 2022-09-19 ⏰ 13:01 → 15:11 Entry: $386.11 Adj Entry: $386.12 Adj Exit: $387.81 ✅ 0.44% [profitTarget] ATR: $0.35; ATR PT [5.0x]: $387.86 (+$1.74, 0.45%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.87 (0.23%)
+↗️ 2022-09-23 ⏰ 13:01 → 13:26 Entry: $366.73 Adj Entry: $366.74 Adj Exit: $366.24 ❌ -0.14% [trailingStop] ATR: $0.35; ATR PT [5.0x]: $368.49 (+$1.75, 0.48%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.87 (0.24%)
+↗️ 2022-09-26 ⏰ 13:01 → 13:07 Entry: $365.37 Adj Entry: $365.38 Adj Exit: $364.38 ❌ -0.27% [trailingStop] ATR: $0.34; ATR PT [5.0x]: $367.10 (+$1.72, 0.47%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.86 (0.24%)
+↘️ 2022-09-27 ⏰ 13:01 → 13:07 Entry: $362.01 Adj Entry: $362.00 Adj Exit: $362.32 ❌ -0.09% [trailingStop] ATR: $0.40; ATR PT [5.0x]: $360.02 (-$1.98, -0.55%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.99 (0.27%)
+↗️ 2022-10-03 ⏰ 13:01 → 13:49 Entry: $364.27 Adj Entry: $364.28 Adj Exit: $365.92 ✅ 0.45% [profitTarget] ATR: $0.38; ATR PT [5.0x]: $366.16 (+$1.88, 0.52%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.94 (0.26%)
+↗️ 2022-10-05 ⏰ 13:01 → 13:18 Entry: $375.36 Adj Entry: $375.37 Adj Exit: $376.60 ✅ 0.33% [profitTarget] ATR: $0.28; ATR PT [5.0x]: $376.75 (+$1.38, 0.37%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.69 (0.18%)
+↘️ 2022-10-07 ⏰ 13:01 → 15:27 Entry: $363.48 Adj Entry: $363.47 Adj Exit: $361.79 ✅ 0.46% [profitTarget] ATR: $0.35; ATR PT [5.0x]: $361.74 (-$1.73, -0.48%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.86 (0.24%)
+↘️ 2022-10-10 ⏰ 13:01 → 13:12 Entry: $358.12 Adj Entry: $358.11 Adj Exit: $358.53 ❌ -0.12% [trailingStop] ATR: $0.29; ATR PT [5.0x]: $356.65 (-$1.46, -0.41%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.73 (0.20%)
+↗️ 2022-10-12 ⏰ 13:01 → 13:32 Entry: $358.72 Adj Entry: $358.73 Adj Exit: $357.68 ❌ -0.29% [trailingStop] ATR: $0.37; ATR PT [5.0x]: $360.57 (+$1.84, 0.51%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.92 (0.26%)
+↘️ 2022-10-19 ⏰ 13:01 → 13:03 Entry: $367.42 Adj Entry: $367.41 Adj Exit: $366.43 ✅ 0.27% [trailingStop] ATR: $0.38; ATR PT [5.0x]: $365.51 (-$1.90, -0.52%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.95 (0.26%)
+↘️ 2022-10-20 ⏰ 13:01 → 13:49 Entry: $367.62 Adj Entry: $367.61 Adj Exit: $365.91 ✅ 0.46% [profitTarget] ATR: $0.33; ATR PT [5.0x]: $365.95 (-$1.66, -0.45%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.83 (0.23%)
+↘️ 2022-10-26 ⏰ 13:01 → 13:33 Entry: $384.03 Adj Entry: $384.02 Adj Exit: $382.78 ✅ 0.32% [profitTarget] ATR: $0.23; ATR PT [5.0x]: $382.88 (-$1.14, -0.30%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.57 (0.15%)
+↗️ 2022-11-03 ⏰ 13:01 → 13:26 Entry: $373.74 Adj Entry: $373.75 Adj Exit: $372.72 ❌ -0.28% [trailingStop] ATR: $0.42; ATR PT [5.0x]: $375.87 (+$2.12, 0.57%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.06 (0.28%)
+↘️ 2022-11-10 ⏰ 13:01 → 13:04 Entry: $389.41 Adj Entry: $389.40 Adj Exit: $390.11 ❌ -0.18% [trailingStop] ATR: $0.32; ATR PT [5.0x]: $387.81 (-$1.59, -0.41%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.79 (0.20%)
+↗️ 2022-11-17 ⏰ 13:01 → 13:32 Entry: $394.45 Adj Entry: $394.46 Adj Exit: $394.16 ❌ -0.08% [trailingStop] ATR: $0.26; ATR PT [5.0x]: $395.78 (+$1.32, 0.33%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.66 (0.17%)
+↘️ 2022-11-23 ⏰ 13:01 → 13:08 Entry: $399.74 Adj Entry: $399.73 Adj Exit: $400.13 ❌ -0.10% [trailingStop] ATR: $0.17; ATR PT [5.0x]: $398.86 (-$0.87, -0.22%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.43 (0.11%)
+↘️ 2022-11-28 ⏰ 13:01 → 13:54 Entry: $397.71 Adj Entry: $397.70 Adj Exit: $397.13 ✅ 0.14% [profitTarget] ATR: $0.11; ATR PT [5.0x]: $397.13 (-$0.57, -0.14%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.28 (0.07%)
+↘️ 2022-12-05 ⏰ 13:01 → 14:01 Entry: $400.40 Adj Entry: $400.39 Adj Exit: $399.11 ✅ 0.32% [profitTarget] ATR: $0.26; ATR PT [5.0x]: $399.09 (-$1.30, -0.32%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.65 (0.16%)
+↘️ 2022-12-06 ⏰ 13:01 → 13:25 Entry: $394.22 Adj Entry: $394.21 Adj Exit: $393.13 ✅ 0.27% [profitTarget] ATR: $0.23; ATR PT [5.0x]: $393.08 (-$1.13, -0.29%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.57 (0.14%)
+↗️ 2022-12-12 ⏰ 13:01 → 15:09 Entry: $395.88 Adj Entry: $395.89 Adj Exit: $397.41 ✅ 0.38% [profitTarget] ATR: $0.27; ATR PT [5.0x]: $397.24 (+$1.35, 0.34%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.67 (0.17%)
+↘️ 2022-12-16 ⏰ 13:01 → 13:18 Entry: $381.37 Adj Entry: $381.36 Adj Exit: $381.74 ❌ -0.10% [trailingStop] ATR: $0.29; ATR PT [5.0x]: $379.89 (-$1.47, -0.39%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.73 (0.19%)
+↗️ 2022-12-20 ⏰ 13:01 → 13:09 Entry: $381.25 Adj Entry: $381.26 Adj Exit: $381.07 ❌ -0.05% [trailingStop] ATR: $0.23; ATR PT [5.0x]: $382.41 (+$1.15, 0.30%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.58 (0.15%)
+↘️ 2022-12-22 ⏰ 13:01 → 13:34 Entry: $376.01 Adj Entry: $376.00 Adj Exit: $374.81 ✅ 0.32% [profitTarget] ATR: $0.21; ATR PT [5.0x]: $374.94 (-$1.06, -0.28%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.53 (0.14%)
+↗️ 2022-12-28 ⏰ 13:01 → 13:15 Entry: $379.62 Adj Entry: $379.63 Adj Exit: $379.62 ❌ -0.00% [trailingStop] ATR: $0.23; ATR PT [5.0x]: $380.76 (+$1.13, 0.30%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.56 (0.15%)
+
+📊 2022 Long Trades ↗️: 44 trades (17.5% of days) | Return Range: -0.32% to 0.65% | Mean: 0.15% | Median: 0.19% | StdDev: 0.29% | Win Rate: 56.8%
+📊 2022 Short Trades ↘️: 35 trades (13.9% of days) | Return Range: -0.21% to 0.82% | Mean: 0.20% | Median: 0.27% | StdDev: 0.26% | Win Rate: 62.9%
+📊 2022 Combined: 79 trades (31.5% of days) | Return Range: -0.32% to 0.82% | Mean: 0.17% | Median: 0.24% | StdDev: 0.27% | Win Rate: 59.5%
+  Compounded Growth ($10k Start): $1425.85 (14.26%)
+  2022 LLM Cost: $3.6854
+
+
+2023 Trades:
+↘️ 2023-01-04 ⏰ 13:01 → 14:26 Entry: $383.89 Adj Entry: $383.88 Adj Exit: $381.90 ✅ 0.52% [profitTarget] ATR: $0.32; ATR PT [5.0x]: $382.26 (-$1.62, -0.42%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.81 (0.21%)
+↘️ 2023-01-18 ⏰ 13:01 → 13:14 Entry: $393.54 Adj Entry: $393.53 Adj Exit: $392.59 ✅ 0.24% [profitTarget] ATR: $0.19; ATR PT [5.0x]: $392.55 (-$0.97, -0.25%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.49 (0.12%)
+↘️ 2023-02-03 ⏰ 13:01 → 13:31 Entry: $414.09 Adj Entry: $414.08 Adj Exit: $412.48 ✅ 0.39% [profitTarget] ATR: $0.30; ATR PT [5.0x]: $412.56 (-$1.52, -0.37%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.76 (0.18%)
+↗️ 2023-02-09 ⏰ 13:01 → 13:31 Entry: $410.03 Adj Entry: $410.04 Adj Exit: $409.71 ❌ -0.08% [trailingStop] ATR: $0.27; ATR PT [5.0x]: $411.40 (+$1.36, 0.33%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.68 (0.17%)
+↗️ 2023-02-10 ⏰ 13:01 → 15:54 Entry: $406.99 Adj Entry: $407.00 Adj Exit: $408.35 ✅ 0.33% [profitTarget] ATR: $0.27; ATR PT [5.0x]: $408.35 (+$1.35, 0.33%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.67 (0.17%)
+↗️ 2023-02-14 ⏰ 13:01 → 13:18 Entry: $412.19 Adj Entry: $412.20 Adj Exit: $413.19 ✅ 0.24% [profitTarget] ATR: $0.18; ATR PT [5.0x]: $413.11 (+$0.91, 0.22%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.45 (0.11%)
+↗️ 2023-02-23 ⏰ 13:01 → 14:15 Entry: $397.47 Adj Entry: $397.48 Adj Exit: $398.94 ✅ 0.37% [profitTarget] ATR: $0.27; ATR PT [5.0x]: $398.83 (+$1.35, 0.34%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.68 (0.17%)
+↗️ 2023-02-28 ⏰ 13:01 → 13:20 Entry: $398.86 Adj Entry: $398.87 Adj Exit: $398.72 ❌ -0.04% [trailingStop] ATR: $0.20; ATR PT [5.0x]: $399.89 (+$1.02, 0.26%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.51 (0.13%)
+↗️ 2023-03-03 ⏰ 13:01 → 15:05 Entry: $402.88 Adj Entry: $402.89 Adj Exit: $404.03 ✅ 0.28% [profitTarget] ATR: $0.21; ATR PT [5.0x]: $403.95 (+$1.06, 0.26%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.53 (0.13%)
+↘️ 2023-03-09 ⏰ 13:01 → 13:26 Entry: $397.71 Adj Entry: $397.70 Adj Exit: $396.47 ✅ 0.31% [profitTarget] ATR: $0.23; ATR PT [5.0x]: $396.53 (-$1.17, -0.29%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.59 (0.15%)
+↘️ 2023-03-10 ⏰ 13:01 → 13:21 Entry: $388.16 Adj Entry: $388.15 Adj Exit: $386.84 ✅ 0.34% [profitTarget] ATR: $0.27; ATR PT [5.0x]: $386.81 (-$1.34, -0.35%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.67 (0.17%)
+↘️ 2023-03-15 ⏰ 13:01 → 13:06 Entry: $384.22 Adj Entry: $384.21 Adj Exit: $384.84 ❌ -0.16% [trailingStop] ATR: $0.32; ATR PT [5.0x]: $382.62 (-$1.59, -0.41%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.79 (0.21%)
+↘️ 2023-03-22 ⏰ 13:01 → 15:07 Entry: $397.74 Adj Entry: $397.73 Adj Exit: $397.25 ✅ 0.12% [profitTarget] ATR: $0.19; ATR PT [5.0x]: $396.76 (-$0.97, -0.24%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.48 (0.12%)
+↘️ 2023-03-30 ⏰ 13:01 → 13:22 Entry: $402.47 Adj Entry: $402.46 Adj Exit: $402.65 ❌ -0.05% [trailingStop] ATR: $0.15; ATR PT [5.0x]: $401.69 (-$0.77, -0.19%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.39 (0.10%)
+↘️ 2023-04-06 ⏰ 13:01 → 13:09 Entry: $408.54 Adj Entry: $408.53 Adj Exit: $408.99 ❌ -0.11% [trailingStop] ATR: $0.17; ATR PT [5.0x]: $407.68 (-$0.85, -0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.43 (0.10%)
+↗️ 2023-04-10 ⏰ 13:01 → 15:00 Entry: $408.35 Adj Entry: $408.36 Adj Exit: $409.07 ✅ 0.18% [profitTarget] ATR: $0.15; ATR PT [5.0x]: $409.12 (+$0.76, 0.19%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.38 (0.09%)
+↗️ 2023-04-11 ⏰ 13:01 → 13:14 Entry: $410.50 Adj Entry: $410.51 Adj Exit: $410.31 ❌ -0.05% [trailingStop] ATR: $0.15; ATR PT [5.0x]: $411.26 (+$0.75, 0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.37 (0.09%)
+↗️ 2023-04-12 ⏰ 13:01 → 13:12 Entry: $410.65 Adj Entry: $410.66 Adj Exit: $411.36 ✅ 0.17% [profitTarget] ATR: $0.13; ATR PT [5.0x]: $411.32 (+$0.66, 0.16%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.33 (0.08%)
+↗️ 2023-04-13 ⏰ 13:01 → 13:41 Entry: $411.11 Adj Entry: $411.12 Adj Exit: $412.36 ✅ 0.30% [profitTarget] ATR: $0.23; ATR PT [5.0x]: $412.28 (+$1.16, 0.28%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.58 (0.14%)
+↗️ 2023-04-20 ⏰ 13:01 → 13:39 Entry: $413.13 Adj Entry: $413.14 Adj Exit: $413.37 ✅ 0.06% [trailingStop] ATR: $0.13; ATR PT [5.0x]: $413.80 (+$0.66, 0.16%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.33 (0.08%)
+↘️ 2023-04-25 ⏰ 13:01 → 13:15 Entry: $408.80 Adj Entry: $408.79 Adj Exit: $407.89 ✅ 0.22% [profitTarget] ATR: $0.14; ATR PT [5.0x]: $408.11 (-$0.68, -0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.34 (0.08%)
+↗️ 2023-04-27 ⏰ 13:01 → 13:44 Entry: $409.76 Adj Entry: $409.77 Adj Exit: $410.67 ✅ 0.22% [profitTarget] ATR: $0.18; ATR PT [5.0x]: $410.69 (+$0.92, 0.22%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.46 (0.11%)
+↗️ 2023-04-28 ⏰ 13:01 → 16:00 Entry: $415.19 Adj Entry: $415.19 Adj Exit: $415.92 ✅ 0.17% [profitTarget] ATR: $0.14; ATR PT [5.0x]: $415.92 (+$0.72, 0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.36 (0.09%)
+↗️ 2023-05-02 ⏰ 13:01 → 13:29 Entry: $409.57 Adj Entry: $409.58 Adj Exit: $410.35 ✅ 0.19% [profitTarget] ATR: $0.16; ATR PT [5.0x]: $410.38 (+$0.80, 0.20%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.40 (0.10%)
+↗️ 2023-05-03 ⏰ 13:01 → 14:01 Entry: $412.11 Adj Entry: $412.12 Adj Exit: $412.71 ✅ 0.14% [profitTarget] ATR: $0.22; ATR PT [5.0x]: $413.22 (+$1.10, 0.27%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.55 (0.13%)
+↗️ 2023-05-04 ⏰ 13:01 → 13:27 Entry: $405.69 Adj Entry: $405.69 Adj Exit: $406.38 ✅ 0.17% [trailingStop] ATR: $0.30; ATR PT [5.0x]: $407.21 (+$1.51, 0.37%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.76 (0.19%)
+↗️ 2023-05-09 ⏰ 13:01 → 14:01 Entry: $411.27 Adj Entry: $411.28 Adj Exit: $412.02 ✅ 0.18% [profitTarget] ATR: $0.14; ATR PT [5.0x]: $411.97 (+$0.69, 0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.34 (0.08%)
+↘️ 2023-05-12 ⏰ 13:01 → 13:08 Entry: $409.43 Adj Entry: $409.42 Adj Exit: $409.87 ❌ -0.11% [trailingStop] ATR: $0.19; ATR PT [5.0x]: $408.47 (-$0.95, -0.23%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.47 (0.12%)
+↗️ 2023-05-15 ⏰ 13:01 → 13:22 Entry: $412.71 Adj Entry: $412.72 Adj Exit: $412.86 ✅ 0.03% [trailingStop] ATR: $0.18; ATR PT [5.0x]: $413.60 (+$0.88, 0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.44 (0.11%)
+↗️ 2023-05-17 ⏰ 13:01 → 13:35 Entry: $414.66 Adj Entry: $414.67 Adj Exit: $415.52 ✅ 0.20% [profitTarget] ATR: $0.16; ATR PT [5.0x]: $415.45 (+$0.78, 0.19%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.39 (0.09%)
+↗️ 2023-05-22 ⏰ 13:01 → 13:15 Entry: $419.24 Adj Entry: $419.25 Adj Exit: $418.60 ❌ -0.16% [trailingStop] ATR: $0.20; ATR PT [5.0x]: $420.25 (+$1.00, 0.24%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.50 (0.12%)
+↘️ 2023-05-23 ⏰ 13:01 → 13:31 Entry: $416.26 Adj Entry: $416.25 Adj Exit: $415.46 ✅ 0.19% [profitTarget] ATR: $0.16; ATR PT [5.0x]: $415.43 (-$0.82, -0.20%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.41 (0.10%)
+↗️ 2023-06-05 ⏰ 13:01 → 13:16 Entry: $429.52 Adj Entry: $429.53 Adj Exit: $428.99 ❌ -0.13% [trailingStop] ATR: $0.17; ATR PT [5.0x]: $430.40 (+$0.87, 0.20%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.43 (0.10%)
+↘️ 2023-06-06 ⏰ 13:01 → 13:09 Entry: $426.94 Adj Entry: $426.94 Adj Exit: $427.32 ❌ -0.09% [trailingStop] ATR: $0.20; ATR PT [5.0x]: $425.93 (-$1.01, -0.24%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.50 (0.12%)
+↗️ 2023-06-12 ⏰ 13:01 → 15:00 Entry: $431.52 Adj Entry: $431.53 Adj Exit: $432.51 ✅ 0.23% [profitTarget] ATR: $0.18; ATR PT [5.0x]: $432.43 (+$0.90, 0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.45 (0.10%)
+↗️ 2023-06-20 ⏰ 13:01 → 13:07 Entry: $437.88 Adj Entry: $437.89 Adj Exit: $437.43 ❌ -0.11% [trailingStop] ATR: $0.21; ATR PT [5.0x]: $438.93 (+$1.03, 0.24%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.52 (0.12%)
+↘️ 2023-06-28 ⏰ 13:01 → 13:03 Entry: $435.05 Adj Entry: $435.04 Adj Exit: $434.94 ✅ 0.02% [trailingStop] ATR: $0.16; ATR PT [5.0x]: $434.25 (-$0.79, -0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.39 (0.09%)
+↘️ 2023-06-29 ⏰ 13:01 → 14:03 Entry: $437.62 Adj Entry: $437.61 Adj Exit: $436.53 ✅ 0.25% [profitTarget] ATR: $0.18; ATR PT [5.0x]: $436.69 (-$0.92, -0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.46 (0.10%)
+↗️ 2023-06-30 ⏰ 13:01 → 13:43 Entry: $443.56 Adj Entry: $443.56 Adj Exit: $443.49 ❌ -0.02% [trailingStop] ATR: $0.18; ATR PT [5.0x]: $444.44 (+$0.88, 0.20%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.44 (0.10%)
+↗️ 2023-07-06 ⏰ 13:01 → 14:45 Entry: $439.23 Adj Entry: $439.24 Adj Exit: $439.87 ✅ 0.14% [profitTarget] ATR: $0.12; ATR PT [5.0x]: $439.83 (+$0.60, 0.14%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.30 (0.07%)
+↗️ 2023-07-07 ⏰ 13:01 → 13:36 Entry: $442.43 Adj Entry: $442.44 Adj Exit: $442.15 ❌ -0.06% [trailingStop] ATR: $0.14; ATR PT [5.0x]: $443.15 (+$0.71, 0.16%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.36 (0.08%)
+↗️ 2023-07-10 ⏰ 13:01 → 16:00 Entry: $438.99 Adj Entry: $439.00 Adj Exit: $439.57 ✅ 0.13% [profitTarget] ATR: $0.15; ATR PT [5.0x]: $439.74 (+$0.74, 0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.37 (0.08%)
+↗️ 2023-07-17 ⏰ 13:01 → 15:20 Entry: $450.59 Adj Entry: $450.60 Adj Exit: $451.75 ✅ 0.26% [profitTarget] ATR: $0.16; ATR PT [5.0x]: $451.41 (+$0.81, 0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.40 (0.09%)
+↗️ 2023-07-25 ⏰ 13:01 → 14:36 Entry: $455.97 Adj Entry: $455.98 Adj Exit: $456.71 ✅ 0.16% [profitTarget] ATR: $0.14; ATR PT [5.0x]: $456.68 (+$0.70, 0.15%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.35 (0.08%)
+↗️ 2023-08-03 ⏰ 13:01 → 13:10 Entry: $450.55 Adj Entry: $450.56 Adj Exit: $450.34 ❌ -0.05% [trailingStop] ATR: $0.19; ATR PT [5.0x]: $451.49 (+$0.93, 0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.46 (0.10%)
+↗️ 2023-08-04 ⏰ 13:01 → 13:06 Entry: $452.59 Adj Entry: $452.60 Adj Exit: $452.25 ❌ -0.08% [trailingStop] ATR: $0.19; ATR PT [5.0x]: $453.54 (+$0.94, 0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.47 (0.10%)
+↘️ 2023-08-16 ⏰ 13:01 → 14:12 Entry: $441.88 Adj Entry: $441.87 Adj Exit: $441.19 ✅ 0.15% [profitTarget] ATR: $0.19; ATR PT [5.0x]: $440.90 (-$0.97, -0.22%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.48 (0.11%)
+↗️ 2023-08-17 ⏰ 13:01 → 13:11 Entry: $440.40 Adj Entry: $440.41 Adj Exit: $439.95 ❌ -0.10% [trailingStop] ATR: $0.21; ATR PT [5.0x]: $441.48 (+$1.07, 0.24%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.54 (0.12%)
+↗️ 2023-08-28 ⏰ 13:01 → 13:37 Entry: $442.68 Adj Entry: $442.69 Adj Exit: $442.31 ❌ -0.09% [trailingStop] ATR: $0.32; ATR PT [5.0x]: $444.31 (+$1.62, 0.37%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.81 (0.18%)
+↘️ 2023-09-06 ⏰ 13:01 → 13:07 Entry: $444.06 Adj Entry: $444.05 Adj Exit: $444.37 ❌ -0.07% [trailingStop] ATR: $0.15; ATR PT [5.0x]: $443.29 (-$0.75, -0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.38 (0.08%)
+↗️ 2023-09-14 ⏰ 13:01 → 13:52 Entry: $450.59 Adj Entry: $450.60 Adj Exit: $450.33 ❌ -0.06% [trailingStop] ATR: $0.17; ATR PT [5.0x]: $451.47 (+$0.87, 0.19%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.44 (0.10%)
+↘️ 2023-09-27 ⏰ 13:01 → 13:22 Entry: $424.27 Adj Entry: $424.26 Adj Exit: $423.20 ✅ 0.25% [profitTarget] ATR: $0.20; ATR PT [5.0x]: $423.27 (-$0.99, -0.23%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.50 (0.12%)
+↘️ 2023-09-28 ⏰ 13:01 → 13:41 Entry: $428.98 Adj Entry: $428.97 Adj Exit: $427.88 ✅ 0.25% [profitTarget] ATR: $0.23; ATR PT [5.0x]: $427.82 (-$1.15, -0.27%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.58 (0.13%)
+↘️ 2023-09-29 ⏰ 13:01 → 13:59 Entry: $427.61 Adj Entry: $427.60 Adj Exit: $426.23 ✅ 0.32% [profitTarget] ATR: $0.25; ATR PT [5.0x]: $426.36 (-$1.24, -0.29%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.62 (0.14%)
+↗️ 2023-10-03 ⏰ 13:01 → 13:10 Entry: $422.70 Adj Entry: $422.71 Adj Exit: $422.17 ❌ -0.13% [trailingStop] ATR: $0.28; ATR PT [5.0x]: $424.09 (+$1.38, 0.33%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.69 (0.16%)
+↗️ 2023-10-11 ⏰ 13:01 → 14:26 Entry: $434.25 Adj Entry: $434.26 Adj Exit: $435.22 ✅ 0.22% [profitTarget] ATR: $0.20; ATR PT [5.0x]: $435.28 (+$1.01, 0.23%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.51 (0.12%)
+↘️ 2023-10-18 ⏰ 13:01 → 15:02 Entry: $431.99 Adj Entry: $431.98 Adj Exit: $430.76 ✅ 0.28% [profitTarget] ATR: $0.24; ATR PT [5.0x]: $430.77 (-$1.21, -0.28%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.60 (0.14%)
+↗️ 2023-10-20 ⏰ 13:01 → 13:09 Entry: $423.90 Adj Entry: $423.91 Adj Exit: $423.12 ❌ -0.19% [trailingStop] ATR: $0.36; ATR PT [5.0x]: $425.71 (+$1.80, 0.43%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.90 (0.21%)
+↗️ 2023-10-23 ⏰ 13:01 → 13:12 Entry: $424.26 Adj Entry: $424.27 Adj Exit: $423.44 ❌ -0.20% [trailingStop] ATR: $0.28; ATR PT [5.0x]: $425.65 (+$1.38, 0.33%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.69 (0.16%)
+↘️ 2023-10-24 ⏰ 13:01 → 13:20 Entry: $421.23 Adj Entry: $421.22 Adj Exit: $421.61 ❌ -0.09% [trailingStop] ATR: $0.25; ATR PT [5.0x]: $419.96 (-$1.26, -0.30%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.63 (0.15%)
+↘️ 2023-10-26 ⏰ 13:01 → 13:04 Entry: $412.54 Adj Entry: $412.53 Adj Exit: $413.07 ❌ -0.13% [trailingStop] ATR: $0.26; ATR PT [5.0x]: $411.25 (-$1.28, -0.31%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.64 (0.15%)
+↗️ 2023-10-31 ⏰ 13:01 → 13:59 Entry: $416.75 Adj Entry: $416.76 Adj Exit: $417.82 ✅ 0.25% [profitTarget] ATR: $0.22; ATR PT [5.0x]: $417.88 (+$1.12, 0.27%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.56 (0.13%)
+↗️ 2023-11-03 ⏰ 13:01 → 13:12 Entry: $435.85 Adj Entry: $435.86 Adj Exit: $435.47 ❌ -0.09% [trailingStop] ATR: $0.16; ATR PT [5.0x]: $436.68 (+$0.82, 0.19%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.41 (0.09%)
+↗️ 2023-11-10 ⏰ 13:01 → 14:14 Entry: $438.70 Adj Entry: $438.71 Adj Exit: $439.81 ✅ 0.25% [profitTarget] ATR: $0.22; ATR PT [5.0x]: $439.83 (+$1.12, 0.26%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.56 (0.13%)
+↗️ 2023-11-16 ⏰ 13:01 → 16:00 Entry: $449.46 Adj Entry: $449.47 Adj Exit: $450.20 ✅ 0.16% [profitTarget] ATR: $0.17; ATR PT [5.0x]: $450.31 (+$0.84, 0.19%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.42 (0.09%)
+↗️ 2023-11-21 ⏰ 13:01 → 13:14 Entry: $453.20 Adj Entry: $453.21 Adj Exit: $453.04 ❌ -0.04% [trailingStop] ATR: $0.12; ATR PT [5.0x]: $453.80 (+$0.59, 0.13%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.30 (0.07%)
+↗️ 2023-11-24 ⏰ 13:01 → 13:05 Entry: $455.37 Adj Entry: $455.38 Adj Exit: $455.22 ❌ -0.04% [trailingStop] ATR: $0.15; ATR PT [5.0x]: $456.14 (+$0.76, 0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.38 (0.08%)
+↘️ 2023-11-28 ⏰ 13:01 → 13:03 Entry: $454.80 Adj Entry: $454.79 Adj Exit: $454.34 ✅ 0.10% [profitTarget] ATR: $0.12; ATR PT [5.0x]: $454.21 (-$0.58, -0.13%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.29 (0.06%)
+↗️ 2023-12-04 ⏰ 13:01 → 13:24 Entry: $456.50 Adj Entry: $456.51 Adj Exit: $456.06 ❌ -0.10% [trailingStop] ATR: $0.19; ATR PT [5.0x]: $457.46 (+$0.95, 0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.47 (0.10%)
+↘️ 2023-12-14 ⏰ 13:01 → 13:49 Entry: $471.38 Adj Entry: $471.37 Adj Exit: $470.60 ✅ 0.16% [profitTarget] ATR: $0.16; ATR PT [5.0x]: $470.58 (-$0.79, -0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.39 (0.08%)
+↘️ 2023-12-15 ⏰ 13:01 → 13:47 Entry: $469.42 Adj Entry: $469.41 Adj Exit: $468.77 ✅ 0.14% [profitTarget] ATR: $0.19; ATR PT [5.0x]: $468.46 (-$0.95, -0.20%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.48 (0.10%)
+↗️ 2023-12-20 ⏰ 13:01 → 13:15 Entry: $475.57 Adj Entry: $475.58 Adj Exit: $475.55 ❌ -0.01% [trailingStop] ATR: $0.11; ATR PT [5.0x]: $476.11 (+$0.53, 0.11%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.26 (0.06%)
+↗️ 2023-12-29 ⏰ 13:01 → 13:09 Entry: $474.41 Adj Entry: $474.42 Adj Exit: $474.97 ✅ 0.12% [profitTarget] ATR: $0.11; ATR PT [5.0x]: $474.99 (+$0.57, 0.12%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.28 (0.06%)
+
+📊 2023 Long Trades ↗️: 47 trades (18.8% of days) | Return Range: -0.20% to 0.37% | Mean: 0.07% | Median: 0.12% | StdDev: 0.16% | Win Rate: 55.3%
+📊 2023 Short Trades ↘️: 26 trades (10.4% of days) | Return Range: -0.16% to 0.52% | Mean: 0.13% | Median: 0.16% | StdDev: 0.19% | Win Rate: 69.2%
+📊 2023 Combined: 73 trades (29.2% of days) | Return Range: -0.20% to 0.52% | Mean: 0.09% | Median: 0.14% | StdDev: 0.17% | Win Rate: 60.3%
+  Compounded Growth ($10k Start): $700.13 (7.00%)
+  2023 LLM Cost: $3.6670
+
+
+2024 Trades:
+↗️ 2024-01-03 ⏰ 13:01 → 13:22 Entry: $470.61 Adj Entry: $470.62 Adj Exit: $470.32 ❌ -0.06% [trailingStop] ATR: $0.17; ATR PT [5.0x]: $471.46 (+$0.84, 0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.42 (0.09%)
+↘️ 2024-01-05 ⏰ 13:01 → 15:33 Entry: $467.37 Adj Entry: $467.36 Adj Exit: $466.63 ✅ 0.16% [profitTarget] ATR: $0.18; ATR PT [5.0x]: $466.46 (-$0.90, -0.19%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.45 (0.10%)
+↗️ 2024-01-08 ⏰ 13:01 → 14:11 Entry: $471.42 Adj Entry: $471.43 Adj Exit: $472.44 ✅ 0.21% [profitTarget] ATR: $0.21; ATR PT [5.0x]: $472.50 (+$1.07, 0.23%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.54 (0.11%)
+↗️ 2024-01-09 ⏰ 13:01 → 13:03 Entry: $474.46 Adj Entry: $474.47 Adj Exit: $474.64 ✅ 0.04% [trailingStop] ATR: $0.15; ATR PT [5.0x]: $475.21 (+$0.74, 0.16%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.37 (0.08%)
+↗️ 2024-01-10 ⏰ 13:01 → 14:06 Entry: $475.10 Adj Entry: $475.11 Adj Exit: $475.85 ✅ 0.15% [profitTarget] ATR: $0.17; ATR PT [5.0x]: $475.95 (+$0.84, 0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.42 (0.09%)
+↗️ 2024-01-11 ⏰ 13:01 → 13:46 Entry: $474.28 Adj Entry: $474.29 Adj Exit: $474.99 ✅ 0.15% [profitTarget] ATR: $0.16; ATR PT [5.0x]: $475.08 (+$0.79, 0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.40 (0.08%)
+↘️ 2024-01-16 ⏰ 13:01 → 14:20 Entry: $474.13 Adj Entry: $474.12 Adj Exit: $473.12 ✅ 0.21% [profitTarget] ATR: $0.20; ATR PT [5.0x]: $473.13 (-$0.99, -0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.49 (0.10%)
+↘️ 2024-01-18 ⏰ 13:01 → 13:09 Entry: $472.86 Adj Entry: $472.85 Adj Exit: $472.79 ✅ 0.01% [trailingStop] ATR: $0.18; ATR PT [5.0x]: $471.97 (-$0.88, -0.19%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.44 (0.09%)
+↗️ 2024-01-19 ⏰ 13:01 → 13:33 Entry: $480.11 Adj Entry: $480.12 Adj Exit: $481.13 ✅ 0.21% [profitTarget] ATR: $0.20; ATR PT [5.0x]: $481.11 (+$0.99, 0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.50 (0.10%)
+↗️ 2024-01-23 ⏰ 13:01 → 15:12 Entry: $483.82 Adj Entry: $483.83 Adj Exit: $484.76 ✅ 0.19% [profitTarget] ATR: $0.17; ATR PT [5.0x]: $484.70 (+$0.87, 0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.43 (0.09%)
+↗️ 2024-01-24 ⏰ 13:01 → 13:09 Entry: $488.17 Adj Entry: $488.18 Adj Exit: $487.94 ❌ -0.05% [trailingStop] ATR: $0.13; ATR PT [5.0x]: $488.81 (+$0.63, 0.13%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.32 (0.06%)
+↘️ 2024-01-26 ⏰ 13:01 → 13:23 Entry: $486.99 Adj Entry: $486.98 Adj Exit: $487.38 ❌ -0.08% [trailingStop] ATR: $0.19; ATR PT [5.0x]: $486.01 (-$0.97, -0.20%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.48 (0.10%)
+↘️ 2024-01-30 ⏰ 13:01 → 13:13 Entry: $490.24 Adj Entry: $490.23 Adj Exit: $490.45 ❌ -0.05% [trailingStop] ATR: $0.13; ATR PT [5.0x]: $489.56 (-$0.67, -0.14%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.34 (0.07%)
+↗️ 2024-02-01 ⏰ 13:01 → 14:48 Entry: $487.15 Adj Entry: $487.16 Adj Exit: $488.41 ✅ 0.26% [profitTarget] ATR: $0.26; ATR PT [5.0x]: $488.46 (+$1.30, 0.27%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.65 (0.13%)
+↗️ 2024-02-09 ⏰ 13:01 → 14:24 Entry: $500.41 Adj Entry: $500.42 Adj Exit: $500.93 ✅ 0.10% [profitTarget] ATR: $0.13; ATR PT [5.0x]: $501.06 (+$0.64, 0.13%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.32 (0.06%)
+↘️ 2024-02-27 ⏰ 13:01 → 13:05 Entry: $505.06 Adj Entry: $505.05 Adj Exit: $505.40 ❌ -0.07% [trailingStop] ATR: $0.15; ATR PT [5.0x]: $504.28 (-$0.77, -0.15%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.38 (0.08%)
+↗️ 2024-02-29 ⏰ 13:01 → 14:17 Entry: $507.43 Adj Entry: $507.44 Adj Exit: $508.06 ✅ 0.12% [profitTarget] ATR: $0.14; ATR PT [5.0x]: $508.14 (+$0.70, 0.14%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.35 (0.07%)
+↘️ 2024-03-08 ⏰ 13:01 → 13:37 Entry: $512.42 Adj Entry: $512.41 Adj Exit: $511.40 ✅ 0.20% [profitTarget] ATR: $0.17; ATR PT [5.0x]: $511.55 (-$0.86, -0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.43 (0.08%)
+↘️ 2024-03-14 ⏰ 13:01 → 13:31 Entry: $513.82 Adj Entry: $513.81 Adj Exit: $512.93 ✅ 0.17% [profitTarget] ATR: $0.17; ATR PT [5.0x]: $512.98 (-$0.83, -0.16%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.41 (0.08%)
+↘️ 2024-03-15 ⏰ 13:01 → 13:07 Entry: $508.63 Adj Entry: $508.62 Adj Exit: $508.96 ❌ -0.07% [trailingStop] ATR: $0.24; ATR PT [5.0x]: $507.41 (-$1.21, -0.24%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.61 (0.12%)
+↘️ 2024-03-18 ⏰ 13:01 → 13:22 Entry: $513.52 Adj Entry: $513.51 Adj Exit: $513.97 ❌ -0.09% [trailingStop] ATR: $0.23; ATR PT [5.0x]: $512.35 (-$1.16, -0.23%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.58 (0.11%)
+↗️ 2024-03-19 ⏰ 13:01 → 13:05 Entry: $515.29 Adj Entry: $515.30 Adj Exit: $514.85 ❌ -0.09% [trailingStop] ATR: $0.16; ATR PT [5.0x]: $516.11 (+$0.81, 0.16%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.40 (0.08%)
+↗️ 2024-03-22 ⏰ 13:01 → 14:17 Entry: $521.85 Adj Entry: $521.86 Adj Exit: $522.22 ✅ 0.07% [trailingStop] ATR: $0.15; ATR PT [5.0x]: $522.63 (+$0.77, 0.15%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.39 (0.07%)
+↗️ 2024-04-05 ⏰ 13:01 → 13:08 Entry: $519.93 Adj Entry: $519.94 Adj Exit: $519.26 ❌ -0.13% [trailingStop] ATR: $0.22; ATR PT [5.0x]: $521.03 (+$1.08, 0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.54 (0.10%)
+↗️ 2024-04-10 ⏰ 13:01 → 13:23 Entry: $513.61 Adj Entry: $513.62 Adj Exit: $514.84 ✅ 0.24% [profitTarget] ATR: $0.24; ATR PT [5.0x]: $514.83 (+$1.21, 0.24%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.61 (0.12%)
+↘️ 2024-04-12 ⏰ 13:01 → 13:31 Entry: $510.64 Adj Entry: $510.63 Adj Exit: $509.53 ✅ 0.22% [profitTarget] ATR: $0.23; ATR PT [5.0x]: $509.46 (-$1.17, -0.23%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.59 (0.11%)
+↘️ 2024-04-17 ⏰ 13:01 → 13:08 Entry: $500.30 Adj Entry: $500.29 Adj Exit: $500.67 ❌ -0.08% [trailingStop] ATR: $0.36; ATR PT [5.0x]: $498.50 (-$1.79, -0.36%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.90 (0.18%)
+↘️ 2024-04-18 ⏰ 13:01 → 13:18 Entry: $501.13 Adj Entry: $501.12 Adj Exit: $499.68 ✅ 0.29% [profitTarget] ATR: $0.33; ATR PT [5.0x]: $499.45 (-$1.67, -0.33%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.84 (0.17%)
+↗️ 2024-04-19 ⏰ 13:01 → 13:55 Entry: $496.91 Adj Entry: $496.92 Adj Exit: $498.28 ✅ 0.27% [profitTarget] ATR: $0.30; ATR PT [5.0x]: $498.40 (+$1.48, 0.30%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.74 (0.15%)
+↗️ 2024-04-22 ⏰ 13:01 → 13:31 Entry: $498.34 Adj Entry: $498.35 Adj Exit: $500.16 ✅ 0.36% [profitTarget] ATR: $0.35; ATR PT [5.0x]: $500.09 (+$1.74, 0.35%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.87 (0.17%)
+↗️ 2024-04-24 ⏰ 13:01 → 13:31 Entry: $504.26 Adj Entry: $504.27 Adj Exit: $505.45 ✅ 0.23% [profitTarget] ATR: $0.20; ATR PT [5.0x]: $505.28 (+$1.01, 0.20%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.51 (0.10%)
+↗️ 2024-04-25 ⏰ 13:01 → 13:40 Entry: $501.69 Adj Entry: $501.70 Adj Exit: $502.93 ✅ 0.25% [profitTarget] ATR: $0.23; ATR PT [5.0x]: $502.84 (+$1.14, 0.23%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.57 (0.11%)
+↗️ 2024-04-26 ⏰ 13:01 → 13:42 Entry: $509.44 Adj Entry: $509.45 Adj Exit: $509.23 ❌ -0.04% [trailingStop] ATR: $0.26; ATR PT [5.0x]: $510.74 (+$1.28, 0.25%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.64 (0.13%)
+↗️ 2024-05-06 ⏰ 13:01 → 15:55 Entry: $514.76 Adj Entry: $514.77 Adj Exit: $516.15 ✅ 0.27% [profitTarget] ATR: $0.24; ATR PT [5.0x]: $515.96 (+$1.19, 0.23%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.59 (0.12%)
+↗️ 2024-05-15 ⏰ 13:01 → 14:15 Entry: $528.61 Adj Entry: $528.62 Adj Exit: $529.39 ✅ 0.15% [profitTarget] ATR: $0.15; ATR PT [5.0x]: $529.36 (+$0.74, 0.14%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.37 (0.07%)
+↘️ 2024-05-23 ⏰ 13:01 → 13:24 Entry: $529.62 Adj Entry: $529.61 Adj Exit: $529.02 ✅ 0.11% [profitTarget] ATR: $0.15; ATR PT [5.0x]: $528.84 (-$0.76, -0.14%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.38 (0.07%)
+↗️ 2024-05-31 ⏰ 13:01 → 13:27 Entry: $519.91 Adj Entry: $519.92 Adj Exit: $520.89 ✅ 0.19% [profitTarget] ATR: $0.18; ATR PT [5.0x]: $520.81 (+$0.88, 0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.44 (0.09%)
+↘️ 2024-06-06 ⏰ 13:01 → 14:11 Entry: $533.57 Adj Entry: $533.56 Adj Exit: $533.07 ✅ 0.09% [profitTarget] ATR: $0.16; ATR PT [5.0x]: $532.77 (-$0.79, -0.15%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.40 (0.07%)
+↘️ 2024-06-24 ⏰ 13:01 → 13:10 Entry: $545.09 Adj Entry: $545.08 Adj Exit: $544.38 ✅ 0.13% [profitTarget] ATR: $0.20; ATR PT [5.0x]: $544.10 (-$0.98, -0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.49 (0.09%)
+↘️ 2024-06-25 ⏰ 13:01 → 13:08 Entry: $542.75 Adj Entry: $542.74 Adj Exit: $543.01 ❌ -0.05% [trailingStop] ATR: $0.20; ATR PT [5.0x]: $541.72 (-$1.01, -0.19%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.51 (0.09%)
+↗️ 2024-07-12 ⏰ 13:01 → 13:36 Entry: $561.64 Adj Entry: $561.65 Adj Exit: $562.84 ✅ 0.21% [profitTarget] ATR: $0.24; ATR PT [5.0x]: $562.85 (+$1.20, 0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.60 (0.11%)
+↗️ 2024-07-17 ⏰ 13:01 → 13:07 Entry: $557.84 Adj Entry: $557.85 Adj Exit: $557.23 ❌ -0.11% [trailingStop] ATR: $0.20; ATR PT [5.0x]: $558.83 (+$0.98, 0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.49 (0.09%)
+↗️ 2024-07-18 ⏰ 13:01 → 13:06 Entry: $554.46 Adj Entry: $554.47 Adj Exit: $553.93 ❌ -0.10% [trailingStop] ATR: $0.24; ATR PT [5.0x]: $555.65 (+$1.18, 0.21%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.59 (0.11%)
+↗️ 2024-07-22 ⏰ 13:01 → 14:39 Entry: $553.74 Adj Entry: $553.75 Adj Exit: $555.23 ✅ 0.27% [profitTarget] ATR: $0.28; ATR PT [5.0x]: $555.17 (+$1.42, 0.26%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.71 (0.13%)
+↘️ 2024-07-24 ⏰ 13:01 → 14:43 Entry: $543.98 Adj Entry: $543.97 Adj Exit: $542.94 ✅ 0.19% [profitTarget] ATR: $0.21; ATR PT [5.0x]: $542.93 (-$1.04, -0.19%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.52 (0.10%)
+↗️ 2024-07-26 ⏰ 13:01 → 13:35 Entry: $546.69 Adj Entry: $546.70 Adj Exit: $545.90 ❌ -0.15% [trailingStop] ATR: $0.38; ATR PT [5.0x]: $548.60 (+$1.90, 0.35%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.95 (0.17%)
+↘️ 2024-07-30 ⏰ 13:01 → 13:05 Entry: $538.63 Adj Entry: $538.62 Adj Exit: $539.11 ❌ -0.09% [trailingStop] ATR: $0.27; ATR PT [5.0x]: $537.27 (-$1.35, -0.25%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.67 (0.12%)
+↘️ 2024-08-05 ⏰ 13:01 → 14:46 Entry: $518.87 Adj Entry: $518.86 Adj Exit: $516.29 ✅ 0.50% [profitTarget] ATR: $0.49; ATR PT [5.0x]: $516.40 (-$2.46, -0.47%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.23 (0.24%)
+↗️ 2024-08-13 ⏰ 13:01 → 13:47 Entry: $540.97 Adj Entry: $540.98 Adj Exit: $539.64 ❌ -0.25% [trailingStop] ATR: $0.31; ATR PT [5.0x]: $542.51 (+$1.53, 0.28%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.76 (0.14%)
+↗️ 2024-08-16 ⏰ 13:01 → 13:51 Entry: $554.57 Adj Entry: $554.58 Adj Exit: $554.12 ❌ -0.08% [trailingStop] ATR: $0.19; ATR PT [5.0x]: $555.55 (+$0.97, 0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.48 (0.09%)
+↗️ 2024-08-19 ⏰ 13:01 → 14:43 Entry: $557.32 Adj Entry: $557.33 Adj Exit: $558.31 ✅ 0.18% [profitTarget] ATR: $0.19; ATR PT [5.0x]: $558.29 (+$0.97, 0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.48 (0.09%)
+↘️ 2024-08-20 ⏰ 13:01 → 13:07 Entry: $557.67 Adj Entry: $557.66 Adj Exit: $557.88 ❌ -0.04% [trailingStop] ATR: $0.16; ATR PT [5.0x]: $556.86 (-$0.80, -0.14%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.40 (0.07%)
+↗️ 2024-08-21 ⏰ 13:01 → 14:01 Entry: $560.15 Adj Entry: $560.16 Adj Exit: $561.17 ✅ 0.18% [profitTarget] ATR: $0.18; ATR PT [5.0x]: $561.06 (+$0.90, 0.16%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.45 (0.08%)
+↗️ 2024-08-26 ⏰ 13:01 → 13:12 Entry: $561.43 Adj Entry: $561.44 Adj Exit: $561.10 ❌ -0.06% [trailingStop] ATR: $0.34; ATR PT [5.0x]: $563.14 (+$1.70, 0.30%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.85 (0.15%)
+↗️ 2024-08-28 ⏰ 13:01 → 13:14 Entry: $558.71 Adj Entry: $558.72 Adj Exit: $558.36 ❌ -0.07% [trailingStop] ATR: $0.20; ATR PT [5.0x]: $559.72 (+$1.00, 0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.50 (0.09%)
+↗️ 2024-08-30 ⏰ 13:01 → 14:52 Entry: $559.15 Adj Entry: $559.16 Adj Exit: $560.74 ✅ 0.28% [profitTarget] ATR: $0.32; ATR PT [5.0x]: $560.76 (+$1.60, 0.29%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.80 (0.14%)
+↗️ 2024-09-05 ⏰ 13:01 → 13:48 Entry: $548.89 Adj Entry: $548.90 Adj Exit: $550.34 ✅ 0.26% [profitTarget] ATR: $0.33; ATR PT [5.0x]: $550.54 (+$1.64, 0.30%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.82 (0.15%)
+↗️ 2024-09-09 ⏰ 13:01 → 13:32 Entry: $547.46 Adj Entry: $547.47 Adj Exit: $546.82 ❌ -0.12% [trailingStop] ATR: $0.39; ATR PT [5.0x]: $549.42 (+$1.95, 0.36%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.97 (0.18%)
+↗️ 2024-09-11 ⏰ 13:01 → 13:13 Entry: $547.67 Adj Entry: $547.68 Adj Exit: $549.00 ✅ 0.24% [profitTarget] ATR: $0.26; ATR PT [5.0x]: $548.98 (+$1.30, 0.24%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.65 (0.12%)
+↗️ 2024-09-12 ⏰ 13:01 → 13:52 Entry: $557.15 Adj Entry: $557.16 Adj Exit: $559.07 ✅ 0.34% [profitTarget] ATR: $0.36; ATR PT [5.0x]: $558.97 (+$1.81, 0.33%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.91 (0.16%)
+↗️ 2024-09-16 ⏰ 13:01 → 14:36 Entry: $561.52 Adj Entry: $561.53 Adj Exit: $562.63 ✅ 0.20% [profitTarget] ATR: $0.22; ATR PT [5.0x]: $562.65 (+$1.12, 0.20%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.56 (0.10%)
+↘️ 2024-09-17 ⏰ 13:01 → 13:46 Entry: $562.30 Adj Entry: $562.29 Adj Exit: $561.03 ✅ 0.22% [profitTarget] ATR: $0.20; ATR PT [5.0x]: $561.29 (-$1.00, -0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.50 (0.09%)
+↗️ 2024-09-18 ⏰ 13:01 → 14:01 Entry: $563.54 Adj Entry: $563.55 Adj Exit: $567.33 ✅ 0.67% [profitTarget] ATR: $0.27; ATR PT [5.0x]: $564.89 (+$1.34, 0.24%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.67 (0.12%)
+↗️ 2024-09-20 ⏰ 13:01 → 13:28 Entry: $568.36 Adj Entry: $568.37 Adj Exit: $567.96 ❌ -0.07% [trailingStop] ATR: $0.26; ATR PT [5.0x]: $569.68 (+$1.31, 0.23%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.65 (0.12%)
+↘️ 2024-09-23 ⏰ 13:01 → 13:14 Entry: $568.26 Adj Entry: $568.25 Adj Exit: $568.63 ❌ -0.07% [trailingStop] ATR: $0.23; ATR PT [5.0x]: $567.11 (-$1.14, -0.20%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.57 (0.10%)
+↘️ 2024-09-25 ⏰ 13:01 → 13:08 Entry: $569.67 Adj Entry: $569.66 Adj Exit: $570.12 ❌ -0.08% [trailingStop] ATR: $0.19; ATR PT [5.0x]: $568.73 (-$0.93, -0.16%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.47 (0.08%)
+↘️ 2024-10-03 ⏰ 13:01 → 13:08 Entry: $565.72 Adj Entry: $565.71 Adj Exit: $566.23 ❌ -0.09% [trailingStop] ATR: $0.23; ATR PT [5.0x]: $564.57 (-$1.14, -0.20%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.57 (0.10%)
+↘️ 2024-10-09 ⏰ 13:01 → 13:13 Entry: $575.87 Adj Entry: $575.86 Adj Exit: $576.11 ❌ -0.04% [trailingStop] ATR: $0.18; ATR PT [5.0x]: $574.94 (-$0.91, -0.16%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.46 (0.08%)
+↗️ 2024-10-16 ⏰ 13:01 → 14:23 Entry: $581.36 Adj Entry: $581.37 Adj Exit: $582.38 ✅ 0.17% [profitTarget] ATR: $0.20; ATR PT [5.0x]: $582.39 (+$1.02, 0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.51 (0.09%)
+↗️ 2024-10-18 ⏰ 13:01 → 13:19 Entry: $584.92 Adj Entry: $584.93 Adj Exit: $584.74 ❌ -0.03% [trailingStop] ATR: $0.20; ATR PT [5.0x]: $585.92 (+$0.99, 0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.49 (0.08%)
+↗️ 2024-10-21 ⏰ 13:01 → 16:00 Entry: $582.89 Adj Entry: $582.90 Adj Exit: $583.67 ✅ 0.13% [profitTarget] ATR: $0.14; ATR PT [5.0x]: $583.62 (+$0.72, 0.12%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.36 (0.06%)
+↘️ 2024-10-23 ⏰ 13:01 → 13:13 Entry: $577.84 Adj Entry: $577.83 Adj Exit: $576.91 ✅ 0.16% [profitTarget] ATR: $0.16; ATR PT [5.0x]: $577.01 (-$0.82, -0.14%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.41 (0.07%)
+↘️ 2024-10-25 ⏰ 13:01 → 13:18 Entry: $581.95 Adj Entry: $581.94 Adj Exit: $580.88 ✅ 0.18% [profitTarget] ATR: $0.20; ATR PT [5.0x]: $580.92 (-$1.02, -0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.51 (0.09%)
+↗️ 2024-10-29 ⏰ 13:01 → 13:06 Entry: $582.17 Adj Entry: $582.18 Adj Exit: $582.39 ✅ 0.04% [trailingStop] ATR: $0.19; ATR PT [5.0x]: $583.11 (+$0.93, 0.16%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.46 (0.08%)
+↗️ 2024-11-04 ⏰ 13:01 → 13:07 Entry: $570.47 Adj Entry: $570.48 Adj Exit: $569.84 ❌ -0.11% [trailingStop] ATR: $0.26; ATR PT [5.0x]: $571.76 (+$1.28, 0.22%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.64 (0.11%)
+↘️ 2024-11-11 ⏰ 13:01 → 13:22 Entry: $597.89 Adj Entry: $597.88 Adj Exit: $597.08 ✅ 0.13% [profitTarget] ATR: $0.15; ATR PT [5.0x]: $597.13 (-$0.75, -0.12%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.37 (0.06%)
+↘️ 2024-11-12 ⏰ 13:01 → 13:03 Entry: $594.54 Adj Entry: $594.53 Adj Exit: $595.00 ❌ -0.08% [trailingStop] ATR: $0.16; ATR PT [5.0x]: $593.73 (-$0.80, -0.13%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.40 (0.07%)
+↗️ 2024-11-13 ⏰ 13:01 → 13:07 Entry: $599.18 Adj Entry: $599.19 Adj Exit: $598.99 ❌ -0.03% [trailingStop] ATR: $0.18; ATR PT [5.0x]: $600.10 (+$0.91, 0.15%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.46 (0.08%)
+↘️ 2024-11-14 ⏰ 13:01 → 13:58 Entry: $595.03 Adj Entry: $595.02 Adj Exit: $593.84 ✅ 0.20% [profitTarget] ATR: $0.23; ATR PT [5.0x]: $593.89 (-$1.13, -0.19%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.57 (0.09%)
+↗️ 2024-11-26 ⏰ 13:01 → 15:48 Entry: $600.02 Adj Entry: $600.03 Adj Exit: $601.10 ✅ 0.18% [profitTarget] ATR: $0.21; ATR PT [5.0x]: $601.10 (+$1.07, 0.18%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.54 (0.09%)
+↘️ 2024-11-29 ⏰ 13:01 → 13:14 Entry: $602.48 Adj Entry: $602.47 Adj Exit: $602.35 ✅ 0.02% [trailingStop] ATR: $0.17; ATR PT [5.0x]: $601.64 (-$0.83, -0.14%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.42 (0.07%)
+↗️ 2024-12-03 ⏰ 13:01 → 13:31 Entry: $603.66 Adj Entry: $603.67 Adj Exit: $603.54 ❌ -0.02% [trailingStop] ATR: $0.13; ATR PT [5.0x]: $604.32 (+$0.65, 0.11%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.33 (0.05%)
+↗️ 2024-12-05 ⏰ 13:01 → 13:18 Entry: $608.31 Adj Entry: $608.32 Adj Exit: $607.96 ❌ -0.06% [trailingStop] ATR: $0.12; ATR PT [5.0x]: $608.92 (+$0.60, 0.10%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.30 (0.05%)
+↗️ 2024-12-11 ⏰ 13:01 → 13:08 Entry: $608.21 Adj Entry: $608.22 Adj Exit: $608.13 ❌ -0.01% [trailingStop] ATR: $0.14; ATR PT [5.0x]: $608.92 (+$0.70, 0.12%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.35 (0.06%)
+↘️ 2024-12-13 ⏰ 13:01 → 13:05 Entry: $603.04 Adj Entry: $603.03 Adj Exit: $603.25 ❌ -0.04% [trailingStop] ATR: $0.16; ATR PT [5.0x]: $602.24 (-$0.79, -0.13%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.40 (0.07%)
+↗️ 2024-12-16 ⏰ 13:01 → 14:29 Entry: $607.22 Adj Entry: $607.23 Adj Exit: $607.32 ✅ 0.01% [trailingStop] ATR: $0.18; ATR PT [5.0x]: $608.15 (+$0.92, 0.15%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.46 (0.08%)
+↗️ 2024-12-23 ⏰ 13:01 → 15:52 Entry: $592.94 Adj Entry: $592.95 Adj Exit: $594.96 ✅ 0.34% [profitTarget] ATR: $0.40; ATR PT [5.0x]: $594.95 (+$2.00, 0.34%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.00 (0.17%)
+↗️ 2024-12-27 ⏰ 13:01 → 13:42 Entry: $592.42 Adj Entry: $592.43 Adj Exit: $593.16 ✅ 0.12% [profitTarget] ATR: $0.19; ATR PT [5.0x]: $593.40 (+$0.97, 0.16%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.48 (0.08%)
+↗️ 2024-12-30 ⏰ 13:01 → 13:20 Entry: $590.71 Adj Entry: $590.72 Adj Exit: $591.01 ✅ 0.05% [trailingStop] ATR: $0.33; ATR PT [5.0x]: $592.36 (+$1.64, 0.28%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.82 (0.14%)
+↗️ 2024-12-31 ⏰ 13:01 → 13:14 Entry: $586.89 Adj Entry: $586.90 Adj Exit: $586.41 ❌ -0.08% [trailingStop] ATR: $0.35; ATR PT [5.0x]: $588.63 (+$1.73, 0.30%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.87 (0.15%)
+
+📊 2024 Long Trades ↗️: 57 trades (22.6% of days) | Return Range: -0.25% to 0.67% | Mean: 0.10% | Median: 0.12% | StdDev: 0.17% | Win Rate: 63.2%
+📊 2024 Short Trades ↘️: 33 trades (13.1% of days) | Return Range: -0.09% to 0.50% | Mean: 0.07% | Median: 0.02% | StdDev: 0.15% | Win Rate: 54.5%
+📊 2024 Combined: 90 trades (35.7% of days) | Return Range: -0.25% to 0.67% | Mean: 0.09% | Median: 0.11% | StdDev: 0.16% | Win Rate: 60.0%
+  Compounded Growth ($10k Start): $806.96 (8.07%)
+  2024 LLM Cost: $3.7056
+
+
+2025 Trades:
+↘️ 2025-01-06 ⏰ 13:01 → 13:46 Entry: $596.96 Adj Entry: $596.95 Adj Exit: $595.84 ✅ 0.19% [profitTarget] ATR: $0.26; ATR PT [5.0x]: $595.63 (-$1.32, -0.22%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.66 (0.11%)
+↗️ 2025-01-08 ⏰ 13:01 → 13:26 Entry: $587.22 Adj Entry: $587.23 Adj Exit: $588.99 ✅ 0.30% [profitTarget] ATR: $0.35; ATR PT [5.0x]: $589.00 (+$1.77, 0.30%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.89 (0.15%)
+↗️ 2025-01-10 ⏰ 13:01 → 13:25 Entry: $581.29 Adj Entry: $581.30 Adj Exit: $583.23 ✅ 0.33% [profitTarget] ATR: $0.37; ATR PT [5.0x]: $583.15 (+$1.85, 0.32%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.92 (0.16%)
+↗️ 2025-01-13 ⏰ 13:01 → 15:56 Entry: $579.36 Adj Entry: $579.37 Adj Exit: $581.52 ✅ 0.37% [profitTarget] ATR: $0.40; ATR PT [5.0x]: $581.38 (+$2.01, 0.35%); TS Act: Immediate; TS Trail [2.5x ATR]: $1.01 (0.17%)
+↗️ 2025-01-21 ⏰ 13:01 → 13:42 Entry: $602.24 Adj Entry: $602.25 Adj Exit: $602.29 ✅ 0.01% [trailingStop] ATR: $0.21; ATR PT [5.0x]: $603.29 (+$1.04, 0.17%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.52 (0.09%)
+↗️ 2025-01-23 ⏰ 13:01 → 15:51 Entry: $607.71 Adj Entry: $607.72 Adj Exit: $608.33 ✅ 0.10% [profitTarget] ATR: $0.14; ATR PT [5.0x]: $608.41 (+$0.69, 0.11%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.35 (0.06%)
+↘️ 2025-01-24 ⏰ 13:01 → 13:13 Entry: $608.82 Adj Entry: $608.81 Adj Exit: $608.21 ✅ 0.10% [profitTarget] ATR: $0.14; ATR PT [5.0x]: $608.12 (-$0.69, -0.11%); TS Act: Immediate; TS Trail [2.5x ATR]: $0.34 (0.06%)
+
+📊 2025 Long Trades ↗️: 5 trades (26.3% of days) | Return Range: 0.01% to 0.37% | Mean: 0.22% | Median: 0.30% | StdDev: 0.16% | Win Rate: 100.0%
+📊 2025 Short Trades ↘️: 2 trades (10.5% of days) | Return Range: 0.10% to 0.19% | Mean: 0.14% | Median: 0.14% | StdDev: 0.06% | Win Rate: 100.0%
+📊 2025 Combined: 7 trades (36.8% of days) | Return Range: 0.01% to 0.37% | Mean: 0.20% | Median: 0.19% | StdDev: 0.14% | Win Rate: 100.0%
+  Compounded Growth ($10k Start): $140.32 (1.40%)
+  2025 LLM Cost: $0.2798
+
+
+📈 Overall Performance Summary:
+  Initial signals (pre-LLM): 1276 (99.9% of trading days)
+  LLM Confirmed Trades: 382 (29.9% of initial signals)
+📊 Overall Long Trades ↗️: 248 trades (19.4% of days) | Return Range: -0.52% to 1.34% | Mean: 0.11% | Median: 0.11% | StdDev: 0.23% | Win Rate: 60.5%
+📊 Overall Short Trades ↘️: 134 trades (10.5% of days) | Return Range: -0.21% to 1.80% | Mean: 0.19% | Median: 0.18% | StdDev: 0.30% | Win Rate: 67.2%
+📊 Overall Combined: 382 trades (29.9% of days) | Return Range: -0.52% to 1.80% | Mean: 0.14% | Median: 0.14% | StdDev: 0.26% | Win Rate: 62.6%
+  Compounded Growth ($10k Start): $7060.52 (70.61%)
+  Total LLM Cost: $18.7199
+
+
+
+═══════════════════════════════════════════════════════════════════════
+Thanks for using AlphaGroove! ♥
