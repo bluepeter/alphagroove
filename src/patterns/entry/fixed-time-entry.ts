@@ -7,7 +7,7 @@ import { Bar, Signal } from '../types.js';
  * @property {string} time - The time to enter the market (e.g., "12:00")
  */
 export interface FixedTimeEntryConfig {
-  time: string; // HH:MM format
+  entryTime: string; // HH:MM format
 }
 
 /**
@@ -42,7 +42,7 @@ export function detectFixedTimeEntry(
     hour12: false, // Use 24-hour format for comparison
   });
 
-  if (barTime === config.time) {
+  if (barTime === config.entryTime) {
     return {
       timestamp: lastBar.timestamp,
       price: lastBar.close, // Enter at the close of the bar that matches the time
@@ -61,7 +61,7 @@ export function createSqlQuery(
   config: FixedTimeEntryConfig,
   _patternSpecificDirection: 'long' | 'short'
 ): string {
-  const entryTime = config.time;
+  const entryTime = config.entryTime;
 
   return `
     WITH raw_data AS (
@@ -110,26 +110,21 @@ export const fixedTimeEntryPattern: PatternDefinition & {
   name: 'Fixed Time Entry',
   description: 'Triggers an entry at a specific time of day.',
   config: {
-    time: '', // No default - must be provided by config
+    entryTime: '', // No default - must be provided by config
   },
   direction: 'long',
   sql: '',
   updateConfig(newConfig: Partial<FixedTimeEntryConfig> & Record<string, any>) {
-    // Handle both 'entry-time' and 'time' keys from config
     const updatedConfig = { ...this.config };
 
-    // If 'entry-time' exists in the config, use it with priority
-    if ('entry-time' in newConfig && newConfig['entry-time']) {
-      updatedConfig.time = newConfig['entry-time'] as string;
-    }
-    // Otherwise use 'time' if it exists
-    else if (newConfig.time) {
-      updatedConfig.time = newConfig.time;
+    // Handle camelCase entryTime
+    if (newConfig.entryTime) {
+      updatedConfig.entryTime = newConfig.entryTime;
     }
 
     // Validate that entry time is provided
-    if (!updatedConfig.time) {
-      throw new Error('Fixed Time Entry pattern requires an entry time to be configured');
+    if (!updatedConfig.entryTime) {
+      throw new Error('Fixed Time Entry pattern requires an entryTime to be configured');
     }
 
     // Ensure a defined direction for SQL query generation during config update.

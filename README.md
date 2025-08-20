@@ -203,7 +203,17 @@ the Node.js package.
    pnpm dev:start
 
    # Or run with specific parameters
-   pnpm dev:start --from 2020-01-01 --to 2025-05-02 --entry-pattern quick-rise
+   pnpm dev:start --from 2020-01-01 --to 2025-05-02 --entry-pattern quickRise
+
+   # Use random time entry pattern with custom time window
+   pnpm dev:start --entry-pattern randomTimeEntry \
+     --randomTimeEntry.startTime 09:30 \
+     --randomTimeEntry.endTime 15:30
+
+   # Use fixed time entry with debug output
+   pnpm dev:start --entry-pattern fixedTimeEntry \
+     --fixedTimeEntry.entryTime 13:00 \
+     --debug
    ```
 
 ### Running Production Build
@@ -237,7 +247,7 @@ default:
   timeframe: '1min'
   direction: 'long'
   patterns:
-    entry: 'quick-rise' # Default entry pattern to use
+    entry: 'quickRise' # Default entry pattern to use
     exit: 'fixed-time' # Default exit pattern to use
   charts:
     generate: false # Set to true to automatically generate charts for each entry
@@ -245,12 +255,12 @@ default:
 
 patterns:
   entry:
-    quick-rise:
-      rise-pct: 0.3
-      within-minutes: 5
-    quick-fall:
-      fall-pct: 0.3
-      within-minutes: 5
+    quickRise:
+      risePct: 0.3
+      withinMinutes: 5
+    quickFall:
+      fallPct: 0.3
+      withinMinutes: 5
 
   exit:
     fixed-time:
@@ -301,6 +311,67 @@ Error: Fixed Time Entry pattern requires an entry time to be configured
 ```
 
 These errors guide you to add the required configuration to your `alphagroove.config.yaml` file.
+
+### Modern Configuration Example
+
+Here's a comprehensive example showing the current configuration format including the new random
+time entry pattern:
+
+```yaml
+default:
+  date:
+    from: '2023-01-01'
+    to: '2025-05-02'
+  ticker: 'SPY'
+  timeframe: '1min'
+  direction: 'llm_decides'
+  charts:
+    generate: true
+    outputDir: './charts'
+
+# Entry pattern configuration
+entry:
+  enabled: [randomTimeEntry] # Can also use: quickRise, quickFall, fixedTimeEntry
+  strategyOptions:
+    randomTimeEntry:
+      startTime: '10:00' # Start of random time window
+      endTime: '15:00' # End of random time window
+    fixedTimeEntry:
+      entryTime: '13:00' # Required if using fixedTimeEntry
+    quickRise:
+      risePct: 0.3
+      withinMinutes: 5
+    quickFall:
+      fallPct: 0.3
+      withinMinutes: 5
+
+# Exit strategies configuration
+exit:
+  enabled: [profitTarget, trailingStop, endOfDay]
+  strategyOptions:
+    profitTarget:
+      atrMultiplier: 3.0
+      useLlmProposedPrice: true
+    trailingStop:
+      activationAtrMultiplier: 0 # Immediate activation
+      trailAtrMultiplier: 2.5
+    endOfDay:
+      time: '16:00'
+  slippage:
+    model: 'fixed'
+    value: 0.01
+
+# LLM configuration for trade confirmation
+llmConfirmationScreen:
+  enabled: true
+  llmProvider: 'anthropic'
+  modelName: 'claude-sonnet-4-20250514'
+  apiKeyEnvVar: 'ANTHROPIC_API_KEY'
+  numCalls: 2
+  agreementThreshold: 2
+  temperatures: [0.1, 1.0]
+  # ... (prompts configuration)
+```
 
 #### Why No Hidden Defaults?
 
@@ -386,7 +457,7 @@ Override config file settings or run without a config file:
 pnpm dev:start --from 2023-01-01 --to 2023-12-31 --direction short
 
 # Override entry pattern parameters
-pnpm dev:start --quick-rise.rise-pct=0.5 --fixed-time-entry.entry-time=13:00
+pnpm dev:start --quickRise.risePct=0.5 --fixedTimeEntry.entryTime=13:00
 
 # Use different patterns
 pnpm dev:start --entry-pattern quick-fall
@@ -409,10 +480,10 @@ Entry patterns can be configured under root `entry` in the YAML (preferred) with
 `strategyOptions`, or overridden via CLI dot notation:
 
 ```bash
-pnpm dev:start --quick-rise.rise-pct=0.5 --fixed-time-entry.entry-time=13:00
+pnpm dev:start --quickRise.risePct=0.5 --fixedTimeEntry.entryTime=13:00
 
 # Combining standard and pattern-specific options
-pnpm dev:start --from 2023-01-01 --to 2023-12-31 --direction short --quick-rise.rise-pct=0.7
+pnpm dev:start --from 2023-01-01 --to 2023-12-31 --direction short --quickRise.risePct=0.7
 ```
 
 ## Available Options
@@ -423,7 +494,7 @@ CLI options override values from the configuration file.
 | --------------------------- | ---------------------------------------------- | ------------------------- |
 | `--from <YYYY-MM-DD>`       | Start date (inclusive)                         | From config               |
 | `--to <YYYY-MM-DD>`         | End date (inclusive)                           | From config               |
-| `--entry-pattern <pattern>` | Entry pattern to use                           | quick-rise                |
+| `--entry-pattern <pattern>` | Entry pattern to use                           | quickRise                 |
 | `--ticker <symbol>`         | Ticker to analyze                              | SPY                       |
 | `--timeframe <period>`      | Data resolution                                | 1min                      |
 | `--direction <direction>`   | Trading direction for position (long or short) | long                      |
@@ -437,28 +508,39 @@ CLI options override values from the configuration file.
 
 #### Quick Rise Pattern Options
 
-| Option                        | Description                                | Default from Config |
-| ----------------------------- | ------------------------------------------ | ------------------- |
-| `--quick-rise.rise-pct`       | Minimum percentage rise to trigger pattern | 0.3                 |
-| `--quick-rise.within-minutes` | Number of minutes to look for the rise     | 5                   |
+| Option                      | Description                                | Default from Config |
+| --------------------------- | ------------------------------------------ | ------------------- |
+| `--quickRise.risePct`       | Minimum percentage rise to trigger pattern | 0.3                 |
+| `--quickRise.withinMinutes` | Number of minutes to look for the rise     | 5                   |
 
 #### Quick Fall Pattern Options
 
-| Option                        | Description                                | Default from Config |
-| ----------------------------- | ------------------------------------------ | ------------------- |
-| `--quick-fall.fall-pct`       | Minimum percentage fall to trigger pattern | 0.3                 |
-| `--quick-fall.within-minutes` | Number of minutes to look for the fall     | 5                   |
+| Option                      | Description                                | Default from Config |
+| --------------------------- | ------------------------------------------ | ------------------- |
+| `--quickFall.fallPct`       | Minimum percentage fall to trigger pattern | 0.3                 |
+| `--quickFall.withinMinutes` | Number of minutes to look for the fall     | 5                   |
 
 <!-- Exit pattern CLI options removed; exit strategies are configured in YAML under root `exit`. -->
 
 #### Fixed Time Entry Pattern Options
 
-| Option                          | Description                                | Default from Config |
-| ------------------------------- | ------------------------------------------ | ------------------- |
-| `--fixed-time-entry.entry-time` | Entry time in HH:MM format (e.g., "13:00") | **Required**        |
+| Option                       | Description                                | Default from Config |
+| ---------------------------- | ------------------------------------------ | ------------------- |
+| `--fixedTimeEntry.entryTime` | Entry time in HH:MM format (e.g., "13:00") | **Required**        |
 
 **Note**: Entry time must be configured - no default provided. Configure in YAML under
 `entry.strategyOptions.fixedTimeEntry.entryTime` or use CLI option.
+
+#### Random Time Entry Pattern Options
+
+| Option                        | Description                                 | Default from Config |
+| ----------------------------- | ------------------------------------------- | ------------------- |
+| `--randomTimeEntry.startTime` | Start of random time window in HH:MM format | `09:30`             |
+| `--randomTimeEntry.endTime`   | End of random time window in HH:MM format   | `16:00`             |
+
+**Note**: Random time entry generates a deterministic random time for each trading day within the
+specified window. Configure in YAML under `entry.strategyOptions.randomTimeEntry` or use CLI
+options.
 
 ### Available Timeframes
 
@@ -480,11 +562,15 @@ Common timeframes include:
 
 #### Entry Patterns
 
-- `quick-rise`: Detects a percentage rise in the first 5 minutes of trading (configurable)
+- `quickRise`: Detects a percentage rise in the first 5 minutes of trading (configurable)
 
-- `quick-fall`: Detects a percentage fall in the first 5 minutes of trading (configurable)
+- `quickFall`: Detects a percentage fall in the first 5 minutes of trading (configurable)
 
-- `fixed-time-entry`: Triggers an entry at a specific configured time of day (e.g., "13:00").
+- `fixedTimeEntry`: Triggers an entry at a specific configured time of day (e.g., "13:00")
+
+- `randomTimeEntry`: Triggers an entry at a random time each day within a configured time window.
+  Each trading day gets a unique random entry time (deterministic based on date), useful for
+  eliminating time-based biases in backtesting.
 
 <!-- Exit patterns CLI/options removed; configure exit strategies under root `exit`. -->
 
@@ -757,10 +843,10 @@ pnpm dev:start
 pnpm dev:start --from 2020-01-01 --to 2025-05-02
 
 # Specify pattern options
-pnpm dev:start --quick-rise.rise-pct=0.5 --fixed-time.hold-minutes=15
+pnpm dev:start --quickRise.risePct=0.5 --fixed-time.hold-minutes=15
 
-# Use the quick-fall pattern
-pnpm dev:start --entry-pattern quick-fall --fall-pct=0.4
+# Use the quickFall pattern
+pnpm dev:start --entry-pattern quickFall --quickFall.fallPct=0.4
 
 # Analyze a different ticker with specific timeframe
 pnpm dev:start --ticker QQQ --timeframe 5min

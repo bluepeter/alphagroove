@@ -33,56 +33,55 @@ describe('Fixed Time Entry Pattern', () => {
   describe('pattern configuration', () => {
     it('should initialize with empty time and long direction', () => {
       // fixedTimeEntryPattern already has a specific type
-      expect(fixedTimeEntryPattern.config.time).toBe('');
+      expect(fixedTimeEntryPattern.config.entryTime).toBe('');
       expect(fixedTimeEntryPattern.direction).toBe('long');
     });
 
     it('should update configuration with updateConfig', () => {
       const updatedPattern = fixedTimeEntryPattern.updateConfig({
-        time: '14:30',
+        entryTime: '14:30',
       });
       // The returned type from updateConfig is PatternDefinition, but we know it's our specific shape
       const specificUpdatedPattern = updatedPattern as FixedTimeEntryPatternType;
-      expect(specificUpdatedPattern.config.time).toBe('14:30');
+      expect(specificUpdatedPattern.config.entryTime).toBe('14:30');
       expect(specificUpdatedPattern.direction).toBe('long'); // updateConfig preserves the original pattern's direction
     });
 
     it('should handle entry-time property from config file', () => {
       // This simulates how the property is named in the alphagroove.config.yaml
       const updatedPattern = fixedTimeEntryPattern.updateConfig({
-        'entry-time': '13:00',
-      } as Partial<FixedTimeEntryConfig> & Record<string, any>);
+        entryTime: '13:00',
+      });
       const specificUpdatedPattern = updatedPattern as FixedTimeEntryPatternType;
-      expect(specificUpdatedPattern.config.time).toBe('13:00');
+      expect(specificUpdatedPattern.config.entryTime).toBe('13:00');
       expect(specificUpdatedPattern.sql).toContain("WHERE bar_time = '13:00'");
     });
 
-    it('should prioritize entry-time over time when both are provided', () => {
+    it('should update configuration with entryTime', () => {
       const updatedPattern = fixedTimeEntryPattern.updateConfig({
-        time: '12:30',
-        'entry-time': '13:45',
-      } as Partial<FixedTimeEntryConfig> & Record<string, any>);
+        entryTime: '13:45',
+      });
       const specificUpdatedPattern = updatedPattern as FixedTimeEntryPatternType;
-      expect(specificUpdatedPattern.config.time).toBe('13:45');
+      expect(specificUpdatedPattern.config.entryTime).toBe('13:45');
       expect(specificUpdatedPattern.sql).toContain("WHERE bar_time = '13:45'");
     });
 
     it('should throw error if no entry time is provided', () => {
       expect(() => {
         fixedTimeEntryPattern.updateConfig({});
-      }).toThrow('Fixed Time Entry pattern requires an entry time to be configured');
+      }).toThrow('Fixed Time Entry pattern requires an entryTime to be configured');
     });
 
     it('should throw error if entry time is empty string', () => {
       expect(() => {
-        fixedTimeEntryPattern.updateConfig({ 'entry-time': '' } as any);
-      }).toThrow('Fixed Time Entry pattern requires an entry time to be configured');
+        fixedTimeEntryPattern.updateConfig({ entryTime: '' });
+      }).toThrow('Fixed Time Entry pattern requires an entryTime to be configured');
     });
 
     it('should update SQL query when configuration is changed', () => {
       const patternOriginal = fixedTimeEntryPattern;
-      const pattern1200 = patternOriginal.updateConfig({ time: '12:00' });
-      const pattern1430 = patternOriginal.updateConfig({ time: '14:30' });
+      const pattern1200 = patternOriginal.updateConfig({ entryTime: '12:00' });
+      const pattern1430 = patternOriginal.updateConfig({ entryTime: '14:30' });
 
       expect(pattern1200.sql).toContain("WHERE bar_time = '12:00'");
       expect(pattern1200.sql).toContain("'{direction}' as direction");
@@ -93,7 +92,7 @@ describe('Fixed Time Entry Pattern', () => {
     it("should use pattern's direction for SQL query in updateConfig", () => {
       const basePattern = fixedTimeEntryPattern;
       // Default direction is long
-      const defaultDirPattern = basePattern.updateConfig({ time: '09:30' });
+      const defaultDirPattern = basePattern.updateConfig({ entryTime: '09:30' });
       expect(defaultDirPattern.sql).toContain("'{direction}' as direction");
 
       // Create a new pattern instance context for 'short' testing if pattern objects are mutable
@@ -111,7 +110,7 @@ describe('Fixed Time Entry Pattern', () => {
         return patternWithDirection.updateConfig(config);
       };
 
-      const updatedShortPattern = createShortPattern({ time: '10:00' }, 'short');
+      const updatedShortPattern = createShortPattern({ entryTime: '10:00' }, 'short');
       expect(updatedShortPattern.direction).toBe('short'); // Direction on pattern object
       expect(updatedShortPattern.sql).toContain("WHERE bar_time = '10:00'");
       expect(updatedShortPattern.sql).toContain("'{direction}' as direction");
@@ -127,7 +126,7 @@ describe('Fixed Time Entry Pattern', () => {
         createBar('2025-05-02 14:59:00', 100.0),
         createBar('2025-05-02 15:00:00', 100.5), // This is the target bar
       ];
-      const config: FixedTimeEntryConfig = { time: entryTime };
+      const config: FixedTimeEntryConfig = { entryTime: entryTime };
       // Mock system time to ensure toLocaleTimeString works as expected in test environment
       // The actual bar time comes from lastBar.timestamp
       vi.setSystemTime(new Date('2025-05-02 15:00:00'));
@@ -147,7 +146,7 @@ describe('Fixed Time Entry Pattern', () => {
         createBar('2025-05-02 10:29:00', 200.1),
         createBar('2025-05-02 10:30:00', 199.5), // Target bar
       ];
-      const config: FixedTimeEntryConfig = { time: entryTime };
+      const config: FixedTimeEntryConfig = { entryTime: entryTime };
       vi.setSystemTime(new Date('2025-05-02 10:30:00'));
       const result = detectFixedTimeEntry(bars, config, 'short');
 
@@ -164,14 +163,14 @@ describe('Fixed Time Entry Pattern', () => {
         createBar('2025-05-02 10:58:00', 99.0),
         createBar('2025-05-02 10:59:00', 100.0), // Last bar is 10:59
       ];
-      const config: FixedTimeEntryConfig = { time: entryTime }; // Configured for 11:00
+      const config: FixedTimeEntryConfig = { entryTime: entryTime }; // Configured for 11:00
       vi.setSystemTime(new Date('2025-05-02 10:59:00'));
       const result = detectFixedTimeEntry(bars, config, 'long');
       expect(result).toBeNull();
     });
 
     it('should return null if no bars are provided', () => {
-      const config: FixedTimeEntryConfig = { time: '12:00' };
+      const config: FixedTimeEntryConfig = { entryTime: '12:00' };
       const result = detectFixedTimeEntry([], config, 'long');
       expect(result).toBeNull();
     });
@@ -179,7 +178,7 @@ describe('Fixed Time Entry Pattern', () => {
     it('should correctly format time with leading zeros from Date object', () => {
       const entryTime = '09:05';
       const bars: Bar[] = [createBar('2025-05-02 09:05:00', 100.0)];
-      const config: FixedTimeEntryConfig = { time: entryTime };
+      const config: FixedTimeEntryConfig = { entryTime: entryTime };
       vi.setSystemTime(new Date('2025-05-02 09:05:00'));
       const result = detectFixedTimeEntry(bars, config, 'long');
       expect(result).not.toBeNull();
@@ -189,7 +188,7 @@ describe('Fixed Time Entry Pattern', () => {
 
   describe('createSqlQuery', () => {
     it('should generate correct SQL for long direction', () => {
-      const config: FixedTimeEntryConfig = { time: '12:30' };
+      const config: FixedTimeEntryConfig = { entryTime: '12:30' };
       const sql = createSqlQuery(config, 'long');
       expect(sql).toContain("strftime(column0, '%H:%M') as bar_time");
       expect(sql).toContain("WHERE bar_time = '12:30'");
@@ -198,7 +197,7 @@ describe('Fixed Time Entry Pattern', () => {
     });
 
     it('should generate correct SQL for short direction', () => {
-      const config: FixedTimeEntryConfig = { time: '09:45' };
+      const config: FixedTimeEntryConfig = { entryTime: '09:45' };
       const sql = createSqlQuery(config, 'short');
       expect(sql).toContain("WHERE bar_time = '09:45'");
       expect(sql).toContain("'{direction}' as direction");

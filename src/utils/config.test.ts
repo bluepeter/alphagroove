@@ -32,7 +32,7 @@ describe('Configuration System', () => {
           to: '2023-12-31',
         },
         patterns: {
-          entry: 'quick-rise',
+          entry: 'quickRise',
         },
         charts: {
           generate: false,
@@ -47,16 +47,16 @@ describe('Configuration System', () => {
 
       const patternsPart = {
         entry: {
-          'quick-rise': {
-            'rise-pct': 0.3,
-            'within-minutes': 5,
+          quickRise: {
+            risePct: 0.3,
+            withinMinutes: 5,
           },
-          'quick-fall': {
-            'fall-pct': 0.3,
-            'within-minutes': 5,
+          quickFall: {
+            fallPct: 0.3,
+            withinMinutes: 5,
           },
-          'fixed-time-entry': {
-            'entry-time': '13:00',
+          fixedTimeEntry: {
+            entryTime: '13:00',
           },
         },
         ...(overrides.patterns || {}),
@@ -96,10 +96,10 @@ describe('Configuration System', () => {
         direction: 'long',
         from: '2024-01-01',
         to: '2023-12-31',
-        entryPattern: 'quick-rise',
-        'quick-rise': {
-          'rise-pct': 0.3,
-          'within-minutes': 5,
+        entryPattern: 'quickRise',
+        quickRise: {
+          risePct: 0.3,
+          withinMinutes: 5,
         },
         exitStrategies: {
           enabled: ['maxHoldTime'],
@@ -111,15 +111,15 @@ describe('Configuration System', () => {
     it('should handle entry pattern-specific options with dot notation', () => {
       const config = createTestConfig();
       const cliOptions = {
-        'quick-rise.rise-pct': 0.7,
+        'quickRise.risePct': 0.7,
       };
 
       const merged = mergeConfigWithCliOptions(config, cliOptions);
 
       expect(merged).toMatchObject({
-        'quick-rise': {
-          'rise-pct': 0.7,
-          'within-minutes': 5,
+        quickRise: {
+          risePct: 0.7,
+          withinMinutes: 5,
         },
       });
     });
@@ -130,21 +130,21 @@ describe('Configuration System', () => {
           ticker: 'SPY',
           timeframe: '1min',
           direction: 'long',
-          patterns: { entry: 'quick-rise' },
+          patterns: { entry: 'quickRise' },
         },
       });
       const cliOptions = {
-        entryPattern: 'quick-rise',
+        entryPattern: 'quickRise',
         risePct: '0.8',
       };
 
       const merged = mergeConfigWithCliOptions(config, cliOptions);
 
       expect(merged).toMatchObject({
-        entryPattern: 'quick-rise',
-        'quick-rise': {
-          'rise-pct': 0.8,
-          'within-minutes': 5,
+        entryPattern: 'quickRise',
+        quickRise: {
+          risePct: 0.8,
+          withinMinutes: 5,
         },
       });
     });
@@ -202,20 +202,20 @@ describe('Configuration System', () => {
           ticker: 'SPY',
           timeframe: '1min',
           direction: 'long',
-          patterns: { entry: 'fixed-time-entry' },
+          patterns: { entry: 'fixedTimeEntry' },
         },
         patterns: {
           entry: {
-            'fixed-time-entry': { 'entry-time': '10:00' },
+            fixedTimeEntry: { entryTime: '10:00' },
           },
         },
       });
       const cliOptions = {
-        'fixed-time-entry.entry-time': '14:30',
+        'fixedTimeEntry.entryTime': '14:30',
       };
       const merged = mergeConfigWithCliOptions(config, cliOptions);
-      expect(merged.entryPattern).toBe('fixed-time-entry');
-      expect(merged['fixed-time-entry']?.['entry-time']).toBe('14:30');
+      expect(merged.entryPattern).toBe('fixedTimeEntry');
+      expect(merged.fixedTimeEntry?.entryTime).toBe('14:30');
     });
 
     it('should map new strategyOptions.fixedTimeEntry.entryTime format correctly', () => {
@@ -224,7 +224,7 @@ describe('Configuration System', () => {
           ticker: 'SPY',
           timeframe: '1min',
           direction: 'long',
-          patterns: { entry: 'fixed-time-entry' },
+          patterns: { entry: 'fixedTimeEntry' },
         },
         entry: {
           strategyOptions: {
@@ -236,8 +236,8 @@ describe('Configuration System', () => {
       });
       const cliOptions = {};
       const merged = mergeConfigWithCliOptions(config, cliOptions);
-      expect(merged.entryPattern).toBe('fixed-time-entry');
-      expect(merged['fixed-time-entry']?.['entry-time']).toBe('13:00');
+      expect(merged.entryPattern).toBe('fixedTimeEntry');
+      expect(merged.fixedTimeEntry?.entryTime).toBe('13:00');
     });
 
     it('should prioritize strategyOptions over legacy patterns config', () => {
@@ -246,11 +246,11 @@ describe('Configuration System', () => {
           ticker: 'SPY',
           timeframe: '1min',
           direction: 'long',
-          patterns: { entry: 'fixed-time-entry' },
+          patterns: { entry: 'fixedTimeEntry' },
         },
         patterns: {
           entry: {
-            'fixed-time-entry': { 'entry-time': '10:00' },
+            fixedTimeEntry: { entryTime: '10:00' },
           },
         },
         entry: {
@@ -263,8 +263,32 @@ describe('Configuration System', () => {
       });
       const cliOptions = {};
       const merged = mergeConfigWithCliOptions(config, cliOptions);
-      expect(merged.entryPattern).toBe('fixed-time-entry');
-      expect(merged['fixed-time-entry']?.['entry-time']).toBe('13:00'); // Should use strategyOptions value
+      expect(merged.entryPattern).toBe('fixedTimeEntry');
+      expect(merged.fixedTimeEntry?.entryTime).toBe('13:00'); // Should use strategyOptions value
+    });
+
+    it('should map new strategyOptions.randomTimeEntry format correctly', () => {
+      const config = createTestConfig({
+        default: {
+          ticker: 'SPY',
+          timeframe: '1min',
+          direction: 'long',
+          patterns: { entry: 'randomTimeEntry' },
+        },
+        entry: {
+          strategyOptions: {
+            randomTimeEntry: {
+              startTime: '10:00',
+              endTime: '14:00',
+            },
+          },
+        },
+      });
+      const cliOptions = {};
+      const merged = mergeConfigWithCliOptions(config, cliOptions);
+      expect(merged.entryPattern).toBe('randomTimeEntry');
+      expect(merged.randomTimeEntry?.startTime).toBe('10:00');
+      expect(merged.randomTimeEntry?.endTime).toBe('14:00');
     });
 
     it('should ensure exitStrategies.maxHoldTime is populated with defaults if enabled but not specified', () => {
@@ -273,7 +297,7 @@ describe('Configuration System', () => {
           ticker: 'SPY',
           timeframe: '1min',
           direction: 'long',
-          patterns: { entry: 'quick-rise' },
+          patterns: { entry: 'quickRise' },
           charts: { generate: false, outputDir: './charts' },
           exitStrategies: {
             enabled: ['maxHoldTime'],
@@ -281,7 +305,7 @@ describe('Configuration System', () => {
         },
         patterns: {
           entry: {
-            'quick-rise': { 'rise-pct': 0.3, 'within-minutes': 5 },
+            quickRise: { risePct: 0.3, withinMinutes: 5 },
           },
         },
         exitStrategies: {
@@ -364,7 +388,7 @@ describe('Configuration System', () => {
       });
 
       const merged = mergeConfigWithCliOptions(config, {});
-      expect(merged.entryPattern).toBe('fixed-time-entry');
+      expect(merged.entryPattern).toBe('fixedTimeEntry');
     });
 
     it('should fall back to entry.pattern if entry.enabled is not set', () => {
@@ -375,7 +399,7 @@ describe('Configuration System', () => {
       });
 
       const merged = mergeConfigWithCliOptions(config, {});
-      expect(merged.entryPattern).toBe('quick-rise');
+      expect(merged.entryPattern).toBe('quickRise');
     });
   });
 });

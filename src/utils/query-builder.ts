@@ -74,6 +74,12 @@ export const buildAnalysisQuery = (
     `;
   }
 
+  if (entryPatternName === 'Random Time Entry') {
+    // Random Time Entry pattern has self-contained SQL with all required fields
+    // Just return the interpolated SQL directly
+    return entrySql;
+  }
+
   // --- Quick Rise/Quick Fall Logic ---
   const isQuickFall = entryPatternName === 'Quick Fall';
 

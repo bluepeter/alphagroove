@@ -6,28 +6,35 @@ import { z } from 'zod';
 
 // Define schema for the quick-rise pattern
 const QuickRiseConfigSchema = z.object({
-  'rise-pct': z.number().default(0.3),
-  'within-minutes': z.number().default(5),
+  risePct: z.number().default(0.3),
+  withinMinutes: z.number().default(5),
 });
 
 // Define schema for the quick-fall pattern
 const QuickFallConfigSchema = z.object({
-  'fall-pct': z.number().default(0.3),
-  'within-minutes': z.number().default(5),
+  fallPct: z.number().default(0.3),
+  withinMinutes: z.number().default(5),
 });
 
 // Define schema for the Fixed Time Entry pattern configuration
 const FixedTimeEntryConfigSchema = z.object({
-  'entry-time': z
+  entryTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Time must be in HH:MM format'),
+});
+
+// Define schema for the Random Time Entry pattern configuration
+const RandomTimeEntryConfigSchema = z.object({
+  startTime: z
     .string()
-    .regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Time must be in HH:MM format'),
+    .regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Start time must be in HH:MM format'),
+  endTime: z.string().regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'End time must be in HH:MM format'),
 });
 
 // Define schema for entry pattern configurations
 const EntryPatternsConfigSchema = z.object({
-  'quick-rise': QuickRiseConfigSchema.optional(),
-  'quick-fall': QuickFallConfigSchema.optional(),
-  'fixed-time-entry': FixedTimeEntryConfigSchema.optional(),
+  quickRise: QuickRiseConfigSchema.optional(),
+  quickFall: QuickFallConfigSchema.optional(),
+  fixedTimeEntry: FixedTimeEntryConfigSchema.optional(),
+  randomTimeEntry: RandomTimeEntryConfigSchema.optional(),
 });
 
 // NEW: Define schemas for exit strategies
@@ -98,10 +105,12 @@ const ExitStrategiesConfigSchema = z
 const EntryRootConfigSchema = z
   .object({
     // New unified format
-    enabled: z.array(z.enum(['quickRise', 'quickFall', 'fixedTimeEntry'])).optional(),
+    enabled: z
+      .array(z.enum(['quickRise', 'quickFall', 'fixedTimeEntry', 'randomTimeEntry']))
+      .optional(),
     pattern: z
-      .enum(['quick-rise', 'quick-fall', 'fixed-time-entry'])
-      .or(z.enum(['quickRise', 'quickFall', 'fixedTimeEntry']))
+      .enum(['quickRise', 'quickFall', 'fixedTimeEntry', 'randomTimeEntry'])
+      .or(z.enum(['quickRise', 'quickFall', 'fixedTimeEntry', 'randomTimeEntry']))
       .optional(),
     strategyOptions: z
       .object({
@@ -125,13 +134,25 @@ const EntryRootConfigSchema = z
               .optional(),
           })
           .optional(),
+        randomTimeEntry: z
+          .object({
+            startTime: z
+              .string()
+              .regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'Start time must be in HH:MM format')
+              .optional(),
+            endTime: z
+              .string()
+              .regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, 'End time must be in HH:MM format')
+              .optional(),
+          })
+          .optional(),
       })
       .optional(),
 
     // Legacy inline options (back-compat)
-    'quick-rise': QuickRiseConfigSchema.optional(),
-    'quick-fall': QuickFallConfigSchema.optional(),
-    'fixed-time-entry': FixedTimeEntryConfigSchema.optional(),
+    quickRise: QuickRiseConfigSchema.optional(),
+    quickFall: QuickFallConfigSchema.optional(),
+    fixedTimeEntry: FixedTimeEntryConfigSchema.optional(),
   })
   .optional();
 
@@ -150,7 +171,7 @@ const DateRangeSchema = z.object({
 
 // Schema for default pattern selection
 const DefaultPatternsSchema = z.object({
-  entry: z.string().default('quick-rise'),
+  entry: z.string().default('quickRise'),
 });
 
 // Schema for chart options
@@ -260,7 +281,7 @@ const DEFAULT_CONFIG: Config = {
     timeframe: '1min',
     direction: 'long',
     patterns: {
-      entry: 'quick-rise',
+      entry: 'quickRise',
     },
     charts: {
       generate: false,
@@ -294,16 +315,16 @@ const DEFAULT_CONFIG: Config = {
   },
   patterns: {
     entry: {
-      'quick-rise': {
-        'rise-pct': 0.3,
-        'within-minutes': 5,
+      quickRise: {
+        risePct: 0.3,
+        withinMinutes: 5,
       },
-      'quick-fall': {
-        'fall-pct': 0.3,
-        'within-minutes': 5,
+      quickFall: {
+        fallPct: 0.3,
+        withinMinutes: 5,
       },
-      'fixed-time-entry': {
-        'entry-time': '13:00', // Default to 1 PM for testing, but should be configurable
+      fixedTimeEntry: {
+        entryTime: '13:00', // Default to 1 PM for testing, but should be configurable
       },
     },
   },
@@ -397,7 +418,7 @@ export const createDefaultConfigFile = (): void => {
         timeframe: '1min',
         direction: 'long',
         patterns: {
-          entry: 'quick-rise',
+          entry: 'quickRise',
         },
         charts: {
           generate: false,
@@ -431,16 +452,16 @@ export const createDefaultConfigFile = (): void => {
       },
       patterns: {
         entry: {
-          'quick-rise': {
-            'rise-pct': 0.3,
-            'within-minutes': 5,
+          quickRise: {
+            risePct: 0.3,
+            withinMinutes: 5,
           },
-          'quick-fall': {
-            'fall-pct': 0.3,
-            'within-minutes': 5,
+          quickFall: {
+            fallPct: 0.3,
+            withinMinutes: 5,
           },
-          'fixed-time-entry': {
-            'entry-time': '12:00',
+          fixedTimeEntry: {
+            entryTime: '12:00',
           },
         },
       },
@@ -501,9 +522,10 @@ export interface MergedConfig {
   chartsDir: string;
   llmConfirmationScreen?: LLMScreenConfig;
   exitStrategies?: ExitStrategiesConfig; // NEW: Add exitStrategies
-  'quick-rise'?: Record<string, any>;
-  'quick-fall'?: Record<string, any>;
-  'fixed-time-entry'?: Record<string, any>; // Added for consistency, was missing before
+  quickRise?: Record<string, any>;
+  quickFall?: Record<string, any>;
+  fixedTimeEntry?: Record<string, any>;
+  randomTimeEntry?: Record<string, any>;
   [key: string]: any;
 }
 
@@ -521,12 +543,14 @@ export const mergeConfigWithCliOptions = (
   const normalizeEntryName = (name: string | undefined): string | undefined => {
     if (!name) return undefined;
     const map: Record<string, string> = {
-      quickRise: 'quick-rise',
-      quickFall: 'quick-fall',
-      fixedTimeEntry: 'fixed-time-entry',
-      'quick-rise': 'quick-rise',
-      'quick-fall': 'quick-fall',
-      'fixed-time-entry': 'fixed-time-entry',
+      quickRise: 'quickRise',
+      quickFall: 'quickFall',
+      fixedTimeEntry: 'fixedTimeEntry',
+      randomTimeEntry: 'randomTimeEntry',
+      'quick-rise': 'quickRise',
+      'quick-fall': 'quickFall',
+      'fixed-time-entry': 'fixedTimeEntry',
+      'random-time-entry': 'randomTimeEntry',
     };
     return map[name] || name;
   };
@@ -652,9 +676,13 @@ export const mergeConfigWithCliOptions = (
     if (key.includes('.')) {
       const [patternName, optionName] = key.split('.');
       if (
-        [mergedConfig.entryPattern, 'quick-rise', 'quick-fall', 'fixed-time-entry'].includes(
-          patternName
-        )
+        [
+          mergedConfig.entryPattern,
+          'quickRise',
+          'quickFall',
+          'fixedTimeEntry',
+          'randomTimeEntry',
+        ].includes(patternName)
       ) {
         if (!patternOptions[patternName]) {
           patternOptions[patternName] = {};
@@ -665,34 +693,43 @@ export const mergeConfigWithCliOptions = (
   });
 
   // Seed with legacy patterns.entry configs
-  if (loadedConfig.patterns.entry['quick-rise']) {
-    mergedConfig['quick-rise'] = { ...loadedConfig.patterns.entry['quick-rise'] };
+  if (loadedConfig.patterns.entry.quickRise) {
+    mergedConfig.quickRise = { ...loadedConfig.patterns.entry.quickRise };
   }
-  if (loadedConfig.patterns.entry['quick-fall']) {
-    mergedConfig['quick-fall'] = { ...loadedConfig.patterns.entry['quick-fall'] };
+  if (loadedConfig.patterns.entry.quickFall) {
+    mergedConfig.quickFall = { ...loadedConfig.patterns.entry.quickFall };
   }
-  if (loadedConfig.patterns.entry['fixed-time-entry']) {
-    mergedConfig['fixed-time-entry'] = { ...loadedConfig.patterns.entry['fixed-time-entry'] };
+  if (loadedConfig.patterns.entry.fixedTimeEntry) {
+    mergedConfig.fixedTimeEntry = { ...loadedConfig.patterns.entry.fixedTimeEntry };
+  }
+  if (loadedConfig.patterns.entry.randomTimeEntry) {
+    mergedConfig.randomTimeEntry = { ...loadedConfig.patterns.entry.randomTimeEntry };
   }
 
   // Overlay root-level entry options if provided
   if (loadedConfig.entry) {
-    if ((loadedConfig.entry as any)['quick-rise']) {
-      mergedConfig['quick-rise'] = {
-        ...(mergedConfig['quick-rise'] || {}),
-        ...(loadedConfig.entry as any)['quick-rise'],
+    if ((loadedConfig.entry as any).quickRise) {
+      mergedConfig.quickRise = {
+        ...(mergedConfig.quickRise || {}),
+        ...(loadedConfig.entry as any).quickRise,
       };
     }
-    if ((loadedConfig.entry as any)['quick-fall']) {
-      mergedConfig['quick-fall'] = {
-        ...(mergedConfig['quick-fall'] || {}),
-        ...(loadedConfig.entry as any)['quick-fall'],
+    if ((loadedConfig.entry as any).quickFall) {
+      mergedConfig.quickFall = {
+        ...(mergedConfig.quickFall || {}),
+        ...(loadedConfig.entry as any).quickFall,
       };
     }
-    if ((loadedConfig.entry as any)['fixed-time-entry']) {
-      mergedConfig['fixed-time-entry'] = {
-        ...(mergedConfig['fixed-time-entry'] || {}),
-        ...(loadedConfig.entry as any)['fixed-time-entry'],
+    if ((loadedConfig.entry as any).fixedTimeEntry) {
+      mergedConfig.fixedTimeEntry = {
+        ...(mergedConfig.fixedTimeEntry || {}),
+        ...(loadedConfig.entry as any).fixedTimeEntry,
+      };
+    }
+    if ((loadedConfig.entry as any).randomTimeEntry) {
+      mergedConfig.randomTimeEntry = {
+        ...(mergedConfig.randomTimeEntry || {}),
+        ...(loadedConfig.entry as any).randomTimeEntry,
       };
     }
 
@@ -701,27 +738,36 @@ export const mergeConfigWithCliOptions = (
     if (strategyOptions) {
       // Map quickRise
       if (strategyOptions.quickRise) {
-        mergedConfig['quick-rise'] = {
-          ...(mergedConfig['quick-rise'] || {}),
-          'rise-pct': strategyOptions.quickRise.risePct,
-          'within-minutes': strategyOptions.quickRise.withinMinutes,
+        mergedConfig.quickRise = {
+          ...(mergedConfig.quickRise || {}),
+          risePct: strategyOptions.quickRise.risePct,
+          withinMinutes: strategyOptions.quickRise.withinMinutes,
         };
       }
 
       // Map quickFall
       if (strategyOptions.quickFall) {
-        mergedConfig['quick-fall'] = {
-          ...(mergedConfig['quick-fall'] || {}),
-          'fall-pct': strategyOptions.quickFall.fallPct,
-          'within-minutes': strategyOptions.quickFall.withinMinutes,
+        mergedConfig.quickFall = {
+          ...(mergedConfig.quickFall || {}),
+          fallPct: strategyOptions.quickFall.fallPct,
+          withinMinutes: strategyOptions.quickFall.withinMinutes,
         };
       }
 
       // Map fixedTimeEntry
       if (strategyOptions.fixedTimeEntry) {
-        mergedConfig['fixed-time-entry'] = {
-          ...(mergedConfig['fixed-time-entry'] || {}),
-          'entry-time': strategyOptions.fixedTimeEntry.entryTime,
+        mergedConfig.fixedTimeEntry = {
+          ...(mergedConfig.fixedTimeEntry || {}),
+          entryTime: strategyOptions.fixedTimeEntry.entryTime,
+        };
+      }
+
+      // Map randomTimeEntry
+      if (strategyOptions.randomTimeEntry) {
+        mergedConfig.randomTimeEntry = {
+          ...(mergedConfig.randomTimeEntry || {}),
+          startTime: strategyOptions.randomTimeEntry.startTime,
+          endTime: strategyOptions.randomTimeEntry.endTime,
         };
       }
     }
@@ -729,15 +775,14 @@ export const mergeConfigWithCliOptions = (
 
   Object.entries(patternOptions).forEach(([pattern, options]) => {
     if (!mergedConfig[pattern]) {
-      if (pattern === 'quick-rise' && loadedConfig.patterns.entry['quick-rise']) {
-        mergedConfig[pattern] = { ...loadedConfig.patterns.entry['quick-rise'] };
-      } else if (pattern === 'quick-fall' && loadedConfig.patterns.entry['quick-fall']) {
-        mergedConfig[pattern] = { ...loadedConfig.patterns.entry['quick-fall'] };
-      } else if (
-        pattern === 'fixed-time-entry' &&
-        loadedConfig.patterns.entry['fixed-time-entry']
-      ) {
-        mergedConfig[pattern] = { ...loadedConfig.patterns.entry['fixed-time-entry'] };
+      if (pattern === 'quickRise' && loadedConfig.patterns.entry.quickRise) {
+        mergedConfig[pattern] = { ...loadedConfig.patterns.entry.quickRise };
+      } else if (pattern === 'quickFall' && loadedConfig.patterns.entry.quickFall) {
+        mergedConfig[pattern] = { ...loadedConfig.patterns.entry.quickFall };
+      } else if (pattern === 'fixedTimeEntry' && loadedConfig.patterns.entry.fixedTimeEntry) {
+        mergedConfig[pattern] = { ...loadedConfig.patterns.entry.fixedTimeEntry };
+      } else if (pattern === 'randomTimeEntry' && loadedConfig.patterns.entry.randomTimeEntry) {
+        mergedConfig[pattern] = { ...loadedConfig.patterns.entry.randomTimeEntry };
       } else {
         mergedConfig[pattern] = {};
       }
@@ -746,13 +791,13 @@ export const mergeConfigWithCliOptions = (
   });
 
   // Handle legacy CLI options for backward compatibility
-  if (mergedConfig.entryPattern === 'quick-rise' && cliOptions.risePct !== undefined) {
-    if (!mergedConfig['quick-rise']) mergedConfig['quick-rise'] = {};
-    mergedConfig['quick-rise']['rise-pct'] = parseFloat(cliOptions.risePct as string);
+  if (mergedConfig.entryPattern === 'quickRise' && cliOptions.risePct !== undefined) {
+    if (!mergedConfig.quickRise) mergedConfig.quickRise = {};
+    mergedConfig.quickRise.risePct = parseFloat(cliOptions.risePct as string);
   }
-  if (mergedConfig.entryPattern === 'quick-fall' && cliOptions.fallPct !== undefined) {
-    if (!mergedConfig['quick-fall']) mergedConfig['quick-fall'] = {};
-    mergedConfig['quick-fall']['fall-pct'] = parseFloat(cliOptions.fallPct as string);
+  if (mergedConfig.entryPattern === 'quickFall' && cliOptions.fallPct !== undefined) {
+    if (!mergedConfig.quickFall) mergedConfig.quickFall = {};
+    mergedConfig.quickFall.fallPct = parseFloat(cliOptions.fallPct as string);
   }
 
   const patternNamesFromConfig = Object.keys(loadedConfig.patterns.entry);
@@ -765,22 +810,28 @@ export const mergeConfigWithCliOptions = (
     }
   });
 
-  if (cliOptions['quick-rise'] && typeof cliOptions['quick-rise'] === 'object') {
-    mergedConfig['quick-rise'] = {
-      ...(mergedConfig['quick-rise'] || {}),
-      ...cliOptions['quick-rise'],
+  if (cliOptions.quickRise && typeof cliOptions.quickRise === 'object') {
+    mergedConfig.quickRise = {
+      ...(mergedConfig.quickRise || {}),
+      ...cliOptions.quickRise,
     };
   }
-  if (cliOptions['quick-fall'] && typeof cliOptions['quick-fall'] === 'object') {
-    mergedConfig['quick-fall'] = {
-      ...(mergedConfig['quick-fall'] || {}),
-      ...cliOptions['quick-fall'],
+  if (cliOptions.quickFall && typeof cliOptions.quickFall === 'object') {
+    mergedConfig.quickFall = {
+      ...(mergedConfig.quickFall || {}),
+      ...cliOptions.quickFall,
     };
   }
-  if (cliOptions['fixed-time-entry'] && typeof cliOptions['fixed-time-entry'] === 'object') {
-    mergedConfig['fixed-time-entry'] = {
-      ...(mergedConfig['fixed-time-entry'] || {}),
-      ...cliOptions['fixed-time-entry'],
+  if (cliOptions.fixedTimeEntry && typeof cliOptions.fixedTimeEntry === 'object') {
+    mergedConfig.fixedTimeEntry = {
+      ...(mergedConfig.fixedTimeEntry || {}),
+      ...cliOptions.fixedTimeEntry,
+    };
+  }
+  if (cliOptions.randomTimeEntry && typeof cliOptions.randomTimeEntry === 'object') {
+    mergedConfig.randomTimeEntry = {
+      ...(mergedConfig.randomTimeEntry || {}),
+      ...cliOptions.randomTimeEntry,
     };
   }
 

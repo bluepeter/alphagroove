@@ -86,12 +86,12 @@ const _getBaseAppConfig = (): AppConfig => ({
     ticker: 'SPY',
     timeframe: '1min',
     direction: 'long',
-    patterns: { entry: 'quick-rise' },
+    patterns: { entry: 'quickRise' },
     charts: { generate: false, outputDir: './charts' },
     date: { from: '2023-01-01', to: '2023-12-31' },
   },
   patterns: {
-    entry: { 'quick-rise': { 'rise-pct': 0.3, 'within-minutes': 5 } },
+    entry: { quickRise: { risePct: 0.3, withinMinutes: 5 } },
   },
   llmConfirmationScreen: getBaseScreenConfig(),
 });

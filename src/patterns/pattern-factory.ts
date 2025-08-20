@@ -1,13 +1,15 @@
 import { fixedTimeEntryPattern } from './entry/fixed-time-entry.js';
 import { quickFallPattern } from './entry/quick-fall.js';
 import { quickRisePattern } from './entry/quick-rise.js';
+import { randomTimeEntryPattern } from './entry/random-time-entry.js';
 import { fixedTimeExitPattern } from './exit/fixed-time.js';
 import { PatternDefinition } from './types.js';
 
 const entryPatterns: Record<string, PatternDefinition> = {
-  'quick-rise': quickRisePattern,
-  'quick-fall': quickFallPattern,
-  'fixed-time-entry': fixedTimeEntryPattern,
+  quickRise: quickRisePattern,
+  quickFall: quickFallPattern,
+  fixedTimeEntry: fixedTimeEntryPattern,
+  randomTimeEntry: randomTimeEntryPattern,
 };
 
 const exitPatterns: Record<string, PatternDefinition> = {

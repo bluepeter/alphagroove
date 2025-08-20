@@ -13,7 +13,7 @@ default:
     outputDir: './charts'
 
 entry:
-  enabled: [fixedTimeEntry]
+  enabled: [randomTimeEntry]
   strategyOptions:
     quickRise:
       risePct: 0.3
