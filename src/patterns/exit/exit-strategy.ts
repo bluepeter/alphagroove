@@ -476,44 +476,55 @@ export const createExitStrategies = (config: any): ExitStrategy[] => {
     );
   }
 
-  const { enabled, ...strategies } = config.exitStrategies;
+  const { enabled, maxHoldTime, strategyOptions } = config.exitStrategies;
+  const strategies: ExitStrategy[] = [];
 
-  return enabled.map((strategyName: string) => {
+  // maxHoldTime is automatically added when configured (doesn't need to be in enabled array)
+  if (maxHoldTime) {
+    strategies.push(new MaxHoldTimeStrategy(maxHoldTime));
+  }
+
+  // Add other strategies based on enabled array
+  enabled.forEach((strategyName: string) => {
     switch (strategyName) {
       case 'stopLoss':
-        if (!strategies.stopLoss) {
+        if (!strategyOptions?.stopLoss) {
           throw new Error('stopLoss strategy enabled but no configuration provided');
         }
-        return new StopLossStrategy(strategies.stopLoss);
+        strategies.push(new StopLossStrategy(strategyOptions.stopLoss));
+        break;
 
       case 'profitTarget':
-        if (!strategies.profitTarget) {
+        if (!strategyOptions?.profitTarget) {
           throw new Error('profitTarget strategy enabled but no configuration provided');
         }
-        return new ProfitTargetStrategy(strategies.profitTarget);
+        strategies.push(new ProfitTargetStrategy(strategyOptions.profitTarget));
+        break;
 
       case 'trailingStop':
-        if (!strategies.trailingStop) {
+        if (!strategyOptions?.trailingStop) {
           throw new Error('trailingStop strategy enabled but no configuration provided');
         }
-        return new TrailingStopStrategy(strategies.trailingStop);
-
-      case 'maxHoldTime':
-        if (!strategies.maxHoldTime) {
-          throw new Error('maxHoldTime strategy enabled but no configuration provided');
-        }
-        return new MaxHoldTimeStrategy(strategies.maxHoldTime);
+        strategies.push(new TrailingStopStrategy(strategyOptions.trailingStop));
+        break;
 
       case 'endOfDay':
-        if (!strategies.endOfDay) {
+        if (!strategyOptions?.endOfDay) {
           throw new Error('endOfDay strategy enabled but no configuration provided');
         }
-        return new EndOfDayStrategy(strategies.endOfDay);
+        strategies.push(new EndOfDayStrategy(strategyOptions.endOfDay));
+        break;
+
+      case 'maxHoldTime':
+        // Skip - maxHoldTime is handled above automatically when configured
+        break;
 
       default:
         throw new Error(`Unknown exit strategy: ${strategyName}`);
     }
   });
+
+  return strategies;
 };
 
 /**

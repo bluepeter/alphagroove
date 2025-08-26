@@ -109,8 +109,10 @@ describe('processTradesLoop - LLM Exit Price Usage', () => {
     llmConfirmationScreen: getDefaultTestLLMScreenConfig(), // Use helper for default
     exitStrategies: {
       enabled: ['stopLoss', 'profitTarget'],
-      stopLoss: { percentFromEntry: 1.0, atrMultiplier: 1.5, useLlmProposedPrice: false },
-      profitTarget: { percentFromEntry: 2.0, atrMultiplier: 3.0, useLlmProposedPrice: false },
+      strategyOptions: {
+        stopLoss: { percentFromEntry: 1.0, atrMultiplier: 1.5, useLlmProposedPrice: false },
+        profitTarget: { percentFromEntry: 2.0, atrMultiplier: 3.0, useLlmProposedPrice: false },
+      },
     },
   };
 
@@ -142,8 +144,8 @@ describe('processTradesLoop - LLM Exit Price Usage', () => {
 
   it('should use LLM proposed stop loss if configured and available', async () => {
     const config = JSON.parse(JSON.stringify(baseMergedConfig)) as MergedConfig;
-    if (config.exitStrategies?.stopLoss) {
-      config.exitStrategies.stopLoss.useLlmProposedPrice = true;
+    if (config.exitStrategies?.strategyOptions?.stopLoss) {
+      config.exitStrategies.strategyOptions.stopLoss.useLlmProposedPrice = true;
     }
     // llmScreenConfig will be derived from config.llmConfirmationScreen which is now valid
     const llmScreenConfig = config.llmConfirmationScreen
@@ -174,8 +176,8 @@ describe('processTradesLoop - LLM Exit Price Usage', () => {
 
   it('should use LLM proposed profit target if configured and available', async () => {
     const config = JSON.parse(JSON.stringify(baseMergedConfig)) as MergedConfig;
-    if (config.exitStrategies?.profitTarget) {
-      config.exitStrategies.profitTarget.useLlmProposedPrice = true;
+    if (config.exitStrategies?.strategyOptions?.profitTarget) {
+      config.exitStrategies.strategyOptions.profitTarget.useLlmProposedPrice = true;
     }
     const llmScreenConfig = config.llmConfirmationScreen
       ? { ...config.llmConfirmationScreen, enabled: true }
@@ -204,9 +206,9 @@ describe('processTradesLoop - LLM Exit Price Usage', () => {
 
   it('should use config-based ATR SL if useLlmProposedPrice is true but LLM SL is not available', async () => {
     const config = JSON.parse(JSON.stringify(baseMergedConfig)) as MergedConfig;
-    if (config.exitStrategies?.stopLoss) {
-      config.exitStrategies.stopLoss.useLlmProposedPrice = true;
-      config.exitStrategies.stopLoss.atrMultiplier = 2.0;
+    if (config.exitStrategies?.strategyOptions?.stopLoss) {
+      config.exitStrategies.strategyOptions.stopLoss.useLlmProposedPrice = true;
+      config.exitStrategies.strategyOptions.stopLoss.atrMultiplier = 2.0;
     }
     const llmScreenConfig = config.llmConfirmationScreen
       ? { ...config.llmConfirmationScreen, enabled: true }
@@ -235,10 +237,10 @@ describe('processTradesLoop - LLM Exit Price Usage', () => {
 
   it('should use config-based Percent PT if useLlmProposedPrice is true but LLM PT is not available', async () => {
     const config = JSON.parse(JSON.stringify(baseMergedConfig)) as MergedConfig;
-    if (config.exitStrategies?.profitTarget) {
-      config.exitStrategies.profitTarget.useLlmProposedPrice = true;
-      config.exitStrategies.profitTarget.percentFromEntry = 3.0;
-      config.exitStrategies.profitTarget.atrMultiplier = undefined; // Ensure ATR is not used
+    if (config.exitStrategies?.strategyOptions?.profitTarget) {
+      config.exitStrategies.strategyOptions.profitTarget.useLlmProposedPrice = true;
+      config.exitStrategies.strategyOptions.profitTarget.percentFromEntry = 3.0;
+      config.exitStrategies.strategyOptions.profitTarget.atrMultiplier = undefined; // Ensure ATR is not used
     }
     const llmScreenConfig = config.llmConfirmationScreen
       ? { ...config.llmConfirmationScreen, enabled: true }

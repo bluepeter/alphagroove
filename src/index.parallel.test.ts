@@ -149,7 +149,9 @@ describe('Parallel Processing Tests', () => {
     },
     exitStrategies: {
       enabled: ['profitTarget'],
-      profitTarget: { percentFromEntry: 2.0, atrMultiplier: 3.0, useLlmProposedPrice: false },
+      strategyOptions: {
+        profitTarget: { percentFromEntry: 2.0, atrMultiplier: 3.0, useLlmProposedPrice: false },
+      },
     },
   };
 

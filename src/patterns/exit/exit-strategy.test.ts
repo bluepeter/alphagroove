@@ -833,9 +833,11 @@ describe('Exit Strategies', () => {
       const config = {
         exitStrategies: {
           enabled: ['stopLoss', 'profitTarget', 'trailingStop'],
-          stopLoss: { percentFromEntry: 1.5 },
-          profitTarget: { percentFromEntry: 3.0 },
-          trailingStop: { activationPercent: 1.5, trailPercent: 0.8 },
+          strategyOptions: {
+            stopLoss: { percentFromEntry: 1.5 },
+            profitTarget: { percentFromEntry: 3.0 },
+            trailingStop: { activationPercent: 1.5, trailPercent: 0.8 },
+          },
         },
       };
 
@@ -851,7 +853,8 @@ describe('Exit Strategies', () => {
       const config = {
         exitStrategies: {
           enabled: ['stopLoss', 'maxHoldTime'],
-          // No specific configuration
+          // No specific configuration in strategyOptions
+          strategyOptions: {},
         },
       };
 
@@ -872,11 +875,66 @@ describe('Exit Strategies', () => {
       const config = {
         exitStrategies: {
           enabled: ['invalidStrategy', 'stopLoss'],
-          stopLoss: { percentFromEntry: 1.0 },
+          strategyOptions: {
+            stopLoss: { percentFromEntry: 1.0 },
+          },
         },
       };
 
       expect(() => createExitStrategies(config)).toThrow('Unknown exit strategy: invalidStrategy');
+    });
+
+    it('should handle maxHoldTime at base level correctly (automatically active)', () => {
+      const config = {
+        exitStrategies: {
+          enabled: ['stopLoss'], // maxHoldTime not needed in enabled array
+          maxHoldTime: { minutes: 120 }, // Base level, automatically active
+          strategyOptions: {
+            stopLoss: { percentFromEntry: 1.0 },
+          },
+        },
+      };
+
+      const strategies = createExitStrategies(config);
+
+      expect(strategies.length).toBe(2);
+      expect(strategies[0]).toBeInstanceOf(MaxHoldTimeStrategy); // Always first when configured
+      expect(strategies[1]).toBeInstanceOf(StopLossStrategy);
+    });
+
+    it('should not add maxHoldTime if not configured at base level', () => {
+      const config = {
+        exitStrategies: {
+          enabled: ['stopLoss'],
+          // maxHoldTime not configured
+          strategyOptions: {
+            stopLoss: { percentFromEntry: 1.0 },
+          },
+        },
+      };
+
+      const strategies = createExitStrategies(config);
+
+      expect(strategies.length).toBe(1);
+      expect(strategies[0]).toBeInstanceOf(StopLossStrategy);
+    });
+
+    it('should skip maxHoldTime in enabled array gracefully', () => {
+      const config = {
+        exitStrategies: {
+          enabled: ['maxHoldTime', 'stopLoss'], // maxHoldTime in enabled is ignored
+          maxHoldTime: { minutes: 120 },
+          strategyOptions: {
+            stopLoss: { percentFromEntry: 1.0 },
+          },
+        },
+      };
+
+      const strategies = createExitStrategies(config);
+
+      expect(strategies.length).toBe(2); // Still only creates one of each
+      expect(strategies[0]).toBeInstanceOf(MaxHoldTimeStrategy);
+      expect(strategies[1]).toBeInstanceOf(StopLossStrategy);
     });
   });
 });

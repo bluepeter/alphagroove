@@ -99,18 +99,18 @@ export const printHeader = (
     for (const strategyName of exitStrategiesConfig.enabled) {
       switch (strategyName) {
         case 'stopLoss':
-          if (exitStrategiesConfig.stopLoss?.useLlmProposedPrice) {
+          if (exitStrategiesConfig.strategyOptions?.stopLoss?.useLlmProposedPrice) {
             details.push('Stop Loss (LLM)');
-          } else if (exitStrategiesConfig.stopLoss?.atrMultiplier) {
+          } else if (exitStrategiesConfig.strategyOptions?.stopLoss?.atrMultiplier) {
             details.push('Stop Loss (ATR)');
           } else {
             details.push('Stop Loss (Percent)');
           }
           break;
         case 'profitTarget':
-          if (exitStrategiesConfig.profitTarget?.useLlmProposedPrice) {
+          if (exitStrategiesConfig.strategyOptions?.profitTarget?.useLlmProposedPrice) {
             details.push('Profit Target (LLM)');
-          } else if (exitStrategiesConfig.profitTarget?.atrMultiplier) {
+          } else if (exitStrategiesConfig.strategyOptions?.profitTarget?.atrMultiplier) {
             details.push('Profit Target (ATR)');
           } else {
             details.push('Profit Target (Percent)');

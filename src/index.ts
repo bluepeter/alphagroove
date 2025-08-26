@@ -437,7 +437,7 @@ const processDayTrades = async (
     let tsActivationAtrMultiplierUsed: number | undefined;
     let tsTrailAtrMultiplierUsed: number | undefined;
 
-    const stopLossConfig = mergedConfig.exitStrategies?.stopLoss;
+    const stopLossConfig = mergedConfig.exitStrategies?.strategyOptions?.stopLoss;
     if (stopLossConfig) {
       if (
         stopLossConfig.useLlmProposedPrice &&
@@ -464,7 +464,7 @@ const processDayTrades = async (
       }
     }
 
-    const profitTargetConfig = mergedConfig.exitStrategies?.profitTarget;
+    const profitTargetConfig = mergedConfig.exitStrategies?.strategyOptions?.profitTarget;
     if (profitTargetConfig) {
       if (
         profitTargetConfig.useLlmProposedPrice &&
@@ -490,7 +490,7 @@ const processDayTrades = async (
       }
     }
 
-    const trailingStopConfig = mergedConfig.exitStrategies?.trailingStop;
+    const trailingStopConfig = mergedConfig.exitStrategies?.strategyOptions?.trailingStop;
     if (trailingStopConfig) {
       if (entryAtrValue && trailingStopConfig.activationAtrMultiplier !== undefined) {
         if (trailingStopConfig.activationAtrMultiplier === 0) {

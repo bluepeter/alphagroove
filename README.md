@@ -123,8 +123,11 @@ exit:
     - stopLoss
     - profitTarget
     - trailingStop
-    - maxHoldTime
     - endOfDay
+  # maxHoldTime is configured at base level and automatically active
+  maxHoldTime:
+    minutes: 60
+  # All other strategies under strategyOptions
   strategyOptions:
     stopLoss:
       percentFromEntry: 1.0
@@ -139,8 +142,6 @@ exit:
     trailingStop:
       activationPercent: 1.0 # activates after 1% favorable move
       trailPercent: 0.5 # trails by 0.5%
-    maxHoldTime:
-      minutes: 60
     endOfDay:
       time: '16:00' # exit by 4:00 PM
   slippage:
@@ -400,15 +401,16 @@ This design choice ensures:
 
 ### Exit Strategies Location
 
-Configure exit strategies at the root of the YAML under `exit` (legacy alias: `exitStrategies`).
-Example:
+Configure exit strategies at the root of the YAML under `exit` (with `exitStrategies` as an alias).
 
 ```yaml
 exit:
-  enabled: [maxHoldTime, profitTarget, trailingStop, endOfDay]
+  enabled: [profitTarget, trailingStop, endOfDay]
+  # maxHoldTime is configured at base level and automatically active when present
+  maxHoldTime:
+    minutes: 60
+  # All other strategies are configured under strategyOptions
   strategyOptions:
-    maxHoldTime:
-      minutes: 60
     profitTarget:
       atrMultiplier: 5.0
     trailingStop:
@@ -416,11 +418,14 @@ exit:
       trailAtrMultiplier: 2.5
     endOfDay:
       time: '16:00'
-  # Slippage is configured at the same level (not in strategyOptions)
   slippage:
     model: fixed
     value: 0.01
 ```
+
+**Note**: `maxHoldTime` is configured at the base level and is automatically active when configured
+(doesn't need to be in the `enabled` array). All other exit strategies must be configured under
+`strategyOptions` and explicitly enabled.
 
 ## Usage Examples
 
@@ -442,10 +447,10 @@ entry:
       risePct: 0.3
       withinMinutes: 5
 exit:
-  enabled: [maxHoldTime, profitTarget, trailingStop, endOfDay]
+  enabled: [profitTarget, trailingStop, endOfDay]
+  maxHoldTime:
+    minutes: 60
   strategyOptions:
-    maxHoldTime:
-      minutes: 60
     profitTarget:
       atrMultiplier: 5.0
     trailingStop:
@@ -558,6 +563,7 @@ CLI options override values from the configuration file.
 | `--maxConcurrentDays <number>` | Maximum days to process concurrently (1-20)    | 1                         |
 | `--debug`                      | Show debug information and SQL queries         | false                     |
 | `--verbose`                    | Show detailed LLM responses and debug info     | false                     |
+| `--dry-run`                    | Show query without executing                   | false                     |
 
 ### Pattern-Specific Options
 

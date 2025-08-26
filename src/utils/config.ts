@@ -83,15 +83,10 @@ const MaxHoldTimeConfigSchema = z.object({
 const ExitStrategiesConfigSchema = z
   .object({
     enabled: z.array(z.string()).default([]),
-    maxHoldTime: MaxHoldTimeConfigSchema.optional(),
-    stopLoss: StopLossConfigSchema.optional(),
-    profitTarget: ProfitTargetConfigSchema.optional(),
-    trailingStop: TrailingStopConfigSchema.optional(),
-    endOfDay: EndOfDayConfigSchema.optional(),
+    maxHoldTime: MaxHoldTimeConfigSchema.optional(), // Base level for exit system
     slippage: SlippageConfigSchema.optional(),
     strategyOptions: z
       .object({
-        maxHoldTime: MaxHoldTimeConfigSchema.optional(),
         stopLoss: StopLossConfigSchema.optional(),
         profitTarget: ProfitTargetConfigSchema.optional(),
         trailingStop: TrailingStopConfigSchema.optional(),
@@ -294,24 +289,26 @@ const DEFAULT_CONFIG: Config = {
       outputDir: './charts',
     },
     exitStrategies: {
-      enabled: ['maxHoldTime'],
+      enabled: [],
       maxHoldTime: {
         minutes: 60,
       },
-      stopLoss: {
-        percentFromEntry: 1.0,
-        useLlmProposedPrice: false,
-      },
-      profitTarget: {
-        percentFromEntry: 2.0,
-        useLlmProposedPrice: false,
-      },
-      trailingStop: {
-        activationPercent: 1.0,
-        trailPercent: 0.5,
-      },
-      endOfDay: {
-        time: '16:00',
+      strategyOptions: {
+        stopLoss: {
+          percentFromEntry: 1.0,
+          useLlmProposedPrice: false,
+        },
+        profitTarget: {
+          percentFromEntry: 2.0,
+          useLlmProposedPrice: false,
+        },
+        trailingStop: {
+          activationPercent: 1.0,
+          trailPercent: 0.5,
+        },
+        endOfDay: {
+          time: '16:00',
+        },
       },
       slippage: {
         model: 'percent',
@@ -339,24 +336,26 @@ const DEFAULT_CONFIG: Config = {
     // Explicitly set a default system prompt if desired when creating the config file
   }),
   exitStrategies: {
-    enabled: ['maxHoldTime'],
+    enabled: [],
     maxHoldTime: {
       minutes: 60,
     },
-    stopLoss: {
-      percentFromEntry: 1.0,
-      useLlmProposedPrice: false,
-    },
-    profitTarget: {
-      percentFromEntry: 2.0,
-      useLlmProposedPrice: false,
-    },
-    trailingStop: {
-      activationPercent: 1.0,
-      trailPercent: 0.5,
-    },
-    endOfDay: {
-      time: '16:00',
+    strategyOptions: {
+      stopLoss: {
+        percentFromEntry: 1.0,
+        useLlmProposedPrice: false,
+      },
+      profitTarget: {
+        percentFromEntry: 2.0,
+        useLlmProposedPrice: false,
+      },
+      trailingStop: {
+        activationPercent: 1.0,
+        trailPercent: 0.5,
+      },
+      endOfDay: {
+        time: '16:00',
+      },
     },
     slippage: {
       model: 'percent',
@@ -431,24 +430,26 @@ export const createDefaultConfigFile = (): void => {
           outputDir: './charts',
         },
         exitStrategies: {
-          enabled: ['maxHoldTime'],
+          enabled: [],
           maxHoldTime: {
             minutes: 60,
           },
-          stopLoss: {
-            percentFromEntry: 1.0,
-            useLlmProposedPrice: false,
-          },
-          profitTarget: {
-            percentFromEntry: 2.0,
-            useLlmProposedPrice: false,
-          },
-          trailingStop: {
-            activationPercent: 1.0,
-            trailPercent: 0.5,
-          },
-          endOfDay: {
-            time: '16:00',
+          strategyOptions: {
+            stopLoss: {
+              percentFromEntry: 1.0,
+              useLlmProposedPrice: false,
+            },
+            profitTarget: {
+              percentFromEntry: 2.0,
+              useLlmProposedPrice: false,
+            },
+            trailingStop: {
+              activationPercent: 1.0,
+              trailPercent: 0.5,
+            },
+            endOfDay: {
+              time: '16:00',
+            },
           },
           slippage: {
             model: 'percent',
@@ -477,24 +478,26 @@ export const createDefaultConfigFile = (): void => {
           'You are an AI assistant that strictly follows user instructions for output format. You will be provided with a task and an example of the JSON output required. Respond ONLY with the valid JSON object described.',
       },
       exitStrategies: {
-        enabled: ['maxHoldTime'],
+        enabled: [],
         maxHoldTime: {
           minutes: 60,
         },
-        stopLoss: {
-          percentFromEntry: 1.0,
-          useLlmProposedPrice: false,
-        },
-        profitTarget: {
-          percentFromEntry: 2.0,
-          useLlmProposedPrice: false,
-        },
-        trailingStop: {
-          activationPercent: 1.0,
-          trailPercent: 0.5,
-        },
-        endOfDay: {
-          time: '16:00',
+        strategyOptions: {
+          stopLoss: {
+            percentFromEntry: 1.0,
+            useLlmProposedPrice: false,
+          },
+          profitTarget: {
+            percentFromEntry: 2.0,
+            useLlmProposedPrice: false,
+          },
+          trailingStop: {
+            activationPercent: 1.0,
+            trailPercent: 0.5,
+          },
+          endOfDay: {
+            time: '16:00',
+          },
         },
         slippage: {
           model: 'percent',
@@ -574,83 +577,71 @@ export const mergeConfigWithCliOptions = (
   // Exit strategies are configured at the ROOT level only
   const enabledArray = rootFromLoaded?.enabled || [];
 
-  // Create merged exit strategies with all configurations merged properly
+  // Create merged exit strategies with strategyOptions-only structure
   const mergedExitStrategies: ExitStrategiesConfig = {
     enabled: enabledArray,
-    maxHoldTime: enabledArray?.includes('maxHoldTime')
+    // maxHoldTime stays at base level and is automatically active when configured
+    maxHoldTime: (rootFromLoaded as any)?.maxHoldTime
       ? {
           minutes:
-            (rootFromLoaded as any)?.strategyOptions?.maxHoldTime?.minutes ??
             (rootFromLoaded as any)?.maxHoldTime?.minutes ??
             MaxHoldTimeConfigSchema.parse({}).minutes,
         }
       : undefined,
-    stopLoss: enabledArray?.includes('stopLoss')
-      ? {
-          percentFromEntry:
-            (rootFromLoaded as any)?.strategyOptions?.stopLoss?.percentFromEntry ??
-            (rootFromLoaded as any)?.stopLoss?.percentFromEntry ??
-            StopLossConfigSchema.parse({}).percentFromEntry,
-          atrMultiplier:
-            (rootFromLoaded as any)?.strategyOptions?.stopLoss?.atrMultiplier ??
-            (rootFromLoaded as any)?.stopLoss?.atrMultiplier,
-          useLlmProposedPrice:
-            (rootFromLoaded as any)?.strategyOptions?.stopLoss?.useLlmProposedPrice ??
-            (rootFromLoaded as any)?.stopLoss?.useLlmProposedPrice ??
-            false,
-        }
-      : undefined,
-    profitTarget: enabledArray?.includes('profitTarget')
-      ? {
-          percentFromEntry:
-            (rootFromLoaded as any)?.strategyOptions?.profitTarget?.percentFromEntry ??
-            (rootFromLoaded as any)?.profitTarget?.percentFromEntry ??
-            ProfitTargetConfigSchema.parse({}).percentFromEntry,
-          atrMultiplier:
-            (rootFromLoaded as any)?.strategyOptions?.profitTarget?.atrMultiplier ??
-            (rootFromLoaded as any)?.profitTarget?.atrMultiplier,
-          useLlmProposedPrice:
-            (rootFromLoaded as any)?.strategyOptions?.profitTarget?.useLlmProposedPrice ??
-            (rootFromLoaded as any)?.profitTarget?.useLlmProposedPrice ??
-            false,
-        }
-      : undefined,
-    trailingStop: enabledArray?.includes('trailingStop')
-      ? (() => {
-          const configActivationAtr =
-            (rootFromLoaded as any)?.strategyOptions?.trailingStop?.activationAtrMultiplier ??
-            (rootFromLoaded as any)?.trailingStop?.activationAtrMultiplier;
-          const configTrailAtr =
-            (rootFromLoaded as any)?.strategyOptions?.trailingStop?.trailAtrMultiplier ??
-            (rootFromLoaded as any)?.trailingStop?.trailAtrMultiplier;
+    // All other strategies must be in strategyOptions
+    strategyOptions: {
+      stopLoss: enabledArray?.includes('stopLoss')
+        ? {
+            percentFromEntry:
+              (rootFromLoaded as any)?.strategyOptions?.stopLoss?.percentFromEntry ??
+              StopLossConfigSchema.parse({}).percentFromEntry,
+            atrMultiplier: (rootFromLoaded as any)?.strategyOptions?.stopLoss?.atrMultiplier,
+            useLlmProposedPrice:
+              (rootFromLoaded as any)?.strategyOptions?.stopLoss?.useLlmProposedPrice ?? false,
+          }
+        : undefined,
+      profitTarget: enabledArray?.includes('profitTarget')
+        ? {
+            percentFromEntry:
+              (rootFromLoaded as any)?.strategyOptions?.profitTarget?.percentFromEntry ??
+              ProfitTargetConfigSchema.parse({}).percentFromEntry,
+            atrMultiplier: (rootFromLoaded as any)?.strategyOptions?.profitTarget?.atrMultiplier,
+            useLlmProposedPrice:
+              (rootFromLoaded as any)?.strategyOptions?.profitTarget?.useLlmProposedPrice ?? false,
+          }
+        : undefined,
+      trailingStop: enabledArray?.includes('trailingStop')
+        ? (() => {
+            const configActivationAtr = (rootFromLoaded as any)?.strategyOptions?.trailingStop
+              ?.activationAtrMultiplier;
+            const configTrailAtr = (rootFromLoaded as any)?.strategyOptions?.trailingStop
+              ?.trailAtrMultiplier;
 
-          const configActivationPercent =
-            (rootFromLoaded as any)?.strategyOptions?.trailingStop?.activationPercent ??
-            (rootFromLoaded as any)?.trailingStop?.activationPercent;
-          const configTrailPercent =
-            (rootFromLoaded as any)?.strategyOptions?.trailingStop?.trailPercent ??
-            (rootFromLoaded as any)?.trailingStop?.trailPercent;
+            const configActivationPercent = (rootFromLoaded as any)?.strategyOptions?.trailingStop
+              ?.activationPercent;
+            const configTrailPercent = (rootFromLoaded as any)?.strategyOptions?.trailingStop
+              ?.trailPercent;
 
-          const result = {
-            // Only use percentage-based defaults if ATR-based values aren't specified
-            activationPercent:
-              configActivationPercent ?? (configActivationAtr !== undefined ? undefined : 1.0),
-            trailPercent: configTrailPercent ?? (configTrailAtr !== undefined ? undefined : 0.5),
-            activationAtrMultiplier: configActivationAtr,
-            trailAtrMultiplier: configTrailAtr,
-          };
+            const result = {
+              // Only use percentage-based defaults if ATR-based values aren't specified
+              activationPercent:
+                configActivationPercent ?? (configActivationAtr !== undefined ? undefined : 1.0),
+              trailPercent: configTrailPercent ?? (configTrailAtr !== undefined ? undefined : 0.5),
+              activationAtrMultiplier: configActivationAtr,
+              trailAtrMultiplier: configTrailAtr,
+            };
 
-          return result;
-        })()
-      : undefined,
-    endOfDay: enabledArray?.includes('endOfDay')
-      ? {
-          time:
-            (rootFromLoaded as any)?.strategyOptions?.endOfDay?.time ??
-            (rootFromLoaded as any)?.endOfDay?.time ??
-            EndOfDayConfigSchema.parse({}).time,
-        }
-      : undefined,
+            return result;
+          })()
+        : undefined,
+      endOfDay: enabledArray?.includes('endOfDay')
+        ? {
+            time:
+              (rootFromLoaded as any)?.strategyOptions?.endOfDay?.time ??
+              EndOfDayConfigSchema.parse({}).time,
+          }
+        : undefined,
+    },
     slippage: {
       model: rootFromLoaded?.slippage?.model ?? SlippageConfigSchema.parse({}).model,
       value: rootFromLoaded?.slippage?.value ?? SlippageConfigSchema.parse({}).value,

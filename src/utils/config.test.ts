@@ -291,8 +291,8 @@ describe('Configuration System', () => {
       expect(merged.randomTimeEntry?.endTime).toBe('14:00');
     });
 
-    it('should ensure exitStrategies.maxHoldTime is populated with defaults if enabled but not specified', () => {
-      const configWithOnlyEnabled: Config = {
+    it('should populate exitStrategies.maxHoldTime with defaults when configured', () => {
+      const configWithMaxHoldTime: Config = {
         default: {
           ticker: 'SPY',
           timeframe: '1min',
@@ -300,7 +300,8 @@ describe('Configuration System', () => {
           patterns: { entry: 'quickRise' },
           charts: { generate: false, outputDir: './charts' },
           exitStrategies: {
-            enabled: ['maxHoldTime'],
+            enabled: [],
+            maxHoldTime: { minutes: 60 }, // Configured with default minutes
           },
         },
         patterns: {
@@ -309,14 +310,15 @@ describe('Configuration System', () => {
           },
         },
         exitStrategies: {
-          enabled: ['maxHoldTime'],
+          enabled: [],
+          maxHoldTime: { minutes: 60 }, // Configured with default minutes
         },
         llmConfirmationScreen: { ...defaultLlmScreenConfig },
       };
 
-      const merged = mergeConfigWithCliOptions(configWithOnlyEnabled, {});
+      const merged = mergeConfigWithCliOptions(configWithMaxHoldTime, {});
       expect(merged.exitStrategies).toBeDefined();
-      expect(merged.exitStrategies?.enabled).toEqual(['maxHoldTime']);
+      expect(merged.exitStrategies?.enabled).toEqual([]);
       expect(merged.exitStrategies?.maxHoldTime).toBeDefined();
       expect(merged.exitStrategies?.maxHoldTime?.minutes).toBe(60);
     });
@@ -324,7 +326,7 @@ describe('Configuration System', () => {
     it('should prefer root exit over exitStrategies when both provided (alias handling)', () => {
       const config = createTestConfig({
         exitStrategies: {
-          enabled: ['maxHoldTime'],
+          enabled: [],
           maxHoldTime: { minutes: 60 },
         },
         exit: {
@@ -338,28 +340,30 @@ describe('Configuration System', () => {
       const merged = mergeConfigWithCliOptions(config, {});
 
       expect(merged.exitStrategies?.enabled).toEqual(['profitTarget']);
-      expect(merged.exitStrategies?.profitTarget?.atrMultiplier).toBe(7.0);
+      expect(merged.exitStrategies?.strategyOptions?.profitTarget?.atrMultiplier).toBe(7.0);
       expect(merged.exitStrategies?.maxHoldTime).toBeUndefined();
     });
 
-    it('should read maxHoldTime from root exit when enabled and not specified (default minutes=60)', () => {
+    it('should read maxHoldTime from root exit when configured (default minutes=60)', () => {
       const config = createTestConfig({
         exit: {
-          enabled: ['maxHoldTime'],
+          enabled: [],
+          maxHoldTime: { minutes: 60 }, // Configured with default minutes
         } as any,
       });
 
       const merged = mergeConfigWithCliOptions(config, {});
-      expect(merged.exitStrategies?.enabled).toEqual(['maxHoldTime']);
+      expect(merged.exitStrategies?.enabled).toEqual([]);
       expect(merged.exitStrategies?.maxHoldTime?.minutes).toBe(60);
     });
 
-    it('should read maxHoldTime from exit.strategyOptions as a fallback', () => {
+    it('should read maxHoldTime from exit base level only', () => {
       const config = createTestConfig({
         exit: {
           enabled: ['maxHoldTime'],
+          maxHoldTime: { minutes: 500 }, // Base level only
           strategyOptions: {
-            maxHoldTime: { minutes: 500 },
+            // maxHoldTime no longer supported here
           },
         } as any,
       });
