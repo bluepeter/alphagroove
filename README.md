@@ -13,8 +13,6 @@ batched analyses across date ranges, and output metrics like mean/median returns
 distribution buckets. AlphaGroove is intended for hands-on quant researchers who prefer scripting
 over spreadsheets, precision over black boxes, and clarity over curve-fitting.
 
-For future enhancement ideas, see [docs/enhancement-ideas.md](docs/enhancement-ideas.md).
-
 ## Advanced Exit Strategies
 
 AlphaGroove supports dynamic exit strategies that analyze price action bar-by-bar. The following
@@ -94,17 +92,17 @@ Stop strategies can optionally use the Average True Range (ATR) calculated from 
 day to set their levels. The ATR used is the simple average of all 1-minute True Range values from
 the entire prior trading day. This is configured per-strategy:
 
-- **`exitStrategies.stopLoss.atrMultiplier`**: (Optional, e.g., `1.5`) If set and the prior day's
-  ATR (`entryAtrValue`) can be calculated, the stop loss will be
+- **`exit.strategyOptions.stopLoss.atrMultiplier`**: (Optional, e.g., `1.5`) If set and the prior
+  day's ATR (`entryAtrValue`) can be calculated, the stop loss will be
   `entryPrice - (ATR * atrMultiplier)` for longs, or `entryPrice + (ATR * atrMultiplier)` for
   shorts.
-- **`exitStrategies.profitTarget.atrMultiplier`**: (Optional, e.g., `3.0`) If set and
+- **`exit.strategyOptions.profitTarget.atrMultiplier`**: (Optional, e.g., `3.0`) If set and
   `entryAtrValue` is available, the profit target will be `entryPrice + (ATR * atrMultiplier)` for
   longs, or `entryPrice - (ATR * atrMultiplier)` for shorts.
-- **`exitStrategies.trailingStop.activationAtrMultiplier`**: (Optional, e.g., `1.0`) If set and
-  `entryAtrValue` is available, the trailing stop activates after price moves
+- **`exit.strategyOptions.trailingStop.activationAtrMultiplier`**: (Optional, e.g., `1.0`) If set
+  and `entryAtrValue` is available, the trailing stop activates after price moves
   `ATR * activationAtrMultiplier` in your favor.
-- **`exitStrategies.trailingStop.trailAtrMultiplier`**: (Optional, e.g., `0.75`) If set and
+- **`exit.strategyOptions.trailingStop.trailAtrMultiplier`**: (Optional, e.g., `0.75`) If set and
   `entryAtrValue` is available, the stop will trail by `ATR * trailAtrMultiplier` from the peak
   price (for longs) or trough price (for shorts).
 
@@ -120,30 +118,31 @@ their order of evaluation.
 ### Configuration Example
 
 ```yaml
-exitStrategies:
+exit:
   enabled:
     - stopLoss
     - profitTarget
     - trailingStop
     - maxHoldTime
     - endOfDay
-  maxHoldTime:
-    minutes: 60
-  stopLoss:
-    percentFromEntry: 1.0
-    # or use ATR-based stop loss with:
-    # atrMultiplier: 1.5
-    useLlmProposedPrice: false # Set to true to use LLM-derived stop loss
-  profitTarget:
-    percentFromEntry: 2.0
-    # or use ATR-based target with:
-    # atrMultiplier: 3.0
-    useLlmProposedPrice: false # Set to true to use LLM-derived profit target
-  trailingStop:
-    activationPercent: 1.0 # activates after 1% favorable move
-    trailPercent: 0.5 # trails by 0.5%
-  endOfDay:
-    time: '16:00' # exit by 4:00 PM
+  strategyOptions:
+    stopLoss:
+      percentFromEntry: 1.0
+      # or use ATR-based stop loss with:
+      # atrMultiplier: 1.5
+      useLlmProposedPrice: false # Set to true to use LLM-derived stop loss
+    profitTarget:
+      percentFromEntry: 2.0
+      # or use ATR-based target with:
+      # atrMultiplier: 3.0
+      useLlmProposedPrice: false # Set to true to use LLM-derived profit target
+    trailingStop:
+      activationPercent: 1.0 # activates after 1% favorable move
+      trailPercent: 0.5 # trails by 0.5%
+    maxHoldTime:
+      minutes: 60
+    endOfDay:
+      time: '16:00' # exit by 4:00 PM
   slippage:
     model: 'percent' # or 'fixed'
     value: 0.05 # 0.05% slippage
@@ -246,33 +245,48 @@ default:
   ticker: 'SPY'
   timeframe: '1min'
   direction: 'long'
-  patterns:
-    entry: 'quickRise' # Default entry pattern to use
-    exit: 'fixed-time' # Default exit pattern to use
   charts:
     generate: false # Set to true to automatically generate charts for each entry
     outputDir: './charts' # Directory to store chart outputs
+  parallelization:
+    maxConcurrentDays: 1 # Process days sequentially by default
 
-patterns:
-  entry:
+# Entry pattern configuration
+entry:
+  enabled: [quickRise] # Available: quickRise, quickFall, fixedTimeEntry, randomTimeEntry
+  strategyOptions:
     quickRise:
       risePct: 0.3
       withinMinutes: 5
     quickFall:
       fallPct: 0.3
       withinMinutes: 5
+    fixedTimeEntry:
+      entryTime: '13:00' # Required if using fixedTimeEntry
+    randomTimeEntry:
+      startTime: '09:30' # Start of random time window
+      endTime: '16:00' # End of random time window
 
-  exit:
-    fixed-time:
-      hold-minutes: 10
+# Exit strategies configuration
+exit:
+  enabled: [profitTarget, endOfDay] # Available: stopLoss, profitTarget, trailingStop, maxHoldTime, endOfDay
+  strategyOptions:
+    profitTarget:
+      atrMultiplier: 3.0
+    endOfDay:
+      time: '16:00'
+  slippage:
+    model: 'fixed'
+    value: 0.01
 ```
 
 This configuration structure allows you to:
 
-1. Define default entry and exit patterns to use when none are specified via CLI
-2. Organize patterns by type (entry vs exit)
-3. Configure parameters for each pattern
+1. Configure entry patterns and their parameters
+2. Set up exit strategies with ATR-based or percentage-based levels
+3. Enable parallel processing for faster backtests
 4. Set default chart generation options
+5. Configure LLM integration for trade confirmation
 
 All pattern configuration must be explicitly provided - there are no hidden defaults in the code.
 The system follows a clear hierarchy for configuration:
@@ -392,9 +406,9 @@ Example:
 ```yaml
 exit:
   enabled: [maxHoldTime, profitTarget, trailingStop, endOfDay]
-  maxHoldTime:
-    minutes: 60
   strategyOptions:
+    maxHoldTime:
+      minutes: 60
     profitTarget:
       atrMultiplier: 5.0
     trailingStop:
@@ -429,9 +443,9 @@ entry:
       withinMinutes: 5
 exit:
   enabled: [maxHoldTime, profitTarget, trailingStop, endOfDay]
-  maxHoldTime:
-    minutes: 60
   strategyOptions:
+    maxHoldTime:
+      minutes: 60
     profitTarget:
       atrMultiplier: 5.0
     trailingStop:
@@ -462,7 +476,7 @@ pnpm dev:start --from 2023-01-01 --to 2023-12-31 --direction short
 pnpm dev:start --quickRise.risePct=0.5 --fixedTimeEntry.entryTime=13:00
 
 # Use different patterns
-pnpm dev:start --entry-pattern quick-fall
+pnpm dev:start --entry-pattern quickFall
 ```
 
 ### Command Line Priority
@@ -884,7 +898,7 @@ pnpm dev:start
 pnpm dev:start --from 2020-01-01 --to 2025-05-02
 
 # Specify pattern options
-pnpm dev:start --quickRise.risePct=0.5 --fixed-time.hold-minutes=15
+pnpm dev:start --quickRise.risePct=0.5 --fixedTimeEntry.entryTime=13:00
 
 # Use the quickFall pattern
 pnpm dev:start --entry-pattern quickFall --quickFall.fallPct=0.4
@@ -917,7 +931,7 @@ The project has been initialized with the following structure:
 - **ESLint & Prettier**: Code quality tools with recommended rules for TypeScript
 - **Build System**: Simple build process using TypeScript compiler
 - **Flexible Configuration**: YAML-based config with CLI overrides
-- **Direct TypeScript Execution**: Using ts-node for rapid development without build steps
+- **Direct TypeScript Execution**: Using tsx for rapid development without build steps
 - **Testing Framework**: Vitest for unit and integration testing
 
 ### Directory Structure
@@ -926,20 +940,29 @@ The project has been initialized with the following structure:
 alphagroove/
 ├── src/                # Source code
 │   ├── index.ts        # Main entry point
-│   └── index.test.ts   # Tests for index.ts
+│   ├── llm-analyze.ts  # Standalone LLM chart analyzer
+│   ├── trade-levels.ts # Standalone trade levels calculator
+│   ├── patterns/       # Entry and exit pattern implementations
+│   │   ├── entry/      # Entry patterns (quickRise, quickFall, etc.)
+│   │   └── exit/       # Exit strategies (stopLoss, profitTarget, etc.)
+│   ├── screens/        # LLM confirmation screen
+│   ├── services/       # External service integrations (LLM APIs)
+│   ├── utils/          # Utility functions and helpers
+│   └── *.test.ts       # Test files
 ├── tickers/            # Market data organized by ticker and timeframe
 │   ├── SPY/            # SPY ticker data
 │   │   ├── 1min.csv    # 1-minute timeframe data
 │   │   └── ...         # Other timeframes
 │   └── README.md       # Documentation for the data structure
+├── charts/             # Generated chart outputs (created when used)
+├── results/            # Backtest result outputs
+├── scripts/            # Build and development scripts
 ├── dist/               # Compiled output (generated)
 ├── package.json        # Project metadata and dependencies
 ├── tsconfig.json       # TypeScript configuration
 ├── eslint.config.ts    # ESLint configuration
 ├── vitest.config.ts    # Vitest configuration
-├── .prettierrc         # Prettier configuration
-├── .gitignore          # Git ignore patterns
-├── alphagroove.config.yaml # Default configuration
+├── alphagroove.config.yaml # Configuration file (you create this)
 └── README.md           # Project documentation
 ```
 
@@ -949,7 +972,7 @@ alphagroove/
 # Install dependencies
 pnpm install
 
-# Run directly with ts-node (no build step)
+# Run directly with tsx (no build step)
 pnpm dev:start
 
 # Or build and run (for production)

@@ -6,7 +6,7 @@ import { LlmConfirmationScreen } from './screens/llm-confirmation.screen';
 
 // Mock dependencies
 vi.mock('./utils/data-loader', () => ({
-  fetchBarsForTradingDay: vi.fn((ticker, timeframe, tradeDate, entryTime) => {
+  fetchBarsForTradingDay: vi.fn((ticker, timeframe, tradeDate, _entryTime) => {
     // Return bars that include the signal timestamp from the test data
     const baseDate = tradeDate;
     return [
@@ -437,8 +437,16 @@ describe('Parallel Processing Tests', () => {
       ...baseConfig,
       maxConcurrentDays: 3,
       llmConfirmationScreen: {
-        ...baseConfig.llmConfirmationScreen,
         enabled: true,
+        llmProvider: 'anthropic' as const,
+        modelName: 'test-model',
+        apiKeyEnvVar: 'TEST_KEY',
+        numCalls: 1,
+        agreementThreshold: 1,
+        temperatures: [0.5],
+        prompts: 'test prompt',
+        commonPromptSuffixForJson: 'json please',
+        maxOutputTokens: 50,
       },
     };
     const totalStats = getBaseTotalStats();
