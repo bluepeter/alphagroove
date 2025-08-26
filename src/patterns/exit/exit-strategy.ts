@@ -476,12 +476,17 @@ export const createExitStrategies = (config: any): ExitStrategy[] => {
     );
   }
 
-  const { enabled, maxHoldTime, strategyOptions } = config.exitStrategies;
+  const { enabled, maxHoldTime, endOfDay, strategyOptions } = config.exitStrategies;
   const strategies: ExitStrategy[] = [];
 
   // maxHoldTime is automatically added when configured (doesn't need to be in enabled array)
   if (maxHoldTime) {
     strategies.push(new MaxHoldTimeStrategy(maxHoldTime));
+  }
+
+  // endOfDay is automatically added when configured (doesn't need to be in enabled array)
+  if (endOfDay) {
+    strategies.push(new EndOfDayStrategy(endOfDay));
   }
 
   // Add other strategies based on enabled array
@@ -509,10 +514,7 @@ export const createExitStrategies = (config: any): ExitStrategy[] => {
         break;
 
       case 'endOfDay':
-        if (!strategyOptions?.endOfDay) {
-          throw new Error('endOfDay strategy enabled but no configuration provided');
-        }
-        strategies.push(new EndOfDayStrategy(strategyOptions.endOfDay));
+        // Skip - endOfDay is handled above automatically when configured
         break;
 
       case 'maxHoldTime':

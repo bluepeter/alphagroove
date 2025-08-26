@@ -75,6 +75,22 @@ Exits the trade at a specific time of day, useful for avoiding overnight exposur
 
 - `time`: Time of day to exit in HH:MM format (e.g., '16:00' for 4:00 PM)
 
+### Time-Based vs Price-Based Strategies
+
+**Time-based constraints** (`maxHoldTime` and `endOfDay`) are fundamentally different from
+price-based strategies:
+
+- **Automatically active**: When configured, they're always used - no need to include them in the
+  `enabled` array
+- **Act as overlays**: They provide time limits/constraints on top of other strategies
+- **Base-level configuration**: Configured directly under `exit:` (not in `strategyOptions`)
+
+**Price-based strategies** (`stopLoss`, `profitTarget`, `trailingStop`) compete with each other:
+
+- **Must be enabled**: Require explicit inclusion in the `enabled` array
+- **Configured under `strategyOptions`**: All settings go in the nested `strategyOptions` section
+- **First one wins**: The first strategy to trigger ends the trade
+
 ### Slippage Model
 
 Models realistic trading costs by applying slippage to exit prices.
@@ -123,11 +139,12 @@ exit:
     - stopLoss
     - profitTarget
     - trailingStop
-    - endOfDay
-  # maxHoldTime is configured at base level and automatically active
+  # Time-based constraints are configured at base level and automatically active
   maxHoldTime:
     minutes: 60
-  # All other strategies under strategyOptions
+  endOfDay:
+    time: '16:00' # exit by 4:00 PM
+  # Price-based strategies under strategyOptions
   strategyOptions:
     stopLoss:
       percentFromEntry: 1.0
@@ -142,8 +159,6 @@ exit:
     trailingStop:
       activationPercent: 1.0 # activates after 1% favorable move
       trailPercent: 0.5 # trails by 0.5%
-    endOfDay:
-      time: '16:00' # exit by 4:00 PM
   slippage:
     model: 'percent' # or 'fixed'
     value: 0.05 # 0.05% slippage
@@ -270,12 +285,13 @@ entry:
 
 # Exit strategies configuration
 exit:
-  enabled: [profitTarget, endOfDay] # Available: stopLoss, profitTarget, trailingStop, maxHoldTime, endOfDay
+  enabled: [profitTarget] # Available: stopLoss, profitTarget, trailingStop
+  # Time-based constraints (automatically active when configured)
+  endOfDay:
+    time: '16:00'
   strategyOptions:
     profitTarget:
       atrMultiplier: 3.0
-    endOfDay:
-      time: '16:00'
   slippage:
     model: 'fixed'
     value: 0.01
@@ -364,7 +380,10 @@ entry:
 
 # Exit strategies configuration
 exit:
-  enabled: [profitTarget, trailingStop, endOfDay]
+  enabled: [profitTarget, trailingStop]
+  # Time-based constraints (automatically active when configured)
+  endOfDay:
+    time: '16:00'
   strategyOptions:
     profitTarget:
       atrMultiplier: 3.0
@@ -372,8 +391,6 @@ exit:
     trailingStop:
       activationAtrMultiplier: 0 # Immediate activation
       trailAtrMultiplier: 2.5
-    endOfDay:
-      time: '16:00'
   slippage:
     model: 'fixed'
     value: 0.01
@@ -405,27 +422,30 @@ Configure exit strategies at the root of the YAML under `exit` (with `exitStrate
 
 ```yaml
 exit:
-  enabled: [profitTarget, trailingStop, endOfDay]
-  # maxHoldTime is configured at base level and automatically active when present
+  enabled: [profitTarget, trailingStop]
+  # Time-based constraints are configured at base level and automatically active
   maxHoldTime:
     minutes: 60
-  # All other strategies are configured under strategyOptions
+  endOfDay:
+    time: '16:00'
+  # Price-based strategies are configured under strategyOptions
   strategyOptions:
     profitTarget:
       atrMultiplier: 5.0
     trailingStop:
       activationAtrMultiplier: 0
       trailAtrMultiplier: 2.5
-    endOfDay:
-      time: '16:00'
   slippage:
     model: fixed
     value: 0.01
 ```
 
-**Note**: `maxHoldTime` is configured at the base level and is automatically active when configured
-(doesn't need to be in the `enabled` array). All other exit strategies must be configured under
-`strategyOptions` and explicitly enabled.
+**Important**: Time-based constraints (`maxHoldTime` and `endOfDay`) are configured at the base
+level and are **automatically active when configured** - they don't need to be in the `enabled`
+array. These act as overlays/constraints on top of other strategies.
+
+Price-based strategies (`stopLoss`, `profitTarget`, `trailingStop`) must be configured under
+`strategyOptions` and explicitly enabled in the `enabled` array.
 
 ## Usage Examples
 
@@ -447,17 +467,18 @@ entry:
       risePct: 0.3
       withinMinutes: 5
 exit:
-  enabled: [profitTarget, trailingStop, endOfDay]
+  enabled: [profitTarget, trailingStop]
+  # Time-based constraints (automatically active when configured)
   maxHoldTime:
     minutes: 60
+  endOfDay:
+    time: '16:00'
   strategyOptions:
     profitTarget:
       atrMultiplier: 5.0
     trailingStop:
       activationAtrMultiplier: 0
       trailAtrMultiplier: 2.5
-    endOfDay:
-      time: '16:00'
   slippage:
     model: fixed
     value: 0.01

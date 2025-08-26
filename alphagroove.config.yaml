@@ -31,13 +31,14 @@ exit:
     #- stopLoss
     - profitTarget
     - trailingStop
-    - endOfDay
   # atrPeriodForEntry: 14 # This specific period is NOT used by the current ATR calculation method (which averages all TRs from the prior day).
   # Remove or keep commented if you plan to use a period-specific ATR calc in the future.
-  # maxHoldTime is configured at base level as it's fundamental to the exit system
+  # Time-based constraints are configured at base level and are automatically active when configured
   maxHoldTime:
     minutes: 500
-  # All other strategies are configured under strategyOptions
+  endOfDay:
+    time: '16:00'
+  # Price-based strategies are configured under strategyOptions
   strategyOptions:
     stopLoss:
       # percentFromEntry: 0.5 # Fallback, commented out to prioritize ATR
@@ -52,8 +53,6 @@ exit:
       # trailPercent: 0.3      # Fallback, commented out to prioritize ATR (0.3 for 0.3% of price)
       activationAtrMultiplier: 0
       trailAtrMultiplier: 2.5
-    endOfDay:
-      time: '16:00'
   slippage:
     model: 'fixed'
     value: 0.01

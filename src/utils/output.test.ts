@@ -50,11 +50,11 @@ describe('output utilities', () => {
     it('should print header with detailed exit strategy information', () => {
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const exitStrategiesConfig = {
-        enabled: ['stopLoss', 'profitTarget', 'endOfDay'],
+        enabled: ['stopLoss', 'profitTarget'],
+        endOfDay: { time: '16:00' },
         strategyOptions: {
           stopLoss: { percentFromEntry: 1.0, useLlmProposedPrice: true, atrMultiplier: 2.0 },
           profitTarget: { percentFromEntry: 2.0, useLlmProposedPrice: false, atrMultiplier: 3.0 },
-          endOfDay: { time: '16:00' },
         },
       };
       printHeader(

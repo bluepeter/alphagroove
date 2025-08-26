@@ -90,46 +90,57 @@ export const printHeader = (
   console.log(chalk.bold(`Entry Pattern: ${entryPatternName}`));
 
   let exitStrategyDetails = 'Default (Max Hold Time)';
-  if (
-    exitStrategiesConfig &&
-    exitStrategiesConfig.enabled &&
-    exitStrategiesConfig.enabled.length > 0
-  ) {
+  if (exitStrategiesConfig) {
     const details: string[] = [];
-    for (const strategyName of exitStrategiesConfig.enabled) {
-      switch (strategyName) {
-        case 'stopLoss':
-          if (exitStrategiesConfig.strategyOptions?.stopLoss?.useLlmProposedPrice) {
-            details.push('Stop Loss (LLM)');
-          } else if (exitStrategiesConfig.strategyOptions?.stopLoss?.atrMultiplier) {
-            details.push('Stop Loss (ATR)');
-          } else {
-            details.push('Stop Loss (Percent)');
-          }
-          break;
-        case 'profitTarget':
-          if (exitStrategiesConfig.strategyOptions?.profitTarget?.useLlmProposedPrice) {
-            details.push('Profit Target (LLM)');
-          } else if (exitStrategiesConfig.strategyOptions?.profitTarget?.atrMultiplier) {
-            details.push('Profit Target (ATR)');
-          } else {
-            details.push('Profit Target (Percent)');
-          }
-          break;
-        case 'trailingStop':
-          details.push('Trailing Stop'); // Could be more detailed if needed (ATR/Percent based)
-          break;
-        case 'maxHoldTime':
-          details.push('Max Hold Time');
-          break;
-        case 'endOfDay':
-          details.push('End of Day');
-          break;
-        default:
-          details.push(strategyName); // For any other custom strategies
+
+    // Add enabled strategies from the enabled array
+    if (exitStrategiesConfig.enabled && exitStrategiesConfig.enabled.length > 0) {
+      for (const strategyName of exitStrategiesConfig.enabled) {
+        switch (strategyName) {
+          case 'stopLoss':
+            if (exitStrategiesConfig.strategyOptions?.stopLoss?.useLlmProposedPrice) {
+              details.push('Stop Loss (LLM)');
+            } else if (exitStrategiesConfig.strategyOptions?.stopLoss?.atrMultiplier) {
+              details.push('Stop Loss (ATR)');
+            } else {
+              details.push('Stop Loss (Percent)');
+            }
+            break;
+          case 'profitTarget':
+            if (exitStrategiesConfig.strategyOptions?.profitTarget?.useLlmProposedPrice) {
+              details.push('Profit Target (LLM)');
+            } else if (exitStrategiesConfig.strategyOptions?.profitTarget?.atrMultiplier) {
+              details.push('Profit Target (ATR)');
+            } else {
+              details.push('Profit Target (Percent)');
+            }
+            break;
+          case 'trailingStop':
+            details.push('Trailing Stop'); // Could be more detailed if needed (ATR/Percent based)
+            break;
+          case 'maxHoldTime':
+            details.push('Max Hold Time');
+            break;
+          case 'endOfDay':
+            details.push('End of Day');
+            break;
+          default:
+            details.push(strategyName); // For any other custom strategies
+        }
       }
     }
-    exitStrategyDetails = details.join(', ');
+
+    // Add base-level time constraints (automatically active when configured)
+    if (exitStrategiesConfig.maxHoldTime) {
+      details.push('Max Hold Time');
+    }
+    if (exitStrategiesConfig.endOfDay) {
+      details.push('End of Day');
+    }
+
+    if (details.length > 0) {
+      exitStrategyDetails = details.join(', ');
+    }
   }
   console.log(chalk.bold(`Exit Strategies: ${exitStrategyDetails}`));
 

@@ -84,13 +84,13 @@ const ExitStrategiesConfigSchema = z
   .object({
     enabled: z.array(z.string()).default([]),
     maxHoldTime: MaxHoldTimeConfigSchema.optional(), // Base level for exit system
+    endOfDay: EndOfDayConfigSchema.optional(), // Base level for exit system
     slippage: SlippageConfigSchema.optional(),
     strategyOptions: z
       .object({
         stopLoss: StopLossConfigSchema.optional(),
         profitTarget: ProfitTargetConfigSchema.optional(),
         trailingStop: TrailingStopConfigSchema.optional(),
-        endOfDay: EndOfDayConfigSchema.optional(),
       })
       .optional(),
   })
@@ -293,6 +293,9 @@ const DEFAULT_CONFIG: Config = {
       maxHoldTime: {
         minutes: 60,
       },
+      endOfDay: {
+        time: '16:00',
+      },
       strategyOptions: {
         stopLoss: {
           percentFromEntry: 1.0,
@@ -305,9 +308,6 @@ const DEFAULT_CONFIG: Config = {
         trailingStop: {
           activationPercent: 1.0,
           trailPercent: 0.5,
-        },
-        endOfDay: {
-          time: '16:00',
         },
       },
       slippage: {
@@ -340,6 +340,9 @@ const DEFAULT_CONFIG: Config = {
     maxHoldTime: {
       minutes: 60,
     },
+    endOfDay: {
+      time: '16:00',
+    },
     strategyOptions: {
       stopLoss: {
         percentFromEntry: 1.0,
@@ -352,9 +355,6 @@ const DEFAULT_CONFIG: Config = {
       trailingStop: {
         activationPercent: 1.0,
         trailPercent: 0.5,
-      },
-      endOfDay: {
-        time: '16:00',
       },
     },
     slippage: {
@@ -434,6 +434,9 @@ export const createDefaultConfigFile = (): void => {
           maxHoldTime: {
             minutes: 60,
           },
+          endOfDay: {
+            time: '16:00',
+          },
           strategyOptions: {
             stopLoss: {
               percentFromEntry: 1.0,
@@ -446,9 +449,6 @@ export const createDefaultConfigFile = (): void => {
             trailingStop: {
               activationPercent: 1.0,
               trailPercent: 0.5,
-            },
-            endOfDay: {
-              time: '16:00',
             },
           },
           slippage: {
@@ -482,6 +482,9 @@ export const createDefaultConfigFile = (): void => {
         maxHoldTime: {
           minutes: 60,
         },
+        endOfDay: {
+          time: '16:00',
+        },
         strategyOptions: {
           stopLoss: {
             percentFromEntry: 1.0,
@@ -494,9 +497,6 @@ export const createDefaultConfigFile = (): void => {
           trailingStop: {
             activationPercent: 1.0,
             trailPercent: 0.5,
-          },
-          endOfDay: {
-            time: '16:00',
           },
         },
         slippage: {
@@ -588,6 +588,12 @@ export const mergeConfigWithCliOptions = (
             MaxHoldTimeConfigSchema.parse({}).minutes,
         }
       : undefined,
+    // endOfDay stays at base level and is automatically active when configured
+    endOfDay: (rootFromLoaded as any)?.endOfDay
+      ? {
+          time: (rootFromLoaded as any)?.endOfDay?.time ?? EndOfDayConfigSchema.parse({}).time,
+        }
+      : undefined,
     // All other strategies must be in strategyOptions
     strategyOptions: {
       stopLoss: enabledArray?.includes('stopLoss')
@@ -633,13 +639,6 @@ export const mergeConfigWithCliOptions = (
 
             return result;
           })()
-        : undefined,
-      endOfDay: enabledArray?.includes('endOfDay')
-        ? {
-            time:
-              (rootFromLoaded as any)?.strategyOptions?.endOfDay?.time ??
-              EndOfDayConfigSchema.parse({}).time,
-          }
         : undefined,
     },
     slippage: {

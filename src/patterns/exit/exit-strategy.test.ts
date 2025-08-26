@@ -936,5 +936,77 @@ describe('Exit Strategies', () => {
       expect(strategies[0]).toBeInstanceOf(MaxHoldTimeStrategy);
       expect(strategies[1]).toBeInstanceOf(StopLossStrategy);
     });
+
+    it('should handle endOfDay at base level correctly (automatically active)', () => {
+      const config = {
+        exitStrategies: {
+          enabled: ['profitTarget'],
+          endOfDay: { time: '16:00' },
+          strategyOptions: {
+            profitTarget: { percentFromEntry: 2.0 },
+          },
+        },
+      };
+
+      const strategies = createExitStrategies(config);
+
+      expect(strategies.length).toBe(2);
+      expect(strategies[0]).toBeInstanceOf(EndOfDayStrategy);
+      expect(strategies[1]).toBeInstanceOf(ProfitTargetStrategy);
+    });
+
+    it('should not add endOfDay if not configured at base level', () => {
+      const config = {
+        exitStrategies: {
+          enabled: ['profitTarget'],
+          strategyOptions: {
+            profitTarget: { percentFromEntry: 2.0 },
+          },
+        },
+      };
+
+      const strategies = createExitStrategies(config);
+
+      expect(strategies.length).toBe(1);
+      expect(strategies[0]).toBeInstanceOf(ProfitTargetStrategy);
+    });
+
+    it('should skip endOfDay in enabled array gracefully', () => {
+      const config = {
+        exitStrategies: {
+          enabled: ['profitTarget', 'endOfDay'], // endOfDay here should be ignored
+          endOfDay: { time: '16:00' },
+          strategyOptions: {
+            profitTarget: { percentFromEntry: 2.0 },
+          },
+        },
+      };
+
+      const strategies = createExitStrategies(config);
+
+      expect(strategies.length).toBe(2); // Still only creates one of each
+      expect(strategies[0]).toBeInstanceOf(EndOfDayStrategy);
+      expect(strategies[1]).toBeInstanceOf(ProfitTargetStrategy);
+    });
+
+    it('should handle both maxHoldTime and endOfDay at base level', () => {
+      const config = {
+        exitStrategies: {
+          enabled: ['stopLoss'],
+          maxHoldTime: { minutes: 60 },
+          endOfDay: { time: '16:00' },
+          strategyOptions: {
+            stopLoss: { percentFromEntry: 1.0 },
+          },
+        },
+      };
+
+      const strategies = createExitStrategies(config);
+
+      expect(strategies.length).toBe(3);
+      expect(strategies[0]).toBeInstanceOf(MaxHoldTimeStrategy);
+      expect(strategies[1]).toBeInstanceOf(EndOfDayStrategy);
+      expect(strategies[2]).toBeInstanceOf(StopLossStrategy);
+    });
   });
 });
