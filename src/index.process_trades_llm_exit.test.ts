@@ -105,6 +105,7 @@ describe('processTradesLoop - LLM Exit Price Usage', () => {
     entryPattern: 'test-entry',
     generateCharts: false,
     chartsDir: './charts',
+    maxConcurrentDays: 1,
     llmConfirmationScreen: getDefaultTestLLMScreenConfig(), // Use helper for default
     exitStrategies: {
       enabled: ['stopLoss', 'profitTarget'],
