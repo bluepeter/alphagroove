@@ -328,6 +328,8 @@ default:
   charts:
     generate: true
     outputDir: './charts'
+  parallelization:
+    maxConcurrentDays: 3 # Process up to 3 days concurrently for faster execution
 
 # Entry pattern configuration
 entry:
@@ -474,6 +476,44 @@ Command line arguments always override config file settings. The hierarchy is:
 **Note**: The system no longer provides fallback defaults. If required configuration is missing,
 you'll receive clear error messages indicating exactly what needs to be configured.
 
+## Performance Optimization
+
+### Parallel Processing
+
+AlphaGroove supports parallel processing to significantly speed up backtests by processing multiple
+trading days concurrently. This is especially beneficial for:
+
+- **Multi-year backtests** with hundreds of trading days
+- **LLM-enabled strategies** where each day involves expensive API calls
+- **Large date ranges** that would otherwise take hours to process
+
+#### How It Works
+
+- **Year-Sequential, Day-Parallel**: Each year is processed sequentially to maintain proper yearly
+  statistics, but individual trading days within each year are processed concurrently
+- **Configurable Concurrency**: Control how many days are processed simultaneously (1-20)
+- **Memory Efficient**: Uses Promise-based concurrency rather than spawning separate processes
+
+#### Configuration
+
+**Via Command Line:**
+
+```bash
+# Process up to 5 days concurrently
+pnpm dev:start --maxConcurrentDays 5
+
+# Sequential processing (default, backward compatible)
+pnpm dev:start --maxConcurrentDays 1
+```
+
+**Via Configuration File:**
+
+```yaml
+default:
+  parallelization:
+    maxConcurrentDays: 5 # Process up to 5 days concurrently
+```
+
 ### Entry Pattern Options
 
 Entry patterns can be configured under root `entry` in the YAML (preferred) with `enabled` and
@@ -490,19 +530,20 @@ pnpm dev:start --from 2023-01-01 --to 2023-12-31 --direction short --quickRise.r
 
 CLI options override values from the configuration file.
 
-| Option                      | Description                                    | Default                   |
-| --------------------------- | ---------------------------------------------- | ------------------------- |
-| `--from <YYYY-MM-DD>`       | Start date (inclusive)                         | From config               |
-| `--to <YYYY-MM-DD>`         | End date (inclusive)                           | From config               |
-| `--entry-pattern <pattern>` | Entry pattern to use                           | quickRise                 |
-| `--ticker <symbol>`         | Ticker to analyze                              | SPY                       |
-| `--timeframe <period>`      | Data resolution                                | 1min                      |
-| `--direction <direction>`   | Trading direction for position (long or short) | long                      |
-| `--config <path>`           | Path to custom configuration file              | ./alphagroove.config.yaml |
-| `--generate-charts`         | Generate multiday charts for each entry        | false                     |
-| `--charts-dir <path>`       | Directory for chart output                     | ./charts                  |
-| `--debug`                   | Show debug information and SQL queries         | false                     |
-| `--verbose`                 | Show detailed LLM responses and debug info     | false                     |
+| Option                         | Description                                    | Default                   |
+| ------------------------------ | ---------------------------------------------- | ------------------------- |
+| `--from <YYYY-MM-DD>`          | Start date (inclusive)                         | From config               |
+| `--to <YYYY-MM-DD>`            | End date (inclusive)                           | From config               |
+| `--entry-pattern <pattern>`    | Entry pattern to use                           | quickRise                 |
+| `--ticker <symbol>`            | Ticker to analyze                              | SPY                       |
+| `--timeframe <period>`         | Data resolution                                | 1min                      |
+| `--direction <direction>`      | Trading direction for position (long or short) | long                      |
+| `--config <path>`              | Path to custom configuration file              | ./alphagroove.config.yaml |
+| `--generate-charts`            | Generate multiday charts for each entry        | false                     |
+| `--charts-dir <path>`          | Directory for chart output                     | ./charts                  |
+| `--maxConcurrentDays <number>` | Maximum days to process concurrently (1-20)    | 1                         |
+| `--debug`                      | Show debug information and SQL queries         | false                     |
+| `--verbose`                    | Show detailed LLM responses and debug info     | false                     |
 
 ### Pattern-Specific Options
 
@@ -857,6 +898,9 @@ pnpm dev:start --direction short
 
 # Generate charts for entry signals
 pnpm dev:start --generate-charts
+
+# Process multiple days concurrently for faster execution
+pnpm dev:start --maxConcurrentDays 5
 
 # List available patterns
 pnpm dev:start list-patterns

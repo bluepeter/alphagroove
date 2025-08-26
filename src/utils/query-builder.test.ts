@@ -47,6 +47,7 @@ describe('buildAnalysisQuery', () => {
       entryPattern: 'Test Pattern',
       generateCharts: false,
       chartsDir: './charts',
+      maxConcurrentDays: 1,
     };
 
     const query = buildAnalysisQuery(mergedConfig, mockEntryPattern);
@@ -63,6 +64,7 @@ describe('buildAnalysisQuery', () => {
       entryPattern: 'Test Pattern',
       generateCharts: false,
       chartsDir: './charts',
+      maxConcurrentDays: 1,
     };
 
     const query = buildAnalysisQuery(mergedConfig, mockEntryPattern);
@@ -80,6 +82,7 @@ describe('buildAnalysisQuery', () => {
       entryPattern: 'Test Pattern',
       generateCharts: false,
       chartsDir: './charts',
+      maxConcurrentDays: 1,
     };
 
     const query = buildAnalysisQuery(mergedConfig, mockEntryPattern);
@@ -96,6 +99,7 @@ describe('buildAnalysisQuery', () => {
       entryPattern: 'Fixed Time Entry',
       generateCharts: false,
       chartsDir: './charts',
+      maxConcurrentDays: 1,
     };
 
     const query = buildAnalysisQuery(mergedConfig, mockFixedTimeEntryPattern);
@@ -112,6 +116,7 @@ describe('buildAnalysisQuery', () => {
       entryPattern: 'Test Pattern',
       generateCharts: false,
       chartsDir: './charts',
+      maxConcurrentDays: 1,
     };
 
     const query = buildAnalysisQuery(mergedConfig, mockEntryPattern);

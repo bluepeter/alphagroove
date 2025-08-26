@@ -1,7 +1,7 @@
 default:
   date:
     # from: '2017-01-01'
-    from: '2020-01-01'
+    from: '2025-01-01'
     to: '2025-01-30'
   ticker: 'SPY'
   timeframe: '1min'
@@ -11,6 +11,8 @@ default:
   charts:
     generate: true
     outputDir: './charts'
+  parallelization:
+    maxConcurrentDays: 3 # Process up to 3 days concurrently for faster execution
 
 entry:
   enabled: [randomTimeEntry]
@@ -113,3 +115,4 @@ llmConfirmationScreen:
 
     `{"action": "do_nothing", "rationalization": "<here>", "confidence": "<here>"}`
   maxOutputTokens: 250
+  timeoutMs: 30000 # 30 second timeout to prevent hanging

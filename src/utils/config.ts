@@ -180,6 +180,11 @@ const ChartOptionsSchema = z.object({
   outputDir: z.string().default('./charts'),
 });
 
+// Schema for parallelization options
+const ParallelizationOptionsSchema = z.object({
+  maxConcurrentDays: z.number().int().min(1).max(20).default(1),
+});
+
 // Schema for LLM Confirmation Screen
 // Use ExternalLLMScreenConfig to guide the Zod schema definition if needed,
 // but Zod schema is the source of truth for validation and type inference here.
@@ -236,6 +241,7 @@ const ConfigSchema = z
       direction: z.enum(['long', 'short', 'llm_decides']).default('long'),
       patterns: DefaultPatternsSchema.optional(),
       charts: ChartOptionsSchema.optional(),
+      parallelization: ParallelizationOptionsSchema.optional(),
       // NEW: Add exitStrategies to default config
       exitStrategies: ExitStrategiesConfigSchema.optional(),
     }),
@@ -520,6 +526,7 @@ export interface MergedConfig {
   entryPattern: string;
   generateCharts: boolean;
   chartsDir: string;
+  maxConcurrentDays: number;
   llmConfirmationScreen?: LLMScreenConfig;
   exitStrategies?: ExitStrategiesConfig; // NEW: Add exitStrategies
   quickRise?: Record<string, any>;
@@ -662,6 +669,8 @@ export const mergeConfigWithCliOptions = (
         ? cliOptions.generateCharts
         : loadedConfig.default.charts?.generate || false,
     chartsDir: cliOptions.chartsDir || loadedConfig.default.charts?.outputDir || './charts',
+    maxConcurrentDays:
+      cliOptions.maxConcurrentDays || loadedConfig.default.parallelization?.maxConcurrentDays || 1,
     llmConfirmationScreen: loadedConfig.llmConfirmationScreen
       ? {
           ...LLMScreenConfigSchema.parse({}),

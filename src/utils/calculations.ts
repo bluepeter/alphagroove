@@ -31,7 +31,10 @@ export const formatTime = (timeString: string | undefined | null): string => {
   return timePart;
 };
 
-export const formatDollar = (value: number): string => {
+export const formatDollar = (value: number | undefined): string => {
+  if (value === undefined || value === null || isNaN(value)) {
+    return '$0.00';
+  }
   return `$${value.toFixed(2)}`;
 };
 

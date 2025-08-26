@@ -44,6 +44,29 @@ import {
 import { calculateATRStopLoss } from './utils/calculations.js';
 import { calculateEntryAtr, evaluateExitStrategies } from './utils/trade-processing';
 
+// Group trades by year and then by individual trading days for parallel processing
+const groupTradesByYearAndDay = (tradesFromQuery: any[]): Map<string, Map<string, any[]>> => {
+  const yearGroups = new Map<string, Map<string, any[]>>();
+
+  for (const trade of tradesFromQuery) {
+    const year = trade.year as string;
+    const tradeDate = trade.trade_date as string;
+
+    if (!yearGroups.has(year)) {
+      yearGroups.set(year, new Map<string, any[]>());
+    }
+
+    const dayGroups = yearGroups.get(year)!;
+    if (!dayGroups.has(tradeDate)) {
+      dayGroups.set(tradeDate, []);
+    }
+
+    dayGroups.get(tradeDate)!.push(trade);
+  }
+
+  return yearGroups;
+};
+
 const generateChartForLLMDecision = async (
   signalData: EnrichedSignal,
   appOrMergedConfig: MergedConfig,
@@ -182,39 +205,120 @@ export const processTradesLoop = async (
   totalStats: OverallTradeStats,
   debug?: boolean
 ) => {
-  let currentYear = '';
-  let yearLongTrades: Trade[] = [];
-  let yearShortTrades: Trade[] = [];
-  const seenYears = new Set<string>();
-  let currentYearLlmCost = 0;
+  // Group trades by year and day for parallel processing
+  const yearGroups = groupTradesByYearAndDay(tradesFromQuery);
 
-  const initialGlobalDirection = mergedConfig.direction;
+  if (debug) {
+    console.log(
+      `Processing ${yearGroups.size} years with max ${mergedConfig.maxConcurrentDays} concurrent days per year`
+    );
+  }
 
-  for (const rawTradeData of tradesFromQuery) {
-    const tradeYear = rawTradeData.year as string;
+  // Process each year sequentially but parallelize days within each year
+  for (const [year, dayGroups] of yearGroups) {
+    printYearHeader(year);
 
-    if (tradeYear !== currentYear) {
-      if (currentYear !== '') {
-        if (yearLongTrades.length > 0 || yearShortTrades.length > 0) {
-          printYearSummary(
-            Number(currentYear),
-            yearLongTrades,
-            yearShortTrades,
-            currentYearLlmCost
-          );
+    const yearLongTrades: Trade[] = [];
+    const yearShortTrades: Trade[] = [];
+    let yearLlmCost = 0;
+
+    // Process days in parallel batches
+    const dayEntries = Array.from(dayGroups.entries());
+    const maxConcurrentDays = mergedConfig.maxConcurrentDays;
+
+    for (let i = 0; i < dayEntries.length; i += maxConcurrentDays) {
+      const batch = dayEntries.slice(i, i + maxConcurrentDays);
+
+      const batchPromises = batch.map(async ([tradeDate, dayTrades]) => {
+        if (debug) {
+          console.log(`Processing ${tradeDate} with ${dayTrades.length} trades...`);
         }
-      }
-      currentYear = tradeYear;
-      printYearHeader(currentYear);
-      yearLongTrades = [];
-      yearShortTrades = [];
-      currentYearLlmCost = 0;
 
-      if (!seenYears.has(tradeYear)) {
-        seenYears.add(tradeYear);
+        // Process all trades for this day using the existing logic
+        const dayResults = await processDayTrades(
+          dayTrades,
+          mergedConfig,
+          entryPattern,
+          exitStrategies,
+          llmScreenInstance,
+          screenSpecificLLMConfig,
+          rawConfig,
+          totalStats,
+          debug
+        );
+
+        return dayResults;
+      });
+
+      const batchResults = await Promise.all(batchPromises);
+
+      // Aggregate results from this batch
+      for (const dayResult of batchResults) {
+        yearLongTrades.push(...dayResult.longTrades);
+        yearShortTrades.push(...dayResult.shortTrades);
+        yearLlmCost += dayResult.llmCost;
+      }
+
+      if (debug && batch.length > 1) {
+        console.log(`Completed batch of ${batch.length} days`);
       }
     }
 
+    // Update total stats for the year
+    totalStats.long_stats.trades.push(...yearLongTrades);
+    totalStats.short_stats.trades.push(...yearShortTrades);
+
+    for (const trade of yearLongTrades) {
+      totalStats.long_stats.all_returns.push(trade.return_pct);
+      totalStats.long_stats.total_return_sum += trade.return_pct;
+      if (isWinningTrade(trade.return_pct, false)) {
+        totalStats.long_stats.winning_trades++;
+      }
+    }
+
+    for (const trade of yearShortTrades) {
+      totalStats.short_stats.all_returns.push(trade.return_pct);
+      totalStats.short_stats.total_return_sum += trade.return_pct;
+      if (isWinningTrade(trade.return_pct, true)) {
+        totalStats.short_stats.winning_trades++;
+      }
+    }
+
+    totalStats.grandTotalLlmCost += yearLlmCost;
+
+    // Print year summary
+    if (yearLongTrades.length > 0 || yearShortTrades.length > 0) {
+      printYearSummary(Number(year), yearLongTrades, yearShortTrades, yearLlmCost);
+    }
+  }
+
+  const confirmedTrades = [...totalStats.long_stats.trades, ...totalStats.short_stats.trades];
+  return { confirmedTradesCount: confirmedTrades.length };
+};
+
+// Process all trades for a single day - extracted from the original logic
+const processDayTrades = async (
+  dayTrades: any[],
+  mergedConfig: MergedConfig,
+  entryPattern: any,
+  exitStrategies: ExitStrategy[],
+  llmScreenInstance: LlmConfirmationScreen | null,
+  screenSpecificLLMConfig: ScreenLLMConfig | undefined,
+  rawConfig: any,
+  totalStats: OverallTradeStats,
+  debug?: boolean
+): Promise<{
+  longTrades: Trade[];
+  shortTrades: Trade[];
+  llmCost: number;
+}> => {
+  const longTrades: Trade[] = [];
+  const shortTrades: Trade[] = [];
+  let llmCost = 0;
+
+  const initialGlobalDirection = mergedConfig.direction;
+
+  for (const rawTradeData of dayTrades) {
     const entrySignalTimestamp = rawTradeData.entry_time as string;
     const tradeDate = rawTradeData.trade_date as string;
     const _rawEntryPriceFromSQL = rawTradeData.entry_price as number;
@@ -278,8 +382,7 @@ export const processTradesLoop = async (
       debug
     );
 
-    currentYearLlmCost += screeningCost;
-    totalStats.grandTotalLlmCost += screeningCost;
+    llmCost += screeningCost;
 
     if (!proceedFromLlm) {
       continue;
@@ -497,29 +600,17 @@ export const processTradesLoop = async (
     };
     finalValidation();
 
-    const statsBucket =
-      actualTradeDirection === 'long' ? totalStats.long_stats : totalStats.short_stats;
-    statsBucket.trades.push(trade);
-    statsBucket.all_returns.push(returnPct);
-    statsBucket.total_return_sum += returnPct;
-    if (isWinningTrade(returnPct, actualTradeDirection === 'short')) {
-      statsBucket.winning_trades++;
-    }
+    // Print trade details immediately as each trade completes
+    printTradeDetails(trade);
 
     if (actualTradeDirection === 'long') {
-      yearLongTrades.push(trade);
+      longTrades.push(trade);
     } else {
-      yearShortTrades.push(trade);
+      shortTrades.push(trade);
     }
-
-    printTradeDetails(trade);
   }
 
-  if (currentYear !== '' && (yearLongTrades.length > 0 || yearShortTrades.length > 0)) {
-    printYearSummary(Number(currentYear), yearLongTrades, yearShortTrades, currentYearLlmCost);
-  }
-  const confirmedTrades = [...totalStats.long_stats.trades, ...totalStats.short_stats.trades];
-  return { confirmedTradesCount: confirmedTrades.length };
+  return { longTrades, shortTrades, llmCost };
 };
 
 // Export for testing
@@ -667,6 +758,11 @@ const parseCLI = async () => {
     .option('--direction <direction>', 'Trading direction (long/short)')
     .option('--generate-charts', 'Generate multiday charts for each entry')
     .option('--charts-dir <path>', 'Directory for chart output')
+    .option(
+      '--maxConcurrentDays <number>',
+      'Maximum number of days to process concurrently (1-20)',
+      parseInt
+    )
     .option('--debug', 'Show debug information')
     .option('--verbose', 'Show detailed LLM responses and debug information')
     .option('--dry-run', 'Show query without executing');

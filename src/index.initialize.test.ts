@@ -68,6 +68,7 @@ describe('initializeAnalysis', () => {
     entryPattern: 'test-pattern',
     generateCharts: false,
     chartsDir: './charts',
+    maxConcurrentDays: 1,
     llmConfirmationScreen: mockLlmScreenConfig,
   };
 

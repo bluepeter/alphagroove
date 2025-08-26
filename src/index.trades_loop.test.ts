@@ -127,6 +127,7 @@ describe('Process Trades Loop Tests', () => {
       entryPattern: 'quick-rise',
       generateCharts: false,
       chartsDir: './charts',
+      maxConcurrentDays: 1,
       exitStrategies: {
         enabled: ['maxHoldTime'],
         maxHoldTime: { minutes: 60 },

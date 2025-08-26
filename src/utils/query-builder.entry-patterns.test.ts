@@ -12,6 +12,7 @@ describe('buildAnalysisQuery with entry patterns', () => {
     entryPattern: 'test-pattern',
     generateCharts: false,
     chartsDir: './charts',
+    maxConcurrentDays: 1,
   };
 
   const entryPattern = {
