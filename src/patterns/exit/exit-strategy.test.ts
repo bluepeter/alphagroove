@@ -898,8 +898,8 @@ describe('Exit Strategies', () => {
       const strategies = createExitStrategies(config);
 
       expect(strategies.length).toBe(2);
-      expect(strategies[0]).toBeInstanceOf(MaxHoldTimeStrategy); // Always first when configured
-      expect(strategies[1]).toBeInstanceOf(StopLossStrategy);
+      expect(strategies[0]).toBeInstanceOf(StopLossStrategy); // Price-based strategies come first
+      expect(strategies[1]).toBeInstanceOf(MaxHoldTimeStrategy); // Time-based constraints come after
     });
 
     it('should not add maxHoldTime if not configured at base level', () => {
@@ -933,8 +933,8 @@ describe('Exit Strategies', () => {
       const strategies = createExitStrategies(config);
 
       expect(strategies.length).toBe(2); // Still only creates one of each
-      expect(strategies[0]).toBeInstanceOf(MaxHoldTimeStrategy);
-      expect(strategies[1]).toBeInstanceOf(StopLossStrategy);
+      expect(strategies[0]).toBeInstanceOf(StopLossStrategy); // Price-based strategies come first
+      expect(strategies[1]).toBeInstanceOf(MaxHoldTimeStrategy); // Time-based constraints come after
     });
 
     it('should handle endOfDay at base level correctly (automatically active)', () => {
@@ -951,8 +951,8 @@ describe('Exit Strategies', () => {
       const strategies = createExitStrategies(config);
 
       expect(strategies.length).toBe(2);
-      expect(strategies[0]).toBeInstanceOf(EndOfDayStrategy);
-      expect(strategies[1]).toBeInstanceOf(ProfitTargetStrategy);
+      expect(strategies[0]).toBeInstanceOf(ProfitTargetStrategy); // Price-based strategies come first
+      expect(strategies[1]).toBeInstanceOf(EndOfDayStrategy); // Time-based constraints come after
     });
 
     it('should not add endOfDay if not configured at base level', () => {
@@ -985,8 +985,8 @@ describe('Exit Strategies', () => {
       const strategies = createExitStrategies(config);
 
       expect(strategies.length).toBe(2); // Still only creates one of each
-      expect(strategies[0]).toBeInstanceOf(EndOfDayStrategy);
-      expect(strategies[1]).toBeInstanceOf(ProfitTargetStrategy);
+      expect(strategies[0]).toBeInstanceOf(ProfitTargetStrategy); // Price-based strategies come first
+      expect(strategies[1]).toBeInstanceOf(EndOfDayStrategy); // Time-based constraints come after
     });
 
     it('should handle both maxHoldTime and endOfDay at base level', () => {
@@ -1004,9 +1004,9 @@ describe('Exit Strategies', () => {
       const strategies = createExitStrategies(config);
 
       expect(strategies.length).toBe(3);
-      expect(strategies[0]).toBeInstanceOf(MaxHoldTimeStrategy);
-      expect(strategies[1]).toBeInstanceOf(EndOfDayStrategy);
-      expect(strategies[2]).toBeInstanceOf(StopLossStrategy);
+      expect(strategies[0]).toBeInstanceOf(StopLossStrategy); // Price-based strategies come first
+      expect(strategies[1]).toBeInstanceOf(MaxHoldTimeStrategy); // Time-based constraints come after
+      expect(strategies[2]).toBeInstanceOf(EndOfDayStrategy);
     });
   });
 });

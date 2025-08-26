@@ -479,17 +479,7 @@ export const createExitStrategies = (config: any): ExitStrategy[] => {
   const { enabled, maxHoldTime, endOfDay, strategyOptions } = config.exitStrategies;
   const strategies: ExitStrategy[] = [];
 
-  // maxHoldTime is automatically added when configured (doesn't need to be in enabled array)
-  if (maxHoldTime) {
-    strategies.push(new MaxHoldTimeStrategy(maxHoldTime));
-  }
-
-  // endOfDay is automatically added when configured (doesn't need to be in enabled array)
-  if (endOfDay) {
-    strategies.push(new EndOfDayStrategy(endOfDay));
-  }
-
-  // Add other strategies based on enabled array
+  // Add price-based strategies first (from enabled array) - they should get priority
   enabled.forEach((strategyName: string) => {
     switch (strategyName) {
       case 'stopLoss':
@@ -525,6 +515,17 @@ export const createExitStrategies = (config: any): ExitStrategy[] => {
         throw new Error(`Unknown exit strategy: ${strategyName}`);
     }
   });
+
+  // Add time-based constraints AFTER price-based strategies (they act as fallbacks/limits)
+  // maxHoldTime is automatically added when configured (doesn't need to be in enabled array)
+  if (maxHoldTime) {
+    strategies.push(new MaxHoldTimeStrategy(maxHoldTime));
+  }
+
+  // endOfDay is automatically added when configured (doesn't need to be in enabled array)
+  if (endOfDay) {
+    strategies.push(new EndOfDayStrategy(endOfDay));
+  }
 
   return strategies;
 };
