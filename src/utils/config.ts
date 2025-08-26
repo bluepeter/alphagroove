@@ -79,13 +79,19 @@ const MaxHoldTimeConfigSchema = z.object({
   minutes: z.number().int().positive().default(60),
 });
 
+// Define schema for Execution configuration (cross-cutting concerns)
+const ExecutionConfigSchema = z
+  .object({
+    slippage: SlippageConfigSchema.optional(),
+  })
+  .optional();
+
 // Define schema for ExitStrategies configuration
 const ExitStrategiesConfigSchema = z
   .object({
     enabled: z.array(z.string()).default([]),
     maxHoldTime: MaxHoldTimeConfigSchema.optional(), // Base level for exit system
     endOfDay: EndOfDayConfigSchema.optional(), // Base level for exit system
-    slippage: SlippageConfigSchema.optional(),
     strategyOptions: z
       .object({
         stopLoss: StopLossConfigSchema.optional(),
@@ -246,6 +252,8 @@ const ConfigSchema = z
     // Prefer 'exit' but accept legacy 'exitStrategies'
     exit: ExitStrategiesConfigSchema.optional(),
     exitStrategies: ExitStrategiesConfigSchema.optional(),
+    // Execution configuration (cross-cutting concerns like slippage)
+    execution: ExecutionConfigSchema,
   })
   .refine(
     data => {
@@ -264,6 +272,7 @@ const ConfigSchema = z
 // Type for the validated config
 export type Config = z.infer<typeof ConfigSchema>;
 export type ExitStrategiesConfig = z.infer<typeof ExitStrategiesConfigSchema>; // Exporting for use elsewhere
+export type ExecutionConfig = z.infer<typeof ExecutionConfigSchema>;
 
 // Export types for each strategy configuration
 export type StopLossConfig = z.infer<typeof StopLossConfigSchema>;
@@ -310,10 +319,6 @@ const DEFAULT_CONFIG: Config = {
           trailPercent: 0.5,
         },
       },
-      slippage: {
-        model: 'percent',
-        value: 0.05,
-      },
     },
   },
   patterns: {
@@ -357,6 +362,8 @@ const DEFAULT_CONFIG: Config = {
         trailPercent: 0.5,
       },
     },
+  },
+  execution: {
     slippage: {
       model: 'percent',
       value: 0.05,
@@ -451,10 +458,6 @@ export const createDefaultConfigFile = (): void => {
               trailPercent: 0.5,
             },
           },
-          slippage: {
-            model: 'percent',
-            value: 0.05,
-          },
         },
       },
       patterns: {
@@ -499,6 +502,8 @@ export const createDefaultConfigFile = (): void => {
             trailPercent: 0.5,
           },
         },
+      },
+      execution: {
         slippage: {
           model: 'percent',
           value: 0.05,
@@ -532,6 +537,7 @@ export interface MergedConfig {
   maxConcurrentDays: number;
   llmConfirmationScreen?: LLMScreenConfig;
   exitStrategies?: ExitStrategiesConfig; // NEW: Add exitStrategies
+  execution?: ExecutionConfig; // NEW: Add execution config
   quickRise?: Record<string, any>;
   quickFall?: Record<string, any>;
   fixedTimeEntry?: Record<string, any>;
@@ -641,10 +647,6 @@ export const mergeConfigWithCliOptions = (
           })()
         : undefined,
     },
-    slippage: {
-      model: rootFromLoaded?.slippage?.model ?? SlippageConfigSchema.parse({}).model,
-      value: rootFromLoaded?.slippage?.value ?? SlippageConfigSchema.parse({}).value,
-    },
   };
 
   const mergedConfig: MergedConfig = {
@@ -668,6 +670,18 @@ export const mergeConfigWithCliOptions = (
         }
       : LLMScreenConfigSchema.parse({}),
     exitStrategies: mergedExitStrategies,
+    execution: {
+      slippage: {
+        model:
+          rootFromLoaded?.slippage?.model ??
+          loadedConfig.execution?.slippage?.model ??
+          SlippageConfigSchema.parse({}).model,
+        value:
+          rootFromLoaded?.slippage?.value ??
+          loadedConfig.execution?.slippage?.value ??
+          SlippageConfigSchema.parse({}).value,
+      },
+    },
   };
 
   const patternOptions: Record<string, Record<string, any>> = {};

@@ -372,7 +372,7 @@ describe('Configuration System', () => {
       expect(merged.exitStrategies?.maxHoldTime?.minutes).toBe(500);
     });
 
-    it('should merge slippage from root exit (outside strategyOptions)', () => {
+    it('should merge slippage from root exit (outside strategyOptions) for backward compatibility', () => {
       const config = createTestConfig({
         exit: {
           enabled: [],
@@ -381,7 +381,18 @@ describe('Configuration System', () => {
       });
 
       const merged = mergeConfigWithCliOptions(config, {});
-      expect(merged.exitStrategies?.slippage).toEqual({ model: 'fixed', value: 0.01 });
+      expect(merged.execution?.slippage).toEqual({ model: 'fixed', value: 0.01 });
+    });
+
+    it('should merge slippage from execution.slippage (new location)', () => {
+      const config = createTestConfig({
+        execution: {
+          slippage: { model: 'percent', value: 0.02 },
+        },
+      });
+
+      const merged = mergeConfigWithCliOptions(config, {});
+      expect(merged.execution?.slippage).toEqual({ model: 'percent', value: 0.02 });
     });
 
     it('should set entryPattern from entry.enabled[0] with camelCase names', () => {

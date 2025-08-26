@@ -81,6 +81,8 @@ describe('runAnalysis refactored components', () => {
         entryPattern: 'fixed-time-entry',
         exitStrategies: {
           enabled: ['maxHoldTime'],
+        },
+        execution: {
           slippage: {
             model: 'percent' as const,
             value: 0.1, // 0.1% slippage
@@ -99,7 +101,7 @@ describe('runAnalysis refactored components', () => {
       const slippageResult = applySlippage(
         mockRawTradeData.entry_price,
         mockMergedConfig.direction === 'long',
-        mockMergedConfig.exitStrategies.slippage
+        mockMergedConfig.execution.slippage
       );
 
       // Verify slippage is applied correctly

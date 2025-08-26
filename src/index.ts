@@ -417,7 +417,7 @@ const processDayTrades = async (
     const finalEntryPriceForPAndL = applySlippage(
       executionBarClosePrice,
       actualTradeDirection === 'long',
-      mergedConfig.exitStrategies?.slippage,
+      mergedConfig.execution?.slippage,
       true
     );
 
@@ -549,7 +549,7 @@ const processDayTrades = async (
     const exitPrice = applySlippage(
       exitSignal.price,
       actualTradeDirection === 'long',
-      mergedConfig.exitStrategies?.slippage
+      mergedConfig.execution?.slippage
     );
 
     const returnPct =

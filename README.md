@@ -93,7 +93,7 @@ price-based strategies:
 
 ### Slippage Model
 
-Models realistic trading costs by applying slippage to exit prices.
+Models realistic trading costs by applying slippage to both entry and exit prices.
 
 **Configuration options:**
 
@@ -159,6 +159,9 @@ exit:
     trailingStop:
       activationPercent: 1.0 # activates after 1% favorable move
       trailPercent: 0.5 # trails by 0.5%
+
+# Execution configuration (applies to both entry and exit)
+execution:
   slippage:
     model: 'percent' # or 'fixed'
     value: 0.05 # 0.05% slippage
@@ -292,6 +295,9 @@ exit:
   strategyOptions:
     profitTarget:
       atrMultiplier: 3.0
+
+# Execution configuration
+execution:
   slippage:
     model: 'fixed'
     value: 0.01
@@ -391,6 +397,9 @@ exit:
     trailingStop:
       activationAtrMultiplier: 0 # Immediate activation
       trailAtrMultiplier: 2.5
+
+# Execution configuration
+execution:
   slippage:
     model: 'fixed'
     value: 0.01
@@ -435,6 +444,9 @@ exit:
     trailingStop:
       activationAtrMultiplier: 0
       trailAtrMultiplier: 2.5
+
+# Execution configuration
+execution:
   slippage:
     model: fixed
     value: 0.01
@@ -479,6 +491,9 @@ exit:
     trailingStop:
       activationAtrMultiplier: 0
       trailAtrMultiplier: 2.5
+
+# Execution configuration
+execution:
   slippage:
     model: fixed
     value: 0.01
