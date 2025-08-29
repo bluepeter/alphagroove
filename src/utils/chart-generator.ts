@@ -190,7 +190,7 @@ const fetchMultiDayData = async (
   }
 };
 
-const generateSvgChart = (
+export const generateSvgChart = (
   ticker: string,
   patternName: string,
   allDataInput: Bar[],
