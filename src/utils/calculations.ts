@@ -47,10 +47,6 @@ export const calculateTradePercentage = (totalTrades: number, tradingDays: numbe
   return ((totalTrades / tradingDays) * 100).toFixed(1);
 };
 
-export const calculateAvgRise = (rises: number[]): number => {
-  return rises.length > 0 ? rises.reduce((a, b) => a + b, 0) / rises.length : 0;
-};
-
 export const calculateWinningTrades = (trades: Trade[], isShort: boolean): number => {
   return isShort
     ? trades.filter(t => t.return_pct > 0).length

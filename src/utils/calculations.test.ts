@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 
 import {
   calculateTradePercentage,
-  calculateAvgRise,
   calculateWinningTrades,
   calculateWinRate,
   calculateMeanReturn,
@@ -50,14 +49,6 @@ describe('calculation functions', () => {
       expect(calculateTradePercentage(25, 250)).toBe('10.0');
       expect(calculateTradePercentage(0, 250)).toBe('0.0');
       expect(calculateTradePercentage(125, 250)).toBe('50.0');
-    });
-  });
-
-  describe('calculateAvgRise', () => {
-    it('should calculate average rise correctly', () => {
-      expect(calculateAvgRise([0.01, 0.02, 0.03])).toBe(0.02);
-      expect(calculateAvgRise([0.005, 0.015])).toBe(0.01);
-      expect(calculateAvgRise([])).toBe(0);
     });
   });
 

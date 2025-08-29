@@ -15,12 +15,6 @@ export interface Signal {
   direction?: 'long' | 'short';
 }
 
-export interface PatternResult {
-  entry: Signal | null;
-  exit: Signal | null;
-  bars: Bar[];
-}
-
 export interface PatternDefinition {
   name: string;
   description: string;
