@@ -225,74 +225,57 @@ const LLMScreenConfigSchema = z
 export type LLMScreenConfig = z.infer<typeof LLMScreenConfigSchema>;
 
 // Define the root config schema with new structure
-const ConfigSchema = z
-  .object({
-    // New structured config
-    shared: z
-      .object({
-        ticker: z.string(),
-        timeframe: z.string(),
-        direction: z.enum(['long', 'short', 'llm_decides']),
-        entry: EntryRootConfigSchema.optional(),
-        llmConfirmationScreen: LLMScreenConfigSchema.optional(),
-      })
-      .optional(),
-    backtest: z
-      .object({
-        date: DateRangeSchema.optional(),
-        parallelization: ParallelizationOptionsSchema.optional(),
-        exit: ExitStrategiesConfigSchema.optional(),
-        execution: ExecutionConfigSchema.optional(),
-      })
-      .optional(),
-    scout: z
-      .object({
-        polygon: z
-          .object({
-            apiKeyEnvVar: z.string().optional(),
-          })
-          .optional(),
-      })
-      .optional(),
+const ConfigSchema = z.object({
+  // New structured config
+  shared: z
+    .object({
+      ticker: z.string(),
+      timeframe: z.string(),
 
-    // Legacy config structure for backward compatibility
-    default: z
-      .object({
-        date: DateRangeSchema.optional(),
-        ticker: z.string(),
-        timeframe: z.string(),
-        direction: z.enum(['long', 'short', 'llm_decides']),
-        patterns: DefaultPatternsSchema.optional(),
-        parallelization: ParallelizationOptionsSchema.optional(),
-        // NEW: Add exitStrategies to default config
-        exitStrategies: ExitStrategiesConfigSchema.optional(),
-      })
-      .optional(),
-    entry: EntryRootConfigSchema.optional(), // root-level entry configuration (optional)
-    patterns: PatternsConfigSchema.optional(), // legacy; defaults to { entry: {} } if missing
-    llmConfirmationScreen: LLMScreenConfigSchema.optional(),
-    // Prefer 'exit' but accept legacy 'exitStrategies'
-    exit: ExitStrategiesConfigSchema.optional(),
-    exitStrategies: ExitStrategiesConfigSchema.optional(),
-    // Execution configuration (cross-cutting concerns like slippage)
-    execution: ExecutionConfigSchema,
-  })
-  .refine(
-    data => {
-      const direction = data.default?.direction || data.shared?.direction;
-      if (direction === 'llm_decides') {
-        const llmConfig = data.llmConfirmationScreen || data.shared?.llmConfirmationScreen;
-        return llmConfig && typeof llmConfig === 'object';
-      }
-      return true;
-    },
-    {
-      message:
-        "If default.direction is 'llm_decides', then llmConfirmationScreen must be configured",
-      path: ['default', 'direction'], // Path to report error on
-    }
-  );
+      entry: EntryRootConfigSchema.optional(),
+      llmConfirmationScreen: LLMScreenConfigSchema.optional(),
+    })
+    .optional(),
+  backtest: z
+    .object({
+      date: DateRangeSchema.optional(),
+      parallelization: ParallelizationOptionsSchema.optional(),
+      exit: ExitStrategiesConfigSchema.optional(),
+      execution: ExecutionConfigSchema.optional(),
+    })
+    .optional(),
+  scout: z
+    .object({
+      polygon: z
+        .object({
+          apiKeyEnvVar: z.string().optional(),
+        })
+        .optional(),
+    })
+    .optional(),
 
+  // Legacy config structure for backward compatibility
+  default: z
+    .object({
+      date: DateRangeSchema.optional(),
+      ticker: z.string(),
+      timeframe: z.string(),
+
+      patterns: DefaultPatternsSchema.optional(),
+      parallelization: ParallelizationOptionsSchema.optional(),
+      // NEW: Add exitStrategies to default config
+      exitStrategies: ExitStrategiesConfigSchema.optional(),
+    })
+    .optional(),
+  entry: EntryRootConfigSchema.optional(), // root-level entry configuration (optional)
+  patterns: PatternsConfigSchema.optional(), // legacy; defaults to { entry: {} } if missing
+  llmConfirmationScreen: LLMScreenConfigSchema.optional(),
+  // Prefer 'exit' but accept legacy 'exitStrategies'
+  exit: ExitStrategiesConfigSchema.optional(),
+  exitStrategies: ExitStrategiesConfigSchema.optional(),
+  // Execution configuration (cross-cutting concerns like slippage)
+  execution: ExecutionConfigSchema,
+});
 // Type for the validated config
 export type Config = z.infer<typeof ConfigSchema>;
 export type ExitStrategiesConfig = z.infer<typeof ExitStrategiesConfigSchema>; // Exporting for use elsewhere
@@ -313,7 +296,7 @@ const DEFAULT_CONFIG: Config = {
   default: {
     ticker: 'SPY',
     timeframe: '1min',
-    direction: 'long',
+
     patterns: {
       entry: 'quickRise',
     },
@@ -449,7 +432,7 @@ export const createDefaultConfigFile = (): void => {
       default: {
         ticker: 'SPY',
         timeframe: '1min',
-        direction: 'long',
+
         patterns: {
           entry: 'quickRise',
         },
@@ -546,7 +529,7 @@ export const createDefaultConfigFile = (): void => {
 export interface MergedConfig {
   ticker: string;
   timeframe: string;
-  direction: 'long' | 'short' | 'llm_decides';
+
   from: string;
   to: string;
   entryPattern: string;
@@ -583,7 +566,7 @@ export const mergeConfigWithCliOptions = (
       default: {
         ticker: loadedConfig.shared?.ticker || 'SPY',
         timeframe: loadedConfig.shared?.timeframe || '1min',
-        direction: loadedConfig.shared?.direction || 'long',
+
         date: loadedConfig.backtest?.date,
         parallelization: loadedConfig.backtest?.parallelization,
       },
@@ -690,7 +673,7 @@ export const mergeConfigWithCliOptions = (
   const mergedConfig: MergedConfig = {
     ticker: cliOptions.ticker || compatConfig.default?.ticker || 'SPY',
     timeframe: cliOptions.timeframe || compatConfig.default?.timeframe || '1min',
-    direction: cliOptions.direction || compatConfig.default?.direction || 'long',
+
     from: cliOptions.from || compatConfig.default?.date?.from || '2010-01-01',
     to: cliOptions.to || compatConfig.default?.date?.to || '2025-12-31',
     entryPattern: cliOptions.entryPattern || cliOptions['entry-pattern'] || defaultEntryPattern,

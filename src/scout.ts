@@ -17,7 +17,7 @@ program
     'AlphaGroove Entry Scout - On-demand entry analysis for real-time and historical market conditions'
   )
   .argument('<imagePath>', 'Path to the chart image to analyze')
-  .option('-d, --direction <direction>', 'Suggested direction (long or short)', 'long')
+
   .option('-c, --config <path>', 'Path to configuration file (default: alphagroove.config.yaml)')
   .option('--ticker <symbol>', 'Ticker symbol (for logging only)')
   .option('--date <YYYY-MM-DD>', 'Trade date (for logging only)')
@@ -61,16 +61,7 @@ export async function main(imagePath?: string, cmdOptions?: any) {
     const llmScreenConfig = llmConfig as LLMScreenConfig;
     const llmScreen = new LlmConfirmationScreen();
 
-    // Create a mock signal
-    const cliDirection = options.direction === 'short' ? 'short' : 'long';
-    let signalDirectionForLogic: 'long' | 'short' | undefined = cliDirection;
-    let displayDirection = cliDirection.toUpperCase();
-
-    const configDirection = rawConfig.shared?.direction || rawConfig.default?.direction;
-    if (configDirection === 'llm_decides') {
-      signalDirectionForLogic = undefined; // LLM screen will use its logic to determine direction
-      displayDirection = 'LLM Decides';
-    }
+    // Create a mock signal - LLM will always decide direction
 
     const ticker = options.ticker || 'TICKER';
     const tradeDate = options.date || new Date().toISOString().split('T')[0];
@@ -82,12 +73,11 @@ export async function main(imagePath?: string, cmdOptions?: any) {
       price,
       timestamp: `${tradeDate} ${new Date().toTimeString().split(' ')[0]}`,
       type: 'entry',
-      direction: signalDirectionForLogic, // Use the type-corrected direction
     };
 
     // Print analysis info
     console.log(chalk.bold(`\nAnalyzing chart: ${path.basename(chartPath)}`));
-    console.log(chalk.dim(`Direction: ${displayDirection}`)); // Use displayDirection
+    console.log(chalk.dim(`Direction: LLM Decides`));
     console.log(chalk.dim(`Model: ${llmScreenConfig.modelName}`));
     console.log(chalk.dim(`Calls: ${llmScreenConfig.numCalls}`));
     console.log(chalk.dim(`Threshold: ${llmScreenConfig.agreementThreshold}`));
@@ -111,16 +101,6 @@ export async function main(imagePath?: string, cmdOptions?: any) {
           decision.direction === 'long' ? chalk.green('LONG ↗️') : chalk.red('SHORT ↘️')
         }`
       );
-    }
-
-    if (options.direction && decision.direction) {
-      if (rawConfig.default?.direction !== 'llm_decides') {
-        const match =
-          decision.direction === cliDirection
-            ? chalk.green('✓ MATCHES')
-            : chalk.red('✗ DIFFERS FROM');
-        console.log(`${match} your suggested ${cliDirection.toUpperCase()} direction`);
-      }
     }
 
     if (decision.rationale) {

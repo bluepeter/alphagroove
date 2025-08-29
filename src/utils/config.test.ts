@@ -92,7 +92,7 @@ describe('Configuration System', () => {
       expect(merged).toMatchObject({
         ticker: 'QQQ',
         timeframe: '1min',
-        direction: 'long',
+
         from: '2024-01-01',
         to: '2023-12-31',
         entryPattern: 'quickRise',
@@ -128,7 +128,7 @@ describe('Configuration System', () => {
         default: {
           ticker: 'SPY',
           timeframe: '1min',
-          direction: 'long',
+
           patterns: { entry: 'quickRise' },
         },
       });
@@ -153,7 +153,7 @@ describe('Configuration System', () => {
         default: {
           ticker: 'SPY',
           timeframe: '1min',
-          direction: 'long',
+
           patterns: { entry: 'quick-fall' },
         },
       });
@@ -179,7 +179,7 @@ describe('Configuration System', () => {
         default: {
           ticker: 'SPY',
           timeframe: '1min',
-          direction: 'long',
+
           exitStrategies: {
             enabled: ['maxHoldTime'],
             maxHoldTime: { minutes: 30 },
@@ -200,7 +200,7 @@ describe('Configuration System', () => {
         default: {
           ticker: 'SPY',
           timeframe: '1min',
-          direction: 'long',
+
           patterns: { entry: 'fixedTimeEntry' },
         },
         patterns: {
@@ -222,7 +222,7 @@ describe('Configuration System', () => {
         default: {
           ticker: 'SPY',
           timeframe: '1min',
-          direction: 'long',
+
           patterns: { entry: 'fixedTimeEntry' },
         },
         entry: {
@@ -244,7 +244,7 @@ describe('Configuration System', () => {
         default: {
           ticker: 'SPY',
           timeframe: '1min',
-          direction: 'long',
+
           patterns: { entry: 'fixedTimeEntry' },
         },
         patterns: {
@@ -271,7 +271,7 @@ describe('Configuration System', () => {
         default: {
           ticker: 'SPY',
           timeframe: '1min',
-          direction: 'long',
+
           patterns: { entry: 'randomTimeEntry' },
         },
         entry: {
@@ -295,7 +295,7 @@ describe('Configuration System', () => {
         default: {
           ticker: 'SPY',
           timeframe: '1min',
-          direction: 'long',
+
           patterns: { entry: 'quickRise' },
 
           exitStrategies: {
@@ -469,7 +469,7 @@ describe('Configuration System', () => {
       // Test that shared config is mapped correctly
       expect(merged.ticker).toBe('SPY');
       expect(merged.timeframe).toBe('1min');
-      expect(merged.direction).toBe('llm_decides');
+
       expect(merged.from).toBe('2023-01-01');
       expect(merged.to).toBe('2023-12-31');
       expect(merged.maxConcurrentDays).toBe(2);
@@ -536,7 +536,7 @@ describe('Configuration System', () => {
       const merged = mergeConfigWithCliOptions(legacyConfig, {});
 
       expect(merged.ticker).toBe('QQQ');
-      expect(merged.direction).toBe('long');
+
       expect(merged.from).toBe('2022-01-01');
       expect(merged.to).toBe('2022-12-31');
       expect(merged.llmConfirmationScreen).toBeDefined();
@@ -590,7 +590,7 @@ describe('Configuration System', () => {
 
       // New structure should take priority
       expect(merged.ticker).toBe('NEW_TICKER');
-      expect(merged.direction).toBe('llm_decides');
+
       expect(merged.from).toBe('2024-01-01');
       expect(merged.llmConfirmationScreen).toBeDefined();
       expect(merged.llmConfirmationScreen!.llmProvider).toBe('anthropic');

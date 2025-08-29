@@ -135,7 +135,7 @@ describe('LLM Trade Screening Tests', () => {
     };
     const mockChartName = 'test-chart';
     const getMockAppConfig = (): AppConfig => ({
-      default: { direction: 'long', ticker: 'SPY', timeframe: '1min' },
+      default: { ticker: 'SPY', timeframe: '1min' },
       patterns: { entry: {} },
     });
 

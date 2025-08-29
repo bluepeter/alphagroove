@@ -278,7 +278,7 @@ the Node.js package.
    pnpm scout /path/to/chart.png
 
    # Include trading context
-   pnpm scout /path/to/chart.png --ticker SPY --price 587.54 --direction long
+   pnpm scout /path/to/chart.png --ticker SPY --price 587.54
    ```
 
 ### Running Production Build
@@ -309,7 +309,6 @@ level as `package.json`):
 shared:
   ticker: 'SPY'
   timeframe: '1min'
-  direction: 'llm_decides' # LLM analyzes charts and decides trade direction
 
   # Entry pattern configuration
   entry:
@@ -457,7 +456,6 @@ Here's a comprehensive example showing the new structured configuration format:
 shared:
   ticker: 'SPY'
   timeframe: '1min'
-  direction: 'llm_decides' # LLM analyzes charts and decides trade direction
 
   # Entry pattern configuration
   entry:
@@ -575,7 +573,6 @@ Create `alphagroove.config.yaml` with your desired settings:
 # === SHARED CONFIGURATION ===
 shared:
   ticker: 'SPY'
-  direction: 'llm_decides' # LLM analyzes charts and decides trade direction
 
   entry:
     enabled: [quickRise]
@@ -632,7 +629,7 @@ Override config file settings or run without a config file:
 
 ```bash
 # Override specific settings
-pnpm dev:start --from 2023-01-01 --to 2023-12-31 --direction short
+pnpm dev:start --from 2023-01-01 --to 2023-12-31
 
 # Override entry pattern parameters
 pnpm dev:start --quickRise.risePct=0.5 --fixedTimeEntry.entryTime=13:00
@@ -699,22 +696,22 @@ Entry patterns can be configured under root `entry` in the YAML (preferred) with
 pnpm dev:start --quickRise.risePct=0.5 --fixedTimeEntry.entryTime=13:00
 
 # Combining standard and pattern-specific options
-pnpm dev:start --from 2023-01-01 --to 2023-12-31 --direction short --quickRise.risePct=0.7
+pnpm dev:start --from 2023-01-01 --to 2023-12-31 --quickRise.risePct=0.7
 ```
 
 ## Available Options
 
 CLI options override values from the configuration file.
 
-| Option                      | Description                                | Default                   |
-| --------------------------- | ------------------------------------------ | ------------------------- |
-| `--from <YYYY-MM-DD>`       | Start date (inclusive)                     | From config               |
-| `--to <YYYY-MM-DD>`         | End date (inclusive)                       | From config               |
-| `--entry-pattern <pattern>` | Entry pattern to use                       | quickRise                 |
-| `--ticker <symbol>`         | Ticker to analyze                          | SPY                       |
-| `--timeframe <period>`      | Data resolution                            | 1min                      |
-| `--direction <direction>`   | Trading direction (long/short/llm_decides) | llm_decides               |
-| `--config <path>`           | Path to custom configuration file          | ./alphagroove.config.yaml |
+| Option                      | Description            | Default     |
+| --------------------------- | ---------------------- | ----------- |
+| `--from <YYYY-MM-DD>`       | Start date (inclusive) | From config |
+| `--to <YYYY-MM-DD>`         | End date (inclusive)   | From config |
+| `--entry-pattern <pattern>` | Entry pattern to use   | quickRise   |
+| `--ticker <symbol>`         | Ticker to analyze      | SPY         |
+| `--timeframe <period>`      | Data resolution        | 1min        |
+
+| `--config <path>` | Path to custom configuration file | ./alphagroove.config.yaml |
 
 | `--maxConcurrentDays <number>` | Maximum days to process concurrently (1-20) | 3 | | `--debug` |
 Show debug information and SQL queries | false | | `--verbose` | Show detailed LLM responses and
@@ -792,42 +789,25 @@ Common timeframes include:
 
 ### Trading Direction
 
-The `--direction` parameter (and its corresponding `default.direction` in `alphagroove.config.yaml`)
-can be set to `long`, `short`, or the new `llm_decides` option.
+AlphaGroove uses LLM (Large Language Model) analysis to dynamically determine trade direction for
+every signal. When an entry pattern triggers:
 
-- **`long` or `short`**:
-  - The system identifies market setups (like a quick rise in price).
-  - If `direction: long`, it takes buy positions, profiting from price increases.
-  - If `direction: short`, it takes sell positions, profiting from price decreases.
-  - Return calculations are based on this fixed direction.
-  - If the `llmConfirmationScreen` is enabled, it acts as a go/no-go filter for this pre-set
-    direction.
+1. **Chart Analysis**: The system generates a chart and sends it to the LLM
+2. **LLM Decision**: The LLM analyzes the chart pattern and market context to decide whether to go
+   **long** (buy) or **short** (sell)
+3. **Consensus Logic**: Based on `numCalls` and `agreementThreshold` in the configuration, multiple
+   LLM calls reach consensus on direction
+4. **Execution**: If consensus is reached, the trade executes in the determined direction;
+   otherwise, no trade occurs
 
-- **`llm_decides`**:
-  - This mode requires `llmConfirmationScreen.enabled` to be `true`.
-  - When an entry pattern triggers, the chart is sent to the LLM.
-  - The LLM's consensus (based on `numCalls` and `agreementThreshold`) determines the actual trade
-    direction (long or short).
-  - If the LLM consensus is to "do_nothing" or doesn't meet the threshold for a directional call, no
-    trade is executed.
-  - This allows the LLM to dynamically decide whether to go long or short on a pattern that might
-    otherwise have a fixed interpretation.
-  - The initial SQL query for fetching trade data identifies entry candidates and their entry
-    prices. If `llm_decides` is active, the query may assume a base direction (e.g., 'long') for
-    context, but it does not calculate a preliminary `return_pct`. The actual `return_pct` for the
-    trade is calculated in JavaScript after the LLM's consensus determines the final trade direction
-    ('long' or 'short'), using the standard formula appropriate for that chosen direction.
+**Metrics Reporting:**
 
-**Metrics Reporting with Dynamic Direction:**
+Trade summaries are automatically split by the LLM's actual execution decisions:
 
-When using fixed `long`/`short` directions, or when `llm_decides` results in trades, the output
-summaries (both yearly and overall) will now be split into:
+- **Long Trades Summary**: Metrics for all LLM-decided long positions
+- **Short Trades Summary**: Metrics for all LLM-decided short positions
 
-- **Long Trades Summary**: Metrics for all trades executed as long positions.
-- **Short Trades Summary**: Metrics for all trades executed as short positions.
-
-This provides a clear view of performance for each actual executed direction, regardless of the
-initial `direction` setting.
+This provides clear performance visibility for each direction as determined by the AI analysis.
 
 ### Chart Generation
 
@@ -859,13 +839,10 @@ covers the technical configuration details for the LLM integration.
   response. The system will average valid prices from responses that align with the consensus trade
   action.
 - **Consensus Logic:**
-  - If `default.direction` in `alphagroove.config.yaml` is set to `long` or `short`: A trade signal
-    proceeds only if a configurable number of LLM responses agree on that specific pre-configured
-    trade direction. Otherwise, the signal is filtered out.
-  - If `default.direction` is `llm_decides`: The LLM's consensus determines the actual trade
-    direction. If a sufficient number of LLMs (`agreementThreshold`) vote for `long` (and more than
-    `short`), a long trade is initiated. Similarly for `short`. If there's no clear consensus or
-    "do_nothing" is favored, no trade occurs.
+  - The LLM's consensus determines the actual trade direction. If a sufficient number of LLMs
+    (`agreementThreshold`) vote for `long` (and more than `short`), a long trade is initiated.
+    Similarly for `short`. If there's no clear consensus or "do_nothing" is favored, no trade
+    occurs.
 - **Cost Tracking:** The cost of LLM calls is tracked and reported.
 
 **Configuration:**
@@ -934,9 +911,6 @@ from existing chart images using your validated LLM configuration:
 # Scout entry opportunities from chart images
 pnpm scout /path/to/chart.png
 
-# Specify trading direction preference
-pnpm scout /path/to/chart.png --direction long
-
 # Include additional context for logging
 pnpm scout /path/to/chart.png --ticker SPY --date 2025-01-15 --price 587.54
 ```
@@ -944,7 +918,7 @@ pnpm scout /path/to/chart.png --ticker SPY --date 2025-01-15 --price 587.54
 **Options:**
 
 - `<imagePath>`: Path to the chart image to analyze (required)
-- `-d, --direction <direction>`: Suggested direction (`long` or `short`, default: `long`)
+
 - `-c, --config <path>`: Path to configuration file (default: `alphagroove.config.yaml`)
 - `--ticker <symbol>`: Ticker symbol (for logging only)
 - `--date <YYYY-MM-DD>`: Trade date (for logging only)
@@ -1071,9 +1045,8 @@ pnpm dev:start --entry-pattern quickFall --quickFall.fallPct=0.4
 # Analyze a different ticker with specific timeframe
 pnpm dev:start --ticker QQQ --timeframe 5min
 
-# Compare both long and short strategies
-pnpm dev:start --direction long
-pnpm dev:start --direction short
+# Run backtest analysis
+pnpm dev:start
 
 # Process multiple days concurrently for faster execution
 pnpm dev:start --maxConcurrentDays 5
@@ -1087,7 +1060,7 @@ pnpm dev:start list-patterns
 pnpm dev:start --config custom-config.yaml
 
 # Entry scout examples
-pnpm scout /path/to/chart.png --ticker SPY --direction long
+pnpm scout /path/to/chart.png --ticker SPY
 pnpm scout /path/to/chart.png --price 587.54 --verbose
 ```
 

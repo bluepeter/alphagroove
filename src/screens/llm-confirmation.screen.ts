@@ -144,8 +144,7 @@ export class LlmConfirmationScreen implements EntryScreen {
         }
       });
 
-      const configuredDirection =
-        appConfig.default?.direction || appConfig.shared?.direction || 'long';
+      const configuredDirection = 'llm_decides';
       const totalCostString = ` (Total Cost: $${totalCost.toFixed(6)})`;
 
       let logMessage = '';

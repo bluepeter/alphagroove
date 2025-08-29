@@ -48,7 +48,7 @@ describe('initializeAnalysis', () => {
     default: {
       ticker: 'SPY',
       timeframe: '1min',
-      direction: 'long',
+
       patterns: {
         entry: 'test-pattern',
       },

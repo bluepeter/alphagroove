@@ -3,9 +3,7 @@
 shared:
   ticker: 'SPY'
   timeframe: '1min'
-  # direction can be 'long', 'short', or 'llm_decides'.
-  # If 'llm_decides', llmConfirmationScreen must be configured.
-  direction: 'llm_decides'
+
   entry:
     enabled: [randomTimeEntry]
     strategyOptions:

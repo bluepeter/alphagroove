@@ -75,7 +75,6 @@ const generateChartForLLMDecision = async (
     timestamp: signalData.timestamp,
     price: signalData.price,
     type: 'entry',
-    direction: signalData.direction,
   };
 
   try {
@@ -124,7 +123,7 @@ export const handleLlmTradeScreeningInternal = async (
   averagedProposedProfitTarget?: number;
 }> => {
   if (!llmScreenInstance || !screenSpecificLLMConfig) {
-    return { proceed: true, cost: 0 }; // No direction needed if LLM screen not active
+    return { proceed: true, cost: 0 }; // No LLM screen active
   }
   const chartPathForLLM = await generateChartForLLMDecision(
     currentSignal,
@@ -140,13 +139,14 @@ export const handleLlmTradeScreeningInternal = async (
     debug // Pass debug flag
   );
 
-  // screenDecision already includes proceed, cost, and optional direction
+  // screenDecision already includes proceed, cost, and LLM analysis
   if (!screenDecision.proceed) {
     return { ...screenDecision, chartPath: undefined, cost: screenDecision.cost ?? 0 }; // Ensure chartPath is not set and cost is number
   } else {
     // Include averaged prices if proceeding
     return {
-      ...screenDecision,
+      proceed: screenDecision.proceed,
+      direction: screenDecision.direction,
       chartPath: chartPathForLLM,
       cost: screenDecision.cost ?? 0,
       averagedProposedStopLoss: screenDecision.averagedProposedStopLoss,
@@ -314,8 +314,6 @@ const processDayTrades = async (
   const shortTrades: Trade[] = [];
   let llmCost = 0;
 
-  const initialGlobalDirection = mergedConfig.direction;
-
   for (const rawTradeData of dayTrades) {
     const entrySignalTimestamp = rawTradeData.entry_time as string;
     const tradeDate = rawTradeData.trade_date as string;
@@ -351,23 +349,19 @@ const processDayTrades = async (
     const actualExecutionTimestamp = executionBar.timestamp;
     const executionBarClosePrice = executionBar.close;
 
-    const signalDirectionForLlm: 'long' | 'short' =
-      initialGlobalDirection === 'llm_decides' ? 'long' : initialGlobalDirection;
-
     const currentSignal: EnrichedSignal = {
       ticker: mergedConfig.ticker,
       trade_date: tradeDate,
       price: signalBar.close,
       timestamp: signalBar.timestamp,
       type: 'entry',
-      direction: signalDirectionForLlm,
     };
 
     const {
       proceed: proceedFromLlm,
       chartPath: llmChartPath,
       cost: screeningCost,
-      direction: llmConfirmationDirection,
+      direction: llmDirection,
       averagedProposedStopLoss: llmAveragedStopLoss,
       averagedProposedProfitTarget: llmAveragedProfitTarget,
     } = await handleLlmTradeScreeningInternal(
@@ -382,29 +376,14 @@ const processDayTrades = async (
 
     llmCost += screeningCost;
 
-    if (!proceedFromLlm) {
-      continue;
-    }
-
-    let actualTradeDirection: 'long' | 'short';
-    if (llmConfirmationDirection) {
-      actualTradeDirection = llmConfirmationDirection;
-    } else if (!llmScreenInstance || !screenSpecificLLMConfig) {
-      if (initialGlobalDirection === 'llm_decides') {
-        console.warn(
-          "[processTradesLoop] LLM screen did not provide direction for 'llm_decides' strategy, or was disabled. Defaulting to 'long'. Trade on " +
-            rawTradeData.trade_date
-        );
-        actualTradeDirection = 'long';
-      } else {
-        actualTradeDirection = initialGlobalDirection;
-      }
-    } else {
+    if (!proceedFromLlm || !llmDirection) {
       console.warn(
-        `[processTradesLoop] LLM proceeded but no direction confirmed by active LLM screen. Skipping trade for ${rawTradeData.trade_date}.`
+        `[processTradesLoop] LLM did not confirm trade or provide direction for ${rawTradeData.trade_date}. Skipping.`
       );
       continue;
     }
+
+    const actualTradeDirection = llmDirection;
 
     const entryAtrValue = await calculateEntryAtr(
       mergedConfig.ticker,
@@ -689,7 +668,7 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
       mergedConfig.to,
       entryPattern.name,
       mergedConfig.exitStrategies,
-      mergedConfig.direction as 'long' | 'short' | 'llm_decides'
+      'llm_decides'
     );
 
     // Ensure distinct arrays for long_stats and short_stats
@@ -750,7 +729,7 @@ const parseCLI = async () => {
     .option('--entry-pattern <name>', 'Entry pattern name')
     .option('--exit-pattern <name>', 'Exit pattern name')
     .option('--config <path>', 'Path to configuration file')
-    .option('--direction <direction>', 'Trading direction (long/short)')
+
     .option(
       '--maxConcurrentDays <number>',
       'Maximum number of days to process concurrently (1-20)',
