@@ -853,12 +853,12 @@ This feature is configured within the `alphagroove.config.yaml` file under the
 - `modelName`: (string) The specific model to use (e.g., `'claude-sonnet-4-20250514'`).
 - `apiKeyEnvVar`: (string) The name of the environment variable that holds the API key for the LLM
   provider (e.g., `'ANTHROPIC_API_KEY'`).
-- `numCalls`: (number) The number of parallel calls to make to the LLM for each signal. Default:
-  `3`.
+- `numCalls`: (number) The number of parallel calls to make to the LLM for each signal. **Must be
+  configured explicitly - no default provided.**
 - `agreementThreshold`: (number) The minimum number of LLM responses that must agree on an action
   for the signal to proceed. Default: `2`.
 - `temperatures`: (array of numbers) An array of temperature settings, one for each LLM call. Length
-  should match `numCalls`. Default: `[0.2, 0.5, 0.8]`.
+  should match `numCalls`. **Must be configured explicitly - no default provided.**
 - `prompts`: (string or array of strings) The prompt(s) to send to the LLM. If an array, its length
   should match `numCalls`.
 - `commonPromptSuffixForJson`: (string, optional) A suffix appended to each prompt to instruct the
@@ -898,53 +898,47 @@ exit strategies validated through historical backtesting. Primarily designed for
 reconnaissance, it's flexible enough to analyze specific historical moments for development and
 testing.
 
-### Current Capabilities (Chart Analysis Mode)
+### Current Capabilities (Live Market Analysis)
 
-The entry scout currently operates in chart analysis mode, allowing you to scout entry opportunities
-from existing chart images using your validated LLM configuration:
+The entry scout provides real-time market analysis using the Polygon.io API, generating charts and
+LLM analysis for current market conditions:
 
 **Usage:**
 
 ```bash
-# Scout entry opportunities from chart images
-pnpm scout /path/to/chart.png
+# Scout current market conditions (uses config for ticker)
+pnpm scout
 
-# Include additional context for logging
-pnpm scout /path/to/chart.png --ticker SPY --date 2025-01-15 --price 587.54
+# Scout with verbose LLM output
+pnpm scout --verbose
 ```
+
+**Features:**
+
+- **Real-Time Data**: Uses Polygon.io API for current and previous day market data
+- **Automatic Chart Generation**: Creates charts identical to backtesting format (2-day view up to
+  current time)
+- **LLM Analysis**: Same LLM configuration and consensus logic as backtesting
+- **Trade Recommendations**: Provides entry/exit levels, stop loss, and profit targets for manual
+  execution
+- **Risk/Reward Analysis**: Calculates risk-reward ratios and percentage moves
 
 **Options:**
 
-- `<imagePath>`: Path to the chart image to analyze (required)
-
 - `-c, --config <path>`: Path to configuration file (default: `alphagroove.config.yaml`)
-- `--ticker <symbol>`: Ticker symbol (for logging only)
-- `--date <YYYY-MM-DD>`: Trade date (for logging only)
-- `--price <number>`: Current price (for logging only)
-- `-v, --verbose`: Show detailed LLM responses including rationales
+- `-v, --verbose`: Show detailed LLM responses and rationales
 
-### Planned Live Scouting Features
+**Requirements:**
 
-The entry scout is being enhanced to support full live market scouting:
-
-**Upcoming Capabilities:**
-
-- **Real-Time Data Integration**: Direct integration with Polygon.io API for live market data
-- **Entry Pattern Detection**: Real-time monitoring for quickRise, quickFall, and fixedTimeEntry
-  patterns
-- **Automated Chart Generation**: Generate current market charts identical to backtesting format
-- **Live Signal Generation**: Provide actionable trade signals with calculated stop loss and profit
-  target levels
-- **Brokerage Integration**: Export trade parameters in formats compatible with major trading
-  platforms
+- Polygon.io API key set in environment variable (configured in `alphagroove.config.yaml`)
+- Market hours: Works during trading hours and shows data up to current time
 
 **Target Workflow:**
 
 1. Run backtesting to validate strategy parameters and LLM configuration
-2. Deploy entry scout with live market monitoring
-3. Receive real-time alerts when entry patterns trigger
-4. Get LLM analysis of current market conditions with specific entry/exit levels
-5. Execute trades in your brokerage using the provided parameters
+2. Use entry scout for real-time market analysis
+3. Get LLM analysis of current market conditions with specific entry/exit levels
+4. Execute trades in your brokerage using the provided parameters
 
 ### Integration with Backtesting
 
@@ -1058,20 +1052,9 @@ pnpm dev:start list-patterns
 pnpm dev:start --config custom-config.yaml
 
 # Entry scout examples
-pnpm scout /path/to/chart.png --ticker SPY
-pnpm scout /path/to/chart.png --price 587.54 --verbose
+pnpm scout
+pnpm scout --verbose
 ```
-
-## Project Setup
-
-The project has been initialized with the following structure:
-
-- **TypeScript Configuration**: Set up with modern ES modules and strict type checking
-- **ESLint & Prettier**: Code quality tools with recommended rules for TypeScript
-- **Build System**: Simple build process using TypeScript compiler
-- **Flexible Configuration**: YAML-based config with CLI overrides
-- **Direct TypeScript Execution**: Using tsx for rapid development without build steps
-- **Testing Framework**: Vitest for unit and integration testing
 
 ### Directory Structure
 
