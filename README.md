@@ -703,16 +703,16 @@ pnpm dev:start --from 2023-01-01 --to 2023-12-31 --quickRise.risePct=0.7
 
 CLI options override values from the configuration file.
 
-| Option                      | Description            | Default     |
-| --------------------------- | ---------------------- | ----------- |
-| `--from <YYYY-MM-DD>`       | Start date (inclusive) | From config |
-| `--to <YYYY-MM-DD>`         | End date (inclusive)   | From config |
-| `--entry-pattern <pattern>` | Entry pattern to use   | quickRise   |
-| `--ticker <symbol>`         | Ticker to analyze      | SPY         |
-| `--timeframe <period>`      | Data resolution        | 1min        |
-| `--maxConcurrentDays <number>` | Maximum days to process concurrently (1-20) | 3 | | `--debug` |
-Show debug information and SQL queries | false | | `--verbose` | Show detailed LLM responses and
-debug info | false | | `--dry-run` | Show query without executing | false |
+| Option                                 | Description                                 | Default     |
+| -------------------------------------- | ------------------------------------------- | ----------- | ----------- | ------------------------------- | ----- |
+| `--from <YYYY-MM-DD>`                  | Start date (inclusive)                      | From config |
+| `--to <YYYY-MM-DD>`                    | End date (inclusive)                        | From config |
+| `--entry-pattern <pattern>`            | Entry pattern to use                        | quickRise   |
+| `--ticker <symbol>`                    | Ticker to analyze                           | SPY         |
+| `--timeframe <period>`                 | Data resolution                             | 1min        |
+| `--maxConcurrentDays <number>`         | Maximum days to process concurrently (1-20) | 3           |             | `--debug`                       |
+| Show debug information and SQL queries | false                                       |             | `--verbose` | Show detailed LLM responses and |
+| debug info                             | false                                       |             | `--dry-run` | Show query without executing    | false |
 
 ### Pattern-Specific Options
 
@@ -964,73 +964,6 @@ The entry scout uses identical configuration and analysis methods as the backtes
   backtesting
 - **ATR-Based Calculations**: Uses real-time ATR calculations for dynamic exit levels
 
-### Trade Levels Calculator
-
-AlphaGroove includes a standalone CLI tool for calculating stop loss, profit target, and trailing
-stop levels based on Average True Range (ATR) from a CSV file with minute bar data. This tool
-calculates ATR based on **all data present in the provided CSV file**. Users should ensure the input
-CSV contains only the historical data relevant for the desired ATR calculation period (e.g., only
-the previous trading day's 1-minute bars). It uses the same configuration from your
-`alphagroove.config.yaml` file to ensure that the calculated levels match what would be used in a
-backtest.
-
-**Usage:**
-
-```bash
-# Basic usage
-pnpm levels charts/adhoc/recent-data-from-fidelity.csv --price 587.54 > PRICE.txt
-```
-
-**Options:**
-
-- `<csvPath>`: Path to the CSV file with minute bar data (required)
-- `-p, --price <price>`: Current execution price (required)
-
-**CSV Format:**
-
-The minute bars CSV file should have the following columns (this format is geared towards manual
-download from Fidelity which differs from the data source we use for backtesting in the `tickers/`
-directory.):
-
-- `Date`: Date in MM/DD/YYYY format
-- `Time`: Time in HH:MM AM/PM format
-- `Open`: Opening price for the period
-- `High`: Highest price for the period
-- `Low`: Lowest price for the period
-- `Close`: Closing price for the period
-- `Volume`: Trading volume for the period (optional)
-
-The tool calculates the ATR from all data in the provided CSV and applies the exit strategy settings
-from your configuration to determine appropriate exit levels for the current trade.
-
-**Example Output:**
-
-```
-Loading configuration...
-Parsing CSV data...
-Parsed 391 records from CSV
-Sample record: {"Date":"05/14/2025","Time":"9:31 AM","Open":"587.81","High":"588.45","Low":"587.81","Close":"588.3214","Volume":"470449"}
-Calculating ATR from the provided CSV data...
-
-ATR (from entire CSV): 0.2729
-
-Trade Levels for LONG at 587.54
-
-Stop Loss: 586.9942 (2x ATR below entry) [-0.09%]
-Profit Target: 588.6316 (4x ATR above entry) [0.19%]
-Trailing Stop: Immediate activation
-Trailing Amount: 0.5458 (2.0x ATR, 0.09% of price)
-
-Trade Levels for SHORT at 587.54
-
-Stop Loss: 588.0858 (2x ATR above entry) [0.09%]
-Profit Target: 586.4484 (4x ATR below entry) [-0.19%]
-Trailing Stop: Immediate activation
-Trailing Amount: 0.5458 (2.0x ATR, 0.09% of price)
-
-Note: ATR is calculated from all data in the provided CSV. Ensure CSV contains only the desired historical period for ATR.
-```
-
 ### Command Examples
 
 ```bash
@@ -1055,8 +988,6 @@ pnpm dev:start
 # Process multiple days concurrently for faster execution
 pnpm dev:start --maxConcurrentDays 5
 
-
-
 # List available patterns
 pnpm dev:start list-patterns
 
@@ -1074,7 +1005,6 @@ alphagroove/
 ├── src/                # Source code
 │   ├── index.ts        # Main entry point (backtesting engine)
 │   ├── scout.ts        # Entry scout for on-demand analysis
-│   ├── trade-levels.ts # Standalone trade levels calculator
 │   ├── patterns/       # Entry and exit pattern implementations
 │   │   ├── entry/      # Entry patterns (quickRise, quickFall, etc.)
 │   │   └── exit/       # Exit strategies (stopLoss, profitTarget, etc.)
@@ -1097,18 +1027,4 @@ alphagroove/
 ├── vitest.config.ts    # Vitest configuration
 ├── alphagroove.config.yaml # Configuration file (you create this)
 └── README.md           # Project documentation
-```
-
-### Getting Started
-
-```bash
-# Install dependencies
-pnpm install
-
-# Run directly with tsx (no build step)
-pnpm dev:start
-
-# Or build and run (for production)
-pnpm build
-pnpm start
 ```

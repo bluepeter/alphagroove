@@ -6,8 +6,7 @@
   "main": "dist/index.js",
   "bin": {
     "alphagroove": "./dist/index.js",
-    "scout": "./dist/scout.js",
-    "trade-levels": "./dist/trade-levels.js"
+    "scout": "./dist/scout.js"
   },
   "files": [
     "dist",
@@ -30,7 +29,6 @@
     "start": "node --import ./scripts/register-esm-loader.mjs dist/index.js",
     "dev:start": "tsx src/index.ts",
     "scout": "tsx src/scout.ts",
-    "levels": "tsx src/trade-levels.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
