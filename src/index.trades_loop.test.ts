@@ -125,8 +125,7 @@ describe('Process Trades Loop Tests', () => {
       from: '2023-01-01',
       to: '2023-01-31',
       entryPattern: 'quick-rise',
-      generateCharts: false,
-      chartsDir: './charts',
+
       maxConcurrentDays: 1,
       exitStrategies: {
         enabled: ['maxHoldTime'],

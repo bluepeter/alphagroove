@@ -298,7 +298,7 @@ describe('Configuration System', () => {
           timeframe: '1min',
           direction: 'long',
           patterns: { entry: 'quickRise' },
-          charts: { generate: true, outputDir: './charts' },
+
           exitStrategies: {
             enabled: [],
             maxHoldTime: { minutes: 60 }, // Configured with default minutes

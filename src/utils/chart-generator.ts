@@ -16,7 +16,6 @@ interface ChartGeneratorOptions {
   tradeDate: string;
   entryTimestamp: string;
   entrySignal: Signal;
-  outputDir?: string;
 }
 
 /**
@@ -24,16 +23,9 @@ interface ChartGeneratorOptions {
  * Displays the current day's data plus 1 previous actual trading day with data.
  */
 export const generateEntryChart = async (options: ChartGeneratorOptions): Promise<string> => {
-  const {
-    ticker,
-    timeframe,
-    entryPatternName,
-    tradeDate,
-    entrySignal,
-    outputDir = './charts',
-  } = options;
+  const { ticker, timeframe, entryPatternName, tradeDate, entrySignal } = options;
 
-  const patternDir = path.join(outputDir, entryPatternName);
+  const patternDir = path.join('./charts', entryPatternName);
   fs.mkdirSync(patternDir, { recursive: true });
 
   const baseFileName = `${ticker}_${entryPatternName}_${tradeDate.replace(/-/g, '')}`;
@@ -598,8 +590,7 @@ export const generateEntryCharts = async (
     entry_time: string;
     entry_price: number;
     direction?: 'long' | 'short';
-  }>,
-  outputDir: string = './charts'
+  }>
 ): Promise<string[]> => {
   // Now returns array of PNG paths
   const outputPngPaths: string[] = [];
@@ -620,7 +611,6 @@ export const generateEntryCharts = async (
         tradeDate: trade.trade_date,
         entryTimestamp: trade.entry_time,
         entrySignal,
-        outputDir,
       });
       if (pngPath) {
         // Check if a path was returned (might be empty on error)

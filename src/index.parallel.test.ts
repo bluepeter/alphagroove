@@ -132,8 +132,7 @@ describe('Parallel Processing Tests', () => {
     from: '2023-01-01',
     to: '2024-01-03',
     entryPattern: 'test-entry',
-    generateCharts: false, // Disable charts to focus on parallel processing logic
-    chartsDir: './charts',
+
     maxConcurrentDays: 3, // Test with parallel processing
     llmConfirmationScreen: {
       enabled: false, // Disable LLM to focus on parallel processing

@@ -84,7 +84,6 @@ describe('Chart Generator', () => {
       tradeDate: '2023-05-01',
       entryTimestamp: '2023-05-01 09:35:00',
       entrySignal: mockSignal,
-      outputDir: testOutputDir,
     });
 
     // SQL query and temporary SVG writing are implicitly tested by sharp successfully reading the SVG
@@ -153,7 +152,6 @@ describe('Chart Generator', () => {
       tradeDate: mondaySignalDate,
       entryTimestamp: mondaySignal.timestamp,
       entrySignal: mondaySignal,
-      outputDir: testOutputDir,
     });
 
     expect(pngPath).toContain('SPY_WEEKEND_TEST_weekend-skip-test_20250127.png');
@@ -200,7 +198,6 @@ describe('Chart Generator', () => {
       tradeDate: tuesdaySignalDate,
       entryTimestamp: tuesdaySignal.timestamp,
       entrySignal: tuesdaySignal,
-      outputDir: testOutputDir,
     });
 
     expect(pngPath).toContain('SPY_HOLIDAY_TEST_holiday-skip-test_20250121.png');

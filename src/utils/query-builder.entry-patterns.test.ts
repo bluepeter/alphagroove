@@ -10,8 +10,7 @@ describe('buildAnalysisQuery with entry patterns', () => {
     from: '2023-01-01',
     to: '2023-01-05',
     entryPattern: 'test-pattern',
-    generateCharts: false,
-    chartsDir: './charts',
+
     maxConcurrentDays: 1,
   };
 

@@ -103,8 +103,7 @@ describe('processTradesLoop - LLM Exit Price Usage', () => {
     from: '2023-01-01',
     to: '2023-01-01',
     entryPattern: 'test-entry',
-    generateCharts: false,
-    chartsDir: './charts',
+
     maxConcurrentDays: 1,
     llmConfirmationScreen: getDefaultTestLLMScreenConfig(), // Use helper for default
     exitStrategies: {

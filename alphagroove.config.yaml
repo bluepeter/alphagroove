@@ -8,8 +8,6 @@ default:
   # direction can be 'long', 'short', or 'llm_decides'.
   # If 'llm_decides', llmConfirmationScreen must be configured.
   direction: 'llm_decides'
-  charts:
-    outputDir: './charts'
   parallelization:
     maxConcurrentDays: 3 # Process up to 3 days concurrently for faster execution
 

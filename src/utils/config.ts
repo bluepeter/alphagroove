@@ -175,12 +175,6 @@ const DefaultPatternsSchema = z.object({
   entry: z.string().default('quickRise'),
 });
 
-// Schema for chart options
-const ChartOptionsSchema = z.object({
-  generate: z.boolean().optional().default(true),
-  outputDir: z.string().default('./charts'),
-});
-
 // Schema for parallelization options
 const ParallelizationOptionsSchema = z.object({
   maxConcurrentDays: z.number().int().min(1).max(20).default(1),
@@ -241,7 +235,6 @@ const ConfigSchema = z
       timeframe: z.string(),
       direction: z.enum(['long', 'short', 'llm_decides']),
       patterns: DefaultPatternsSchema.optional(),
-      charts: ChartOptionsSchema.optional(),
       parallelization: ParallelizationOptionsSchema.optional(),
       // NEW: Add exitStrategies to default config
       exitStrategies: ExitStrategiesConfigSchema.optional(),
@@ -293,10 +286,7 @@ const DEFAULT_CONFIG: Config = {
     patterns: {
       entry: 'quickRise',
     },
-    charts: {
-      generate: false,
-      outputDir: './charts',
-    },
+
     exitStrategies: {
       enabled: [],
       maxHoldTime: {
@@ -432,10 +422,7 @@ export const createDefaultConfigFile = (): void => {
         patterns: {
           entry: 'quickRise',
         },
-        charts: {
-          generate: false,
-          outputDir: './charts',
-        },
+
         exitStrategies: {
           enabled: [],
           maxHoldTime: {
@@ -532,8 +519,7 @@ export interface MergedConfig {
   from: string;
   to: string;
   entryPattern: string;
-  generateCharts: boolean;
-  chartsDir: string;
+
   maxConcurrentDays: number;
   llmConfirmationScreen?: LLMScreenConfig;
   exitStrategies?: ExitStrategiesConfig; // NEW: Add exitStrategies
@@ -656,11 +642,6 @@ export const mergeConfigWithCliOptions = (
     from: cliOptions.from || loadedConfig.default.date?.from || '2010-01-01',
     to: cliOptions.to || loadedConfig.default.date?.to || '2025-12-31',
     entryPattern: cliOptions.entryPattern || cliOptions['entry-pattern'] || defaultEntryPattern,
-    generateCharts:
-      cliOptions.generateCharts !== undefined
-        ? cliOptions.generateCharts
-        : (loadedConfig.default.charts?.generate ?? true),
-    chartsDir: cliOptions.chartsDir || loadedConfig.default.charts?.outputDir || './charts',
     maxConcurrentDays:
       cliOptions.maxConcurrentDays || loadedConfig.default.parallelization?.maxConcurrentDays || 1,
     llmConfirmationScreen: loadedConfig.llmConfirmationScreen
@@ -846,10 +827,6 @@ export const mergeConfigWithCliOptions = (
       ...(mergedConfig.randomTimeEntry || {}),
       ...cliOptions.randomTimeEntry,
     };
-  }
-
-  if (cliOptions.generateCharts === true && mergedConfig.generateCharts === false) {
-    mergedConfig.generateCharts = true;
   }
 
   return mergedConfig;

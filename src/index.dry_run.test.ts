@@ -18,7 +18,7 @@ vi.mock('./utils/config.js', async () => {
       exitPattern: 'test-exit',
       timeframe: '1min',
       llmConfirmationScreen: { enabled: false },
-      generateCharts: false,
+
       debug: true, // Important for dry run logging
       exitStrategies: {
         enabled: ['maxHoldTime'],
@@ -156,7 +156,7 @@ describe('runAnalysis dry run', () => {
       timeframe: '1min',
       direction: 'long',
       llmConfirmationScreen: { enabled: false },
-      generateCharts: false,
+
       debug: true, // Ensure debug is true for dry run query logging
       someBaseOpt: 'value',
       config: 'path/to/config.yaml',

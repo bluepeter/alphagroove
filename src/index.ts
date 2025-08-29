@@ -86,14 +86,14 @@ const generateChartForLLMDecision = async (
       tradeDate: signalData.trade_date,
       entryTimestamp: signalData.timestamp,
       entrySignal: entrySignalForChart,
-      outputDir: appOrMergedConfig.chartsDir || './charts',
+      outputDir: './charts',
     });
 
     if (!chartPath) {
       console.warn(
         `[LLM Prep] Chart generation for ${signalData.trade_date} returned an empty path (likely no data).`
       );
-      const chartDir = join(appOrMergedConfig.chartsDir || './charts', entryPatternName);
+      const chartDir = join('./charts', entryPatternName);
       const chartFileName = `${signalData.ticker}_${entryPatternName}_${signalData.trade_date.replace(/-/g, '')}_llm_failed.png`;
       return join(chartDir, chartFileName);
     }
@@ -101,7 +101,7 @@ const generateChartForLLMDecision = async (
     return chartPath;
   } catch (error) {
     console.error(`[LLM Prep] Error generating chart for ${signalData.trade_date}:`, error);
-    const chartDir = join(appOrMergedConfig.chartsDir || './charts', entryPatternName);
+    const chartDir = join('./charts', entryPatternName);
     const chartFileName = `${signalData.ticker}_${entryPatternName}_${signalData.trade_date.replace(/-/g, '')}_llm_error.png`;
     return join(chartDir, chartFileName);
   }
@@ -623,7 +623,7 @@ export const finalizeAnalysis = async (
 
   printOverallSummary(totalStats);
 
-  if (mergedConfig.generateCharts && totalStats.total_llm_confirmed_trades > 0) {
+  if (totalStats.total_llm_confirmed_trades > 0) {
     const llmScreenEnabled = mergedConfig.llmConfirmationScreen?.enabled;
 
     if (llmScreenEnabled) {
@@ -654,14 +654,12 @@ export const finalizeAnalysis = async (
         mergedConfig.timeframe,
         entryPattern.name,
         tradesForBulkCharts,
-        mergedConfig.chartsDir || './charts'
+        './charts'
       );
-      console.log(
-        `\nGenerated ${chartPaths.length} charts in ${mergedConfig.chartsDir || './charts'}/${entryPattern.name}/`
-      );
+      console.log(`\nGenerated ${chartPaths.length} charts in ./charts/${entryPattern.name}/`);
     }
-  } else if (mergedConfig.generateCharts && confirmedTrades.length === 0) {
-    console.log('\nChart generation enabled, but no trades to chart.');
+  } else if (confirmedTrades.length === 0) {
+    console.log('\nNo trades to chart.');
   }
 
   printFooter();
@@ -755,8 +753,6 @@ const parseCLI = async () => {
     .option('--exit-pattern <name>', 'Exit pattern name')
     .option('--config <path>', 'Path to configuration file')
     .option('--direction <direction>', 'Trading direction (long/short)')
-    .option('--generate-charts', 'Generate multiday charts for each entry')
-    .option('--charts-dir <path>', 'Directory for chart output')
     .option(
       '--maxConcurrentDays <number>',
       'Maximum number of days to process concurrently (1-20)',

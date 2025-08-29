@@ -45,8 +45,7 @@ describe('buildAnalysisQuery', () => {
       from: '2023-01-01',
       to: '2023-01-05',
       entryPattern: 'Test Pattern',
-      generateCharts: false,
-      chartsDir: './charts',
+
       maxConcurrentDays: 1,
     };
 
@@ -62,8 +61,7 @@ describe('buildAnalysisQuery', () => {
       from: '2023-01-01',
       to: '2023-01-05',
       entryPattern: 'Test Pattern',
-      generateCharts: false,
-      chartsDir: './charts',
+
       maxConcurrentDays: 1,
     };
 
@@ -80,8 +78,7 @@ describe('buildAnalysisQuery', () => {
       from: '2023-01-01',
       to: '2023-01-05',
       entryPattern: 'Test Pattern',
-      generateCharts: false,
-      chartsDir: './charts',
+
       maxConcurrentDays: 1,
     };
 
@@ -97,8 +94,7 @@ describe('buildAnalysisQuery', () => {
       from: '2023-01-01',
       to: '2023-01-05',
       entryPattern: 'Fixed Time Entry',
-      generateCharts: false,
-      chartsDir: './charts',
+
       maxConcurrentDays: 1,
     };
 
@@ -114,8 +110,7 @@ describe('buildAnalysisQuery', () => {
       from: '2023-01-01',
       to: '2023-01-05',
       entryPattern: 'Test Pattern',
-      generateCharts: false,
-      chartsDir: './charts',
+
       maxConcurrentDays: 1,
     };
 

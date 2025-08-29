@@ -311,8 +311,7 @@ default:
   ticker: 'SPY'
   timeframe: '1min'
   direction: 'llm_decides' # LLM analyzes charts and decides trade direction
-  charts:
-    outputDir: './charts'
+
   parallelization:
     maxConcurrentDays: 3 # Process multiple days concurrently for faster execution
 
@@ -443,8 +442,7 @@ default:
   ticker: 'SPY'
   timeframe: '1min'
   direction: 'llm_decides' # LLM analyzes charts and decides trade direction
-  charts:
-    outputDir: './charts'
+
   parallelization:
     maxConcurrentDays: 3 # Process up to 3 days concurrently for faster execution
 
@@ -551,8 +549,7 @@ default:
     to: '2025-05-02'
   ticker: 'SPY'
   direction: 'llm_decides' # LLM analyzes charts and decides trade direction
-  charts:
-    outputDir: './charts'
+
   parallelization:
     maxConcurrentDays: 3
 
@@ -677,21 +674,19 @@ pnpm dev:start --from 2023-01-01 --to 2023-12-31 --direction short --quickRise.r
 
 CLI options override values from the configuration file.
 
-| Option                         | Description                                  | Default                   |
-| ------------------------------ | -------------------------------------------- | ------------------------- |
-| `--from <YYYY-MM-DD>`          | Start date (inclusive)                       | From config               |
-| `--to <YYYY-MM-DD>`            | End date (inclusive)                         | From config               |
-| `--entry-pattern <pattern>`    | Entry pattern to use                         | quickRise                 |
-| `--ticker <symbol>`            | Ticker to analyze                            | SPY                       |
-| `--timeframe <period>`         | Data resolution                              | 1min                      |
-| `--direction <direction>`      | Trading direction (long/short/llm_decides)   | llm_decides               |
-| `--config <path>`              | Path to custom configuration file            | ./alphagroove.config.yaml |
-| `--no-generate-charts`         | Disable chart generation (also disables LLM) | false (charts enabled)    |
-| `--charts-dir <path>`          | Directory for chart output                   | ./charts                  |
-| `--maxConcurrentDays <number>` | Maximum days to process concurrently (1-20)  | 3                         |
-| `--debug`                      | Show debug information and SQL queries       | false                     |
-| `--verbose`                    | Show detailed LLM responses and debug info   | false                     |
-| `--dry-run`                    | Show query without executing                 | false                     |
+| Option                      | Description                                | Default                   |
+| --------------------------- | ------------------------------------------ | ------------------------- |
+| `--from <YYYY-MM-DD>`       | Start date (inclusive)                     | From config               |
+| `--to <YYYY-MM-DD>`         | End date (inclusive)                       | From config               |
+| `--entry-pattern <pattern>` | Entry pattern to use                       | quickRise                 |
+| `--ticker <symbol>`         | Ticker to analyze                          | SPY                       |
+| `--timeframe <period>`      | Data resolution                            | 1min                      |
+| `--direction <direction>`   | Trading direction (long/short/llm_decides) | llm_decides               |
+| `--config <path>`           | Path to custom configuration file          | ./alphagroove.config.yaml |
+
+| `--maxConcurrentDays <number>` | Maximum days to process concurrently (1-20) | 3 | | `--debug` |
+Show debug information and SQL queries | false | | `--verbose` | Show detailed LLM responses and
+debug info | false | | `--dry-run` | Show query without executing | false |
 
 ### Pattern-Specific Options
 
@@ -831,18 +826,10 @@ for each signal:
 
 Both charts share the same visual style and are saved in the pattern-specific output directory.
 
-Charts are generated automatically by default. To customize chart output:
+Charts are generated automatically for all trades.
 
-```bash
-# Use custom output directory
-pnpm dev:start --charts-dir ./my-charts
-
-# Disable chart generation (will also disable LLM analysis)
-pnpm dev:start --no-generate-charts
-```
-
-Chart images are automatically generated and saved to the specified directory, with folders
-organized by entry pattern name. Each chart is named with the pattern, ticker, and date for easy
+Chart images are automatically generated and saved to the ./charts directory, with folders organized
+by entry pattern name. Each chart is named with the pattern, ticker, and date for easy
 identification.
 
 > **Note on former HTML/Puppeteer fallback:** Previously, the system might fall back to HTML charts
@@ -1094,8 +1081,7 @@ pnpm dev:start --direction short
 # Process multiple days concurrently for faster execution
 pnpm dev:start --maxConcurrentDays 5
 
-# Use custom chart output directory
-pnpm dev:start --charts-dir ./my-analysis
+
 
 # List available patterns
 pnpm dev:start list-patterns

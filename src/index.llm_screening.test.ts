@@ -22,7 +22,6 @@ vi.mock('./utils/config.js', async () => {
       exitPattern: 'test-exit',
       timeframe: '1min',
       llmConfirmationScreen: { enabled: false },
-      generateCharts: false,
     })),
   };
 });
@@ -118,7 +117,7 @@ describe('LLM Trade Screening Tests', () => {
       timeframe: '1min',
       direction: 'long',
       llmConfirmationScreen: { enabled: false },
-      generateCharts: false,
+
       someBaseOpt: 'value',
       config: 'path/to/config.yaml',
     };
@@ -172,7 +171,6 @@ describe('LLM Trade Screening Tests', () => {
       const currentAppConfig = getMockAppConfig();
       const currentMergedConfig = {
         ...mockMergedConfigValue,
-        generateCharts: true,
       };
 
       vi.mocked(localMockLlmInstance.shouldSignalProceed).mockResolvedValueOnce({

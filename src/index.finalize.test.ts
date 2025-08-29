@@ -18,7 +18,6 @@ vi.mock('./utils/config.js', async () => {
       exitPattern: 'test-exit',
       timeframe: '1min',
       llmConfirmationScreen: { enabled: false },
-      generateCharts: false,
     })),
   };
 });
@@ -117,7 +116,7 @@ describe('Finalize Analysis Tests', () => {
       timeframe: '1min',
       direction: 'long',
       llmConfirmationScreen: { enabled: false },
-      generateCharts: false, // Will be overridden in test
+      // Will be overridden in test
       someBaseOpt: 'value',
       config: 'path/to/config.yaml',
     };
@@ -160,7 +159,6 @@ describe('Finalize Analysis Tests', () => {
       const currentMergedConfig = {
         ...mockMergedConfigValue,
         direction: 'long',
-        generateCharts: true, // Enable chart generation for this test
       };
 
       await mainModule.finalizeAnalysis(totalStats, mockEntryPatternValue, currentMergedConfig);
