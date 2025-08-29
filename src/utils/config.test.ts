@@ -425,16 +425,18 @@ describe('Configuration System', () => {
           timeframe: '1min',
           direction: 'llm_decides' as const,
           llmConfirmationScreen: {
-            enabled: true,
             llmProvider: 'anthropic' as const,
             modelName: 'claude-sonnet-4-20250514',
             apiKeyEnvVar: 'ANTHROPIC_API_KEY',
             numCalls: 3,
             agreementThreshold: 2,
             temperatures: [0.1, 0.5, 1.0],
+            prompts: ['test prompt'],
+            commonPromptSuffixForJson: 'test suffix',
+            maxOutputTokens: 150,
           },
           entry: {
-            enabled: ['quickRise'],
+            enabled: ['quickRise' as const],
             strategyOptions: {
               quickRise: { risePct: 0.3, withinMinutes: 5 },
             },
@@ -446,7 +448,11 @@ describe('Configuration System', () => {
           exit: {
             enabled: ['profitTarget'],
             strategyOptions: {
-              profitTarget: { atrMultiplier: 3.0 },
+              profitTarget: {
+                percentFromEntry: 1.0,
+                useLlmProposedPrice: false,
+                atrMultiplier: 3.0,
+              },
             },
           },
           execution: {
@@ -470,21 +476,21 @@ describe('Configuration System', () => {
 
       // Test that LLM config is accessible
       expect(merged.llmConfirmationScreen).toBeDefined();
-      expect(merged.llmConfirmationScreen.enabled).toBe(true);
-      expect(merged.llmConfirmationScreen.llmProvider).toBe('anthropic');
-      expect(merged.llmConfirmationScreen.numCalls).toBe(3);
+      expect(merged.llmConfirmationScreen).toBeDefined();
+      expect(merged.llmConfirmationScreen!.llmProvider).toBe('anthropic');
+      expect(merged.llmConfirmationScreen!.numCalls).toBe(3);
 
       // Test that entry config is mapped
       expect(merged.entryPattern).toBe('quickRise');
       expect(merged.quickRise).toEqual({ risePct: 0.3, withinMinutes: 5 });
 
       // Test that exit strategies are mapped
-      expect(merged.exitStrategies.enabled).toContain('profitTarget');
-      expect(merged.exitStrategies.strategyOptions.profitTarget.atrMultiplier).toBe(3.0);
+      expect(merged.exitStrategies!.enabled).toContain('profitTarget');
+      expect(merged.exitStrategies!.strategyOptions!.profitTarget!.atrMultiplier).toBe(3.0);
 
       // Test that execution config is mapped
-      expect(merged.execution.slippage.model).toBe('fixed');
-      expect(merged.execution.slippage.value).toBe(0.01);
+      expect(merged.execution!.slippage!.model).toBe('fixed');
+      expect(merged.execution!.slippage!.value).toBe(0.01);
     });
 
     it('should maintain backward compatibility with legacy config structure', () => {
@@ -506,16 +512,18 @@ describe('Configuration System', () => {
           maxHoldTime: { minutes: 60 },
         },
         llmConfirmationScreen: {
-          enabled: true,
           llmProvider: 'openai' as const,
           modelName: 'gpt-4',
           apiKeyEnvVar: 'OPENAI_API_KEY',
           numCalls: 2,
           agreementThreshold: 2,
           temperatures: [0.2, 0.8],
+          prompts: ['test prompt'],
+          commonPromptSuffixForJson: 'test suffix',
+          maxOutputTokens: 150,
         },
         entry: {
-          enabled: ['quickFall'],
+          enabled: ['quickFall' as const],
           strategyOptions: {
             quickFall: { fallPct: 0.5, withinMinutes: 3 },
           },
@@ -531,8 +539,8 @@ describe('Configuration System', () => {
       expect(merged.direction).toBe('long');
       expect(merged.from).toBe('2022-01-01');
       expect(merged.to).toBe('2022-12-31');
-      expect(merged.llmConfirmationScreen.enabled).toBe(true);
-      expect(merged.llmConfirmationScreen.llmProvider).toBe('openai');
+      expect(merged.llmConfirmationScreen).toBeDefined();
+      expect(merged.llmConfirmationScreen!.llmProvider).toBe('openai');
       expect(merged.entryPattern).toBe('quickFall');
       expect(merged.quickFall).toEqual({ fallPct: 0.5, withinMinutes: 3 });
     });
@@ -542,19 +550,35 @@ describe('Configuration System', () => {
         // Legacy structure
         default: {
           ticker: 'LEGACY_TICKER',
+          timeframe: '1min',
           direction: 'short' as const,
         },
         llmConfirmationScreen: {
           llmProvider: 'openai' as const,
+          modelName: 'gpt-4',
+          apiKeyEnvVar: 'OPENAI_API_KEY',
+          numCalls: 2,
+          agreementThreshold: 2,
+          temperatures: [0.2, 0.8],
+          prompts: ['test prompt'],
+          commonPromptSuffixForJson: 'test suffix',
+          maxOutputTokens: 150,
         },
         // New structure (should take priority)
         shared: {
           ticker: 'NEW_TICKER',
+          timeframe: '1min',
           direction: 'llm_decides' as const,
           llmConfirmationScreen: {
-            enabled: true,
             llmProvider: 'anthropic' as const,
             modelName: 'claude-sonnet-4-20250514',
+            apiKeyEnvVar: 'ANTHROPIC_API_KEY',
+            numCalls: 3,
+            agreementThreshold: 2,
+            temperatures: [0.1, 1.0],
+            prompts: ['test prompt'],
+            commonPromptSuffixForJson: 'test suffix',
+            maxOutputTokens: 150,
           },
         },
         backtest: {
@@ -568,8 +592,8 @@ describe('Configuration System', () => {
       expect(merged.ticker).toBe('NEW_TICKER');
       expect(merged.direction).toBe('llm_decides');
       expect(merged.from).toBe('2024-01-01');
-      expect(merged.llmConfirmationScreen.enabled).toBe(true);
-      expect(merged.llmConfirmationScreen.llmProvider).toBe('anthropic');
+      expect(merged.llmConfirmationScreen).toBeDefined();
+      expect(merged.llmConfirmationScreen!.llmProvider).toBe('anthropic');
     });
   });
 });
