@@ -111,13 +111,7 @@ describe('Chart Generator', () => {
       },
     ];
 
-    const chartPaths = await generateEntryCharts(
-      'SPY',
-      '1min',
-      'quick-rise',
-      mockTrades,
-      testOutputDir
-    );
+    const chartPaths = await generateEntryCharts('SPY', '1min', 'quick-rise', mockTrades);
 
     expect(chartPaths.length).toBe(2);
     // Paths should now be PNG paths

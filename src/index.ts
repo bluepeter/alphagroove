@@ -86,7 +86,6 @@ const generateChartForLLMDecision = async (
       tradeDate: signalData.trade_date,
       entryTimestamp: signalData.timestamp,
       entrySignal: entrySignalForChart,
-      outputDir: './charts',
     });
 
     if (!chartPath) {
@@ -653,8 +652,7 @@ export const finalizeAnalysis = async (
         mergedConfig.ticker,
         mergedConfig.timeframe,
         entryPattern.name,
-        tradesForBulkCharts,
-        './charts'
+        tradesForBulkCharts
       );
       console.log(`\nGenerated ${chartPaths.length} charts in ./charts/${entryPattern.name}/`);
     }

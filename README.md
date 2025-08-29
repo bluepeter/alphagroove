@@ -799,49 +799,14 @@ initial `direction` setting.
 
 ### Chart Generation
 
-AlphaGroove automatically generates high-quality chart images for each entry signal it detects.
-Chart generation is enabled by default. These charts:
+AlphaGroove automatically generates high-quality candlestick charts for each entry signal, saved to
+the `./charts` directory organized by pattern name. Charts display the current day (up to entry
+point) plus 1 previous trading day, essential for LLM analysis.
 
-- Show the current day (up to the entry point) and 1 previous trading day
-- Are rendered as Candlestick charts for detailed OHLC analysis
-- Display volume data below the price chart
-- Highlight the entry point with a marker (Note: entry point marker not yet implemented)
-- Only include regular market hours (9:30 AM - 4:00 PM ET)
-- Organize charts by pattern name for easy reference
-- Save as both SVG (vector) and high-quality PNG (300 DPI, white background) image files for easy
-  sharing and inclusion in reports
+Two PNG images are created for each signal:
 
-When chart generation is enabled (`--generate-charts` or via config), two PNG images are produced
-for each signal:
-
-1.  **Standard Chart (e.g., `TICKER_PATTERN_DATE.png`):** This chart displays data up to the entry
-    signal's timestamp on the signal day, plus the full prior trading day. This version is typically
-    used for LLM analysis. To prevent data leakage to the LLM, this chart image has its content
-    anonymized: the ticker symbol is replaced with "XXX", the date in the header is replaced with
-    "XXX", and the X-axis date labels are changed to generic day identifiers (e.g., "Prior Day",
-    "Signal Day").
-2.  **Complete Two-Day Chart (e.g., `TICKER_PATTERN_DATE_complete.png`):** This chart displays the
-    _entirety_ of the signal day and the _entirety_ of the prior trading day. This version is
-    intended for more comprehensive manual review and analysis.
-
-Both charts share the same visual style and are saved in the pattern-specific output directory.
-
-Charts are generated automatically for all trades.
-
-Chart images are automatically generated and saved to the ./charts directory, with folders organized
-by entry pattern name. Each chart is named with the pattern, ticker, and date for easy
-identification.
-
-> **Note on former HTML/Puppeteer fallback:** Previously, the system might fall back to HTML charts
-> if Puppeteer had issues. With the current direct SVG-to-PNG generation using `sharp`, this
-> fallback is no longer in place. Ensure `sharp` installs correctly for PNG output.
-
-The image formats make it easy to:
-
-- Include charts in research reports and presentations
-- Share findings with colleagues
-- Document market behavior around specific entry conditions
-- Compare patterns visually across multiple days
+- **Standard Chart**: Anonymized version used for LLM analysis (prevents data leakage)
+- **Complete Chart**: Full two-day view for manual review
 
 ### LLM Configuration Details
 

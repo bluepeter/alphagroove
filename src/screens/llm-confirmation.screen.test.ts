@@ -87,7 +87,6 @@ const _getBaseAppConfig = (): AppConfig => ({
     timeframe: '1min',
     direction: 'long',
     patterns: { entry: 'quickRise' },
-
     date: { from: '2023-01-01', to: '2023-12-31' },
   },
   patterns: {
