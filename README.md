@@ -785,8 +785,6 @@ Common timeframes include:
   Each trading day gets a unique random entry time (deterministic based on date), useful for
   eliminating time-based biases in backtesting.
 
-<!-- Exit patterns CLI/options removed; configure exit strategies under root `exit`. -->
-
 ### Trading Direction
 
 AlphaGroove uses LLM (Large Language Model) analysis to dynamically determine trade direction for
