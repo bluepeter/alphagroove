@@ -131,6 +131,14 @@ scout:
     apiKeyEnvVar: 'POLYGON_API_KEY'
 ```
 
+**Configuration Structure**
+
+The `alphagroove.config.yaml` file is organized into three sections:
+
+1. **`shared`**: Settings used by both tools (ticker, LLM configuration)
+2. **`backtest`**: Backtest-specific settings (date ranges, entry patterns, exit strategies)
+3. **`scout`**: Scout-specific settings (API configuration)
+
 **Environment Variables**
 
 Create a `.env.local` file in the project root with your API keys:
@@ -139,6 +147,23 @@ Create a `.env.local` file in the project root with your API keys:
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 POLYGON_API_KEY=your_polygon_api_key_here
 ```
+
+**Available Timeframes**
+
+Format: `<number><unit>` where unit is min, hour, or day
+
+- `1min`, `5min`, `15min`, `30min`, `1hour`, `1day`
+
+**Configuration Priority**
+
+Configuration hierarchy (highest to lowest priority):
+
+1. Command line arguments
+2. Config file settings
+3. ⚠️ **No system defaults** - explicit configuration required
+
+All configuration must be explicitly provided. The system will provide clear error messages for
+missing settings rather than using hidden defaults.
 
 You can generate a default config file by running:
 
@@ -371,61 +396,6 @@ The scout uses identical methods as the backtesting engine:
 1. **Backtest**: Validate strategy parameters and LLM configuration using historical data
 2. **Scout**: Use real-time analysis for current market conditions
 3. **Execute**: Apply LLM recommendations and calculated levels in your brokerage platform
-
----
-
-# Configuration Reference
-
-## Configuration Structure
-
-The `alphagroove.config.yaml` file is organized into three sections:
-
-1. **`shared`**: Settings used by both tools (ticker, LLM configuration)
-2. **`backtest`**: Backtest-specific settings (date ranges, entry patterns, exit strategies)
-3. **`scout`**: Scout-specific settings (API configuration)
-
-## No Hidden Defaults
-
-All configuration must be explicitly provided. The system will provide clear error messages for
-missing settings rather than using hidden defaults. This ensures:
-
-- Predictable behavior
-- Clear configuration visibility
-- Maintainable code
-- Explicit intent for every setting
-
-## LLM Configuration Details
-
-```yaml
-shared:
-  llmConfirmationScreen:
-    llmProvider: 'anthropic' # or 'openai'
-    modelName: 'claude-sonnet-4-20250514'
-    apiKeyEnvVar: 'ANTHROPIC_API_KEY'
-    numCalls: 2 # Number of parallel LLM calls (required)
-    agreementThreshold: 2 # Minimum agreement for consensus
-    temperatures: [0.1, 1.0] # Temperature for each call (required)
-    prompts: # Prompts for each call
-      - 'Analyze this chart as a cautious trader...'
-      - 'Analyze this chart as an aggressive trader...'
-    commonPromptSuffixForJson: 'Respond in JSON: {...}'
-    maxOutputTokens: 150
-    timeoutMs: 30000 # Optional timeout
-```
-
-## Available Timeframes
-
-Format: `<number><unit>` where unit is min, hour, or day
-
-- `1min`, `5min`, `15min`, `30min`, `1hour`, `1day`
-
-## Command Line Priority
-
-Configuration hierarchy (highest to lowest priority):
-
-1. Command line arguments
-2. Config file settings
-3. ⚠️ **No system defaults** - explicit configuration required
 
 ## Directory Structure
 
