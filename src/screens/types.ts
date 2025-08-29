@@ -2,7 +2,6 @@ import { type Signal } from '../patterns/types';
 import { type Config as AppConfig } from '../utils/config'; // Corrected and aliased
 
 export interface LLMScreenConfig {
-  enabled: boolean;
   llmProvider: 'anthropic' | 'openai'; // Made stricter to match Zod schema
   modelName: string;
   apiKeyEnvVar: string;

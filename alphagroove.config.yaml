@@ -1,115 +1,120 @@
-default:
-  date:
-    # from: '2017-01-01'
-    from: '2017-01-01'
-    to: '2025-05-30'
+# === SHARED CONFIGURATION ===
+# Used by both backtest and scout tools
+shared:
   ticker: 'SPY'
   timeframe: '1min'
   # direction can be 'long', 'short', or 'llm_decides'.
   # If 'llm_decides', llmConfirmationScreen must be configured.
   direction: 'llm_decides'
+  entry:
+    enabled: [randomTimeEntry]
+    strategyOptions:
+      quickRise:
+        risePct: 0.3
+        withinMinutes: 5
+      quickFall:
+        fallPct: 0.3
+        withinMinutes: 5
+      fixedTimeEntry:
+        entryTime: '13:00'
+  llmConfirmationScreen:
+    llmProvider: 'anthropic'
+    modelName: 'claude-sonnet-4-20250514'
+    apiKeyEnvVar: 'ANTHROPIC_API_KEY'
+    numCalls: 2
+    agreementThreshold: 2
+    temperatures: [0.1, 1.0]
+    systemPrompt: >-
+      You are a seasoned day trader. You know when to save your powder and wait. You don't assume
+      you always need to be in the market. Only when you're sure will you go long or short.
+
+      You will be provided with a stock chart for the previous trading day and the current day. Note
+      the x-axis dates and times to find the close of the prior day and the open of the current day:
+      it is plotted continuously so the day end/start may not be immediately apparent. The current
+      day will be incomplete as the trading day is still in progress. Pay careful attention to the
+      current day as that is what we are trading. The chart will use candlesticks and volume bars.
+      These are key items to pay attention to. Ignore the ticker symbol, current date, etc. We are
+      backtesting a strategy so you must focus on generating an action based solely on chart
+      mechanics, not any historical knowledge you have of that particular day.
+
+      You strictly follow user instructions for output format. Respond ONLY with the valid JSON
+      object described by the user. Do not include any other text, narration, or explanations.
+    prompts:
+      - You are a seasoned but conservative day trader. You are mindful of sudden reversals,
+        continuations, and other interesting patterns.
+      - You are a quant trader that still has a knack for spotting patterns and trends. You were top
+        of your class at MIT and Stanford.
+    #   - You are a YOLO trader that is super-savvy and has exceptional intuition. Your rationale must be in WSB lingo.
+    commonPromptSuffixForJson: >-
+      Based on the provided chart: 
+
+      - What day trade action would you take: go long, go short, or do_nothing?  
+
+      - Provide a one-sentence rationalization for your decision.  
+
+      - Provide a 1-10 confidence score for your decision. 
+
+      - Provide target stop loss and profit target prices (only provide if action is long or short)
+      that are realistic exit prices given today's range, remaining time in the day, and the current
+      price.
+
+      Your response MUST be a valid JSON object and nothing else.  JSON in the following format:
+
+      `{"action": "long", "rationalization": "<here>", "confidence": "<here>", "proposedStopLoss":
+      "<here>", "proposedProfitTarget": "<here>"}` 
+
+      or  
+
+      `{"action": "short", "rationalization": "<here>", "confidence": "<here>", "proposedStopLoss":
+      "<here>", "proposedProfitTarget": "<here>"}` 
+
+      or  
+
+      `{"action": "do_nothing", "rationalization": "<here>", "confidence": "<here>"}`
+    maxOutputTokens: 250
+    timeoutMs: 30000 # 30 second timeout to prevent hanging
+
+# === BACKTEST-SPECIFIC CONFIGURATION ===
+backtest:
+  date:
+    from: '2017-01-01'
+    to: '2025-05-30'
   parallelization:
     maxConcurrentDays: 3 # Process up to 3 days concurrently for faster execution
+  exit:
+    enabled:
+      #- stopLoss
+      - profitTarget
+      - trailingStop
+    # atrPeriodForEntry: 14 # This specific period is NOT used by the current ATR calculation method (which averages all TRs from the prior day).
+    # Remove or keep commented if you plan to use a period-specific ATR calc in the future.
+    # Time-based constraints are configured at base level and are automatically active when configured
+    maxHoldTime:
+      minutes: 500
+    endOfDay:
+      time: '16:00'
+    # Price-based strategies are configured under strategyOptions
+    strategyOptions:
+      stopLoss:
+        # percentFromEntry: 0.5 # Fallback, commented out to prioritize ATR
+        atrMultiplier: 2.0
+        useLlmProposedPrice: false
+      profitTarget:
+        # percentFromEntry: 0.5 # Fallback, commented out to prioritize ATR
+        atrMultiplier: 5.0
+        useLlmProposedPrice: false
+      trailingStop:
+        # activationPercent: 0 # Fallback, commented out to prioritize ATR
+        # trailPercent: 0.3      # Fallback, commented out to prioritize ATR (0.3 for 0.3% of price)
+        activationAtrMultiplier: 0
+        trailAtrMultiplier: 2.5
+  execution:
+    slippage:
+      model: 'fixed'
+      value: 0.01
 
-entry:
-  enabled: [randomTimeEntry]
-  strategyOptions:
-    quickRise:
-      risePct: 0.3
-      withinMinutes: 5
-    quickFall:
-      fallPct: 0.3
-      withinMinutes: 5
-    fixedTimeEntry:
-      entryTime: '13:00'
-
-exit:
-  enabled:
-    #- stopLoss
-    - profitTarget
-    - trailingStop
-  # atrPeriodForEntry: 14 # This specific period is NOT used by the current ATR calculation method (which averages all TRs from the prior day).
-  # Remove or keep commented if you plan to use a period-specific ATR calc in the future.
-  # Time-based constraints are configured at base level and are automatically active when configured
-  maxHoldTime:
-    minutes: 500
-  endOfDay:
-    time: '16:00'
-  # Price-based strategies are configured under strategyOptions
-  strategyOptions:
-    stopLoss:
-      # percentFromEntry: 0.5 # Fallback, commented out to prioritize ATR
-      atrMultiplier: 2.0
-      useLlmProposedPrice: false
-    profitTarget:
-      # percentFromEntry: 0.5 # Fallback, commented out to prioritize ATR
-      atrMultiplier: 5.0
-      useLlmProposedPrice: false
-    trailingStop:
-      # activationPercent: 0 # Fallback, commented out to prioritize ATR
-      # trailPercent: 0.3      # Fallback, commented out to prioritize ATR (0.3 for 0.3% of price)
-      activationAtrMultiplier: 0
-      trailAtrMultiplier: 2.5
-
-# Execution configuration (cross-cutting concerns)
-execution:
-  slippage:
-    model: 'fixed'
-    value: 0.01
-
-llmConfirmationScreen:
-  llmProvider: 'anthropic'
-  modelName: 'claude-sonnet-4-20250514'
-  apiKeyEnvVar: 'ANTHROPIC_API_KEY'
-  numCalls: 2
-  agreementThreshold: 2
-  temperatures: [0.1, 1.0]
-  systemPrompt: >-
-    You are a seasoned day trader. You know when to save your powder and wait. You don't assume you
-    always need to be in the market. Only when you're sure will you go long or short.
-
-    You will be provided with a stock chart for the previous trading day and the current day. Note
-    the x-axis dates and times to find the close of the prior day and the open of the current day:
-    it is plotted continuously so the day end/start may not be immediately apparent. The current day
-    will be incomplete as the trading day is still in progress. Pay careful attention to the current
-    day as that is what we are trading. The chart will use candlesticks and volume bars. These are
-    key items to pay attention to. Ignore the ticker symbol, current date, etc. We are backtesting a
-    strategy so you must focus on generating an action based solely on chart mechanics, not any
-    historical knowledge you have of that particular day.
-
-    You strictly follow user instructions for output format. Respond ONLY with the valid JSON object
-    described by the user. Do not include any other text, narration, or explanations.
-  prompts:
-    - You are a seasoned but conservative day trader. You are mindful of sudden reversals,
-      continuations, and other interesting patterns.
-    - You are a quant trader that still has a knack for spotting patterns and trends. You were top
-      of your class at MIT and Stanford.
-  #   - You are a YOLO trader that is super-savvy and has exceptional intuition. Your rationale must be in WSB lingo.
-  commonPromptSuffixForJson: >-
-    Based on the provided chart: 
-
-    - What day trade action would you take: go long, go short, or do_nothing?  
-
-    - Provide a one-sentence rationalization for your decision.  
-
-    - Provide a 1-10 confidence score for your decision. 
-
-    - Provide target stop loss and profit target prices (only provide if action is long or short)
-    that are realistic exit prices given today's range, remaining time in the day, and the current
-    price.
-
-    Your response MUST be a valid JSON object and nothing else.  JSON in the following format:
-
-    `{"action": "long", "rationalization": "<here>", "confidence": "<here>", "proposedStopLoss":
-    "<here>", "proposedProfitTarget": "<here>"}` 
-
-    or  
-
-    `{"action": "short", "rationalization": "<here>", "confidence": "<here>", "proposedStopLoss":
-    "<here>", "proposedProfitTarget": "<here>"}` 
-
-    or  
-
-    `{"action": "do_nothing", "rationalization": "<here>", "confidence": "<here>"}`
-  maxOutputTokens: 250
-  timeoutMs: 30000 # 30 second timeout to prevent hanging
+# === SCOUT-SPECIFIC CONFIGURATION ===
+scout:
+  # Future: Polygon.io API settings, alerts, refresh intervals, etc.
+  polygon:
+    apiKeyEnvVar: 'POLYGON_API_KEY'

@@ -135,7 +135,6 @@ describe('Parallel Processing Tests', () => {
 
     maxConcurrentDays: 3, // Test with parallel processing
     llmConfirmationScreen: {
-      enabled: false, // Disable LLM to focus on parallel processing
       llmProvider: 'anthropic',
       modelName: 'test-model',
       apiKeyEnvVar: 'TEST_KEY',

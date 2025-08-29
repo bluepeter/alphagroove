@@ -23,7 +23,6 @@ vi.mock('dotenv', () => ({
 const MOCK_API_KEY = 'test-api-key';
 
 const getBaseConfig = (): LLMScreenConfig => ({
-  enabled: true,
   llmProvider: 'anthropic',
   modelName: 'claude-test-model',
   apiKeyEnvVar: 'TEST_ANTHROPIC_API_KEY',
@@ -73,10 +72,11 @@ describe('LlmApiService', () => {
       consoleWarnSpy.mockRestore();
     });
 
-    it('should not be enabled if config.enabled is false, even with API key', () => {
-      const config = { ...getBaseConfig(), enabled: false };
+    it('should be enabled when API key exists (enabled field removed)', () => {
+      process.env.TEST_ANTHROPIC_API_KEY = MOCK_API_KEY;
+      const config = { ...getBaseConfig() };
       const service = new ActualLlmApiService(config);
-      expect(service.isEnabled()).toBe(false);
+      expect(service.isEnabled()).toBe(true);
     });
   });
 
@@ -130,8 +130,9 @@ describe('LlmApiService', () => {
       vi.restoreAllMocks(); // Restore all spied-on console methods
     });
 
-    it('should return do_nothing responses if service is not enabled', async () => {
-      const config = { ...getBaseConfig(), enabled: false };
+    it('should return do_nothing responses if no API key is provided', async () => {
+      delete process.env.TEST_ANTHROPIC_API_KEY;
+      const config = { ...getBaseConfig() };
       const service = new ActualLlmApiService(config);
       const responses = await service.getTradeDecisions(mockChartPath);
       expect(responses).toEqual([

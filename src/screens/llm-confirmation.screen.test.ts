@@ -33,7 +33,6 @@ vi.mock('../services/llm-api.service', () => ({
 }));
 
 const getBaseScreenConfig = (): LLMScreenConfig => ({
-  enabled: true,
   llmProvider: 'anthropic',
   modelName: 'claude-test-model',
   apiKeyEnvVar: 'TEST_ANTHROPIC_API_KEY',

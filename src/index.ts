@@ -123,7 +123,7 @@ export const handleLlmTradeScreeningInternal = async (
   averagedProposedStopLoss?: number;
   averagedProposedProfitTarget?: number;
 }> => {
-  if (!llmScreenInstance || !screenSpecificLLMConfig?.enabled) {
+  if (!llmScreenInstance || !screenSpecificLLMConfig) {
     return { proceed: true, cost: 0 }; // No direction needed if LLM screen not active
   }
   const chartPathForLLM = await generateChartForLLMDecision(
@@ -164,7 +164,7 @@ export const initializeAnalysis = (cliOptions: Record<string, any>) => {
   let llmScreenInstance: LlmConfirmationScreen | null = null;
   const screenSpecificLLMConfig = llmScreenYAMLConfig as ScreenLLMConfig | undefined;
 
-  if (screenSpecificLLMConfig?.enabled) {
+  if (screenSpecificLLMConfig) {
     llmScreenInstance = new LlmConfirmationScreen();
   }
 
@@ -389,7 +389,7 @@ const processDayTrades = async (
     let actualTradeDirection: 'long' | 'short';
     if (llmConfirmationDirection) {
       actualTradeDirection = llmConfirmationDirection;
-    } else if (!llmScreenInstance || !screenSpecificLLMConfig?.enabled) {
+    } else if (!llmScreenInstance || !screenSpecificLLMConfig) {
       if (initialGlobalDirection === 'llm_decides') {
         console.warn(
           "[processTradesLoop] LLM screen did not provide direction for 'llm_decides' strategy, or was disabled. Defaulting to 'long'. Trade on " +
@@ -623,7 +623,7 @@ export const finalizeAnalysis = async (
   printOverallSummary(totalStats);
 
   if (totalStats.total_llm_confirmed_trades > 0) {
-    const llmScreenEnabled = mergedConfig.llmConfirmationScreen?.enabled;
+    const llmScreenEnabled = !!mergedConfig.llmConfirmationScreen;
 
     if (llmScreenEnabled) {
       const chartPaths: string[] = [];

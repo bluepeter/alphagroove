@@ -45,19 +45,20 @@ export async function main(imagePath?: string, cmdOptions?: any) {
     console.log(chalk.dim('Loading configuration...'));
     const rawConfig = loadConfig(options.config);
 
-    // Check if LLM configuration exists
-    if (!rawConfig.llmConfirmationScreen) {
+    // Check if LLM configuration exists (check both new and legacy locations)
+    const llmConfig = rawConfig.shared?.llmConfirmationScreen || rawConfig.llmConfirmationScreen;
+    if (!llmConfig) {
       console.error(chalk.red(`Error: LLM configuration not found in config file.`));
       console.log(
         chalk.yellow(
-          `Make sure 'llmConfirmationScreen' is configured in your alphagroove.config.yaml`
+          `Make sure 'shared.llmConfirmationScreen' is configured in your alphagroove.config.yaml`
         )
       );
       process.exit(1);
     }
 
     // Initialize LLM screen
-    const llmScreenConfig = rawConfig.llmConfirmationScreen as LLMScreenConfig;
+    const llmScreenConfig = llmConfig as LLMScreenConfig;
     const llmScreen = new LlmConfirmationScreen();
 
     // Create a mock signal
@@ -65,7 +66,8 @@ export async function main(imagePath?: string, cmdOptions?: any) {
     let signalDirectionForLogic: 'long' | 'short' | undefined = cliDirection;
     let displayDirection = cliDirection.toUpperCase();
 
-    if (rawConfig.default?.direction === 'llm_decides') {
+    const configDirection = rawConfig.shared?.direction || rawConfig.default?.direction;
+    if (configDirection === 'llm_decides') {
       signalDirectionForLogic = undefined; // LLM screen will use its logic to determine direction
       displayDirection = 'LLM Decides';
     }

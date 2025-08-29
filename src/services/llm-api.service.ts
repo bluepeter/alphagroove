@@ -48,7 +48,7 @@ export class LlmApiService {
   }
 
   public isEnabled(): boolean {
-    return this.config.enabled && !!this.apiKey;
+    return !!this.apiKey;
   }
 
   private async getChartImageBase64(chartPath: string): Promise<string> {

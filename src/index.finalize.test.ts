@@ -69,7 +69,7 @@ vi.mock('./utils/mappers.js', () => ({
 
 vi.mock('./utils/chart-generator.js', () => ({
   generateEntryChart: vi.fn(() => Promise.resolve('path/to/chart.png')),
-  generateEntryCharts: vi.fn(() => Promise.resolve([])), // Used by finalizeAnalysis
+  generateEntryCharts: vi.fn(() => Promise.resolve(['chart1.png', 'chart2.png'])), // This is aliased as generateBulkEntryCharts
 }));
 
 vi.mock('./utils/calculations.js', async () => {
@@ -86,7 +86,7 @@ vi.mock('./utils/calculations.js', async () => {
 });
 
 import { getEntryPattern, getExitPattern } from './patterns/pattern-factory.js';
-import { generateEntryCharts } from './utils/chart-generator.js';
+import { generateEntryCharts as generateBulkEntryCharts } from './utils/chart-generator.js';
 import { loadConfig, mergeConfigWithCliOptions } from './utils/config.js';
 import { fetchTradesFromQuery } from './utils/data-loader.js';
 import { printOverallSummary, printFooter } from './utils/output.js';
@@ -154,17 +154,37 @@ describe('Finalize Analysis Tests', () => {
         total_trading_days: 10,
         total_raw_matches: 2,
         grandTotalLlmCost: 0.05,
+        total_llm_confirmed_trades: 2,
       };
 
       const currentMergedConfig = {
         ...mockMergedConfigValue,
         direction: 'long',
+        llmConfirmationScreen: undefined, // Explicitly disable LLM, will use bulk chart generation
       };
+
+      // Mock confirmed trades with required properties for bulk chart generation
+      totalStats.long_stats.trades = [
+        {
+          return_pct: 0.5,
+          direction: 'long',
+          trade_date: '2023-01-01',
+          entry_time: '09:30:00',
+          entry_price: 100.0,
+        },
+        {
+          return_pct: -0.2,
+          direction: 'long',
+          trade_date: '2023-01-02',
+          entry_time: '10:30:00',
+          entry_price: 101.0,
+        },
+      ];
 
       await mainModule.finalizeAnalysis(totalStats, mockEntryPatternValue, currentMergedConfig);
 
       expect(printOverallSummary).toHaveBeenCalledWith(totalStats);
-      expect(generateEntryCharts).toHaveBeenCalled();
+      expect(generateBulkEntryCharts).toHaveBeenCalled();
       expect(printFooter).toHaveBeenCalled();
       expect(totalStats.total_llm_confirmed_trades).toBe(2); // Check that stats are updated
     });

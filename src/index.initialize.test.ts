@@ -33,7 +33,6 @@ import { LlmConfirmationScreen } from './screens/llm-confirmation.screen.js';
 
 describe('initializeAnalysis', () => {
   const mockLlmScreenConfig: LLMScreenConfig = {
-    enabled: false,
     llmProvider: 'anthropic',
     modelName: 'claude-sonnet-4-20250514',
     apiKeyEnvVar: 'ANTHROPIC_API_KEY',
@@ -109,7 +108,7 @@ describe('initializeAnalysis', () => {
     expect(result).toEqual({
       rawConfig: mockRawConfigValue,
       mergedConfig: mockMergedConfigValue,
-      llmScreenInstance: null,
+      llmScreenInstance: expect.any(Object), // LLM screen instance is created when config exists
       screenSpecificLLMConfig: mockMergedConfigValue.llmConfirmationScreen,
       entryPattern: mockEntryPatternValue,
       exitStrategies: mockExitStrategiesValue,

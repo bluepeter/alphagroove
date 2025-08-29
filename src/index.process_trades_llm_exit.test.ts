@@ -83,7 +83,6 @@ vi.mock('./screens/llm-confirmation.screen.js', () => ({
 
 // Helper to get a default LLMScreenConfig for tests
 const getDefaultTestLLMScreenConfig = (): ActualLLMScreenConfig => ({
-  enabled: true,
   llmProvider: 'anthropic',
   modelName: 'test-model',
   apiKeyEnvVar: 'TEST_KEY',

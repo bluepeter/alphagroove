@@ -304,78 +304,96 @@ the application.
 level as `package.json`):
 
 ```yaml
-default:
-  date:
-    from: '2023-01-01'
-    to: '2025-05-02'
+# === SHARED CONFIGURATION ===
+# Used by both backtest and scout tools
+shared:
   ticker: 'SPY'
   timeframe: '1min'
   direction: 'llm_decides' # LLM analyzes charts and decides trade direction
 
+  # Entry pattern configuration
+  entry:
+    enabled: [quickRise] # Available: quickRise, quickFall, fixedTimeEntry, randomTimeEntry
+    strategyOptions:
+      quickRise:
+        risePct: 0.3
+        withinMinutes: 5
+      quickFall:
+        fallPct: 0.3
+        withinMinutes: 5
+      fixedTimeEntry:
+        entryTime: '13:00' # Required if using fixedTimeEntry
+      randomTimeEntry:
+        startTime: '09:30' # Start of random time window
+        endTime: '16:00' # End of random time window
+
+  # LLM configuration for intelligent trade analysis
+  llmConfirmationScreen:
+    llmProvider: 'anthropic'
+    modelName: 'claude-sonnet-4-20250514'
+    apiKeyEnvVar: 'ANTHROPIC_API_KEY'
+    numCalls: 2
+    agreementThreshold: 2
+    temperatures: [0.1, 1.0]
+    # ... (see full configuration below)
+
+# === BACKTEST-SPECIFIC CONFIGURATION ===
+backtest:
+  date:
+    from: '2023-01-01'
+    to: '2025-05-02'
   parallelization:
     maxConcurrentDays: 3 # Process multiple days concurrently for faster execution
 
-# Entry pattern configuration
-entry:
-  enabled: [quickRise] # Available: quickRise, quickFall, fixedTimeEntry, randomTimeEntry
-  strategyOptions:
-    quickRise:
-      risePct: 0.3
-      withinMinutes: 5
-    quickFall:
-      fallPct: 0.3
-      withinMinutes: 5
-    fixedTimeEntry:
-      entryTime: '13:00' # Required if using fixedTimeEntry
-    randomTimeEntry:
-      startTime: '09:30' # Start of random time window
-      endTime: '16:00' # End of random time window
+  # Exit strategies configuration (backtest only)
+  exit:
+    enabled: [profitTarget] # Available: stopLoss, profitTarget, trailingStop
+    # Time-based constraints (automatically active when configured)
+    endOfDay:
+      time: '16:00'
+    strategyOptions:
+      profitTarget:
+        atrMultiplier: 3.0
 
-# Exit strategies configuration
-exit:
-  enabled: [profitTarget] # Available: stopLoss, profitTarget, trailingStop
-  # Time-based constraints (automatically active when configured)
-  endOfDay:
-    time: '16:00'
-  strategyOptions:
-    profitTarget:
-      atrMultiplier: 3.0
+  # Execution configuration (backtest only)
+  execution:
+    slippage:
+      model: 'fixed'
+      value: 0.01
 
-# Execution configuration
-execution:
-  slippage:
-    model: 'fixed'
-    value: 0.01
-
-# LLM configuration for intelligent trade analysis
-llmConfirmationScreen:
-  llmProvider: 'anthropic'
-  modelName: 'claude-sonnet-4-20250514'
-  apiKeyEnvVar: 'ANTHROPIC_API_KEY'
-  numCalls: 2
-  agreementThreshold: 2
-  temperatures: [0.1, 1.0]
-  # ... (see full configuration below)
+# === SCOUT-SPECIFIC CONFIGURATION ===
+scout:
+  # Future: Polygon.io API settings, alerts, refresh intervals, etc.
+  polygon:
+    apiKeyEnvVar: 'POLYGON_API_KEY'
 ```
 
-This configuration structure allows you to:
+This configuration structure is organized into three main sections:
 
-1. **Configure LLM analysis** for intelligent trade decisions
-2. **Automatic chart generation** (enabled by default)
-3. Configure entry patterns and their parameters
-4. Set up exit strategies with ATR-based or percentage-based levels
-5. Enable parallel processing for faster backtests
+1. **`shared`**: Configuration used by both backtest and scout tools (ticker, entry patterns, LLM
+   settings)
+2. **`backtest`**: Configuration specific to backtesting (date ranges, exit strategies, slippage
+   modeling)
+3. **`scout`**: Configuration specific to real-time entry scouting (API settings, future
+   enhancements)
 
-All pattern configuration must be explicitly provided - there are no hidden defaults in the code.
-The system follows a clear hierarchy for configuration:
+### Key Benefits of the New Structure:
+
+- **Clear Separation**: No confusion about which settings apply to which tool
+- **Shared Configuration**: Entry patterns and LLM settings are defined once and used by both tools
+- **Explicit Ownership**: Exit strategies and execution modeling are clearly backtest-only
+- **Future-Ready**: Scout section ready for real-time API integration
+
+All configuration must be explicitly provided - there are no hidden defaults in the code. The system
+follows a clear hierarchy for configuration:
 
 1. Command-line arguments (highest priority)
 2. Values from `alphagroove.config.yaml`
 3. ⚠️ **No system defaults** - missing configuration will cause clear error messages
 
-**Important**: As of recent updates, all exit strategies and pattern configurations must be
-explicitly provided. The system will throw descriptive errors if required configuration is missing,
-rather than silently using hidden defaults.
+**Important**: All exit strategies and pattern configurations must be explicitly provided. The
+system will throw descriptive errors if required configuration is missing, rather than silently
+using hidden defaults.
 
 You can generate a default config file by running:
 
@@ -431,66 +449,75 @@ These errors guide you to add the required configuration to your `alphagroove.co
 
 ### Modern Configuration Example
 
-Here's a comprehensive example showing the current configuration format including the new random
-time entry pattern:
+Here's a comprehensive example showing the new structured configuration format:
 
 ```yaml
-default:
-  date:
-    from: '2023-01-01'
-    to: '2025-05-02'
+# === SHARED CONFIGURATION ===
+# Used by both backtest and scout tools
+shared:
   ticker: 'SPY'
   timeframe: '1min'
   direction: 'llm_decides' # LLM analyzes charts and decides trade direction
 
+  # Entry pattern configuration
+  entry:
+    enabled: [randomTimeEntry] # Can also use: quickRise, quickFall, fixedTimeEntry
+    strategyOptions:
+      randomTimeEntry:
+        startTime: '10:00' # Start of random time window
+        endTime: '15:00' # End of random time window
+      fixedTimeEntry:
+        entryTime: '13:00' # Required if using fixedTimeEntry
+      quickRise:
+        risePct: 0.3
+        withinMinutes: 5
+      quickFall:
+        fallPct: 0.3
+        withinMinutes: 5
+
+  # LLM configuration for intelligent trade analysis
+  llmConfirmationScreen:
+    llmProvider: 'anthropic'
+    modelName: 'claude-sonnet-4-20250514'
+    apiKeyEnvVar: 'ANTHROPIC_API_KEY'
+    numCalls: 2
+    agreementThreshold: 2
+    temperatures: [0.1, 1.0]
+    # ... (prompts configuration)
+
+# === BACKTEST-SPECIFIC CONFIGURATION ===
+backtest:
+  date:
+    from: '2023-01-01'
+    to: '2025-05-02'
   parallelization:
     maxConcurrentDays: 3 # Process up to 3 days concurrently for faster execution
 
-# Entry pattern configuration
-entry:
-  enabled: [randomTimeEntry] # Can also use: quickRise, quickFall, fixedTimeEntry
-  strategyOptions:
-    randomTimeEntry:
-      startTime: '10:00' # Start of random time window
-      endTime: '15:00' # End of random time window
-    fixedTimeEntry:
-      entryTime: '13:00' # Required if using fixedTimeEntry
-    quickRise:
-      risePct: 0.3
-      withinMinutes: 5
-    quickFall:
-      fallPct: 0.3
-      withinMinutes: 5
+  # Exit strategies configuration (backtest only)
+  exit:
+    enabled: [profitTarget, trailingStop]
+    # Time-based constraints (automatically active when configured)
+    endOfDay:
+      time: '16:00'
+    strategyOptions:
+      profitTarget:
+        atrMultiplier: 3.0
+        useLlmProposedPrice: true
+      trailingStop:
+        activationAtrMultiplier: 0 # Immediate activation
+        trailAtrMultiplier: 2.5
 
-# Exit strategies configuration
-exit:
-  enabled: [profitTarget, trailingStop]
-  # Time-based constraints (automatically active when configured)
-  endOfDay:
-    time: '16:00'
-  strategyOptions:
-    profitTarget:
-      atrMultiplier: 3.0
-      useLlmProposedPrice: true
-    trailingStop:
-      activationAtrMultiplier: 0 # Immediate activation
-      trailAtrMultiplier: 2.5
+  # Execution configuration (backtest only)
+  execution:
+    slippage:
+      model: 'fixed'
+      value: 0.01
 
-# Execution configuration
-execution:
-  slippage:
-    model: 'fixed'
-    value: 0.01
-
-# LLM configuration for intelligent trade analysis
-llmConfirmationScreen:
-  llmProvider: 'anthropic'
-  modelName: 'claude-sonnet-4-20250514'
-  apiKeyEnvVar: 'ANTHROPIC_API_KEY'
-  numCalls: 2
-  agreementThreshold: 2
-  temperatures: [0.1, 1.0]
-  # ... (prompts configuration)
+# === SCOUT-SPECIFIC CONFIGURATION ===
+scout:
+  # Future: Polygon.io API settings, alerts, refresh intervals, etc.
+  polygon:
+    apiKeyEnvVar: 'POLYGON_API_KEY'
 ```
 
 #### Why No Hidden Defaults?
@@ -504,25 +531,27 @@ This design choice ensures:
 
 ### Exit Strategies Location
 
-Configure exit strategies at the root of the YAML under `exit` (with `exitStrategies` as an alias).
+Exit strategies are now configured under the `backtest` section, as they are specific to
+backtesting:
 
 ```yaml
-exit:
-  enabled: [profitTarget, trailingStop]
-  # Time-based constraints are configured at base level and automatically active
-  maxHoldTime:
-    minutes: 60
-  endOfDay:
-    time: '16:00'
-  # Price-based strategies are configured under strategyOptions
-  strategyOptions:
-    profitTarget:
-      atrMultiplier: 5.0
-    trailingStop:
-      activationAtrMultiplier: 0
-      trailAtrMultiplier: 2.5
+backtest:
+  exit:
+    enabled: [profitTarget, trailingStop]
+    # Time-based constraints are configured at base level and automatically active
+    maxHoldTime:
+      minutes: 60
+    endOfDay:
+      time: '16:00'
+    # Price-based strategies are configured under strategyOptions
+    strategyOptions:
+      profitTarget:
+        atrMultiplier: 5.0
+      trailingStop:
+        activationAtrMultiplier: 0
+        trailAtrMultiplier: 2.5
 
-# Execution configuration
+  # Execution configuration (also backtest-specific)
 execution:
   slippage:
     model: fixed
@@ -543,49 +572,52 @@ Price-based strategies (`stopLoss`, `profitTarget`, `trailingStop`) must be conf
 Create `alphagroove.config.yaml` with your desired settings:
 
 ```yaml
-default:
-  date:
-    from: '2020-01-01'
-    to: '2025-05-02'
+# === SHARED CONFIGURATION ===
+shared:
   ticker: 'SPY'
   direction: 'llm_decides' # LLM analyzes charts and decides trade direction
 
+  entry:
+    enabled: [quickRise]
+    strategyOptions:
+      quickRise:
+        risePct: 0.3
+        withinMinutes: 5
+
+  # LLM configuration for intelligent trade analysis
+  llmConfirmationScreen:
+    llmProvider: 'anthropic'
+    modelName: 'claude-sonnet-4-20250514'
+    apiKeyEnvVar: 'ANTHROPIC_API_KEY'
+    numCalls: 2
+    agreementThreshold: 2
+    temperatures: [0.1, 1.0]
+
+# === BACKTEST-SPECIFIC CONFIGURATION ===
+backtest:
+  date:
+    from: '2020-01-01'
+    to: '2025-05-02'
   parallelization:
     maxConcurrentDays: 3
 
-entry:
-  enabled: [quickRise]
-  strategyOptions:
-    quickRise:
-      risePct: 0.3
-      withinMinutes: 5
+  exit:
+    enabled: [profitTarget, trailingStop]
+    maxHoldTime:
+      minutes: 60
+    endOfDay:
+      time: '16:00'
+    strategyOptions:
+      profitTarget:
+        atrMultiplier: 5.0
+      trailingStop:
+        activationAtrMultiplier: 0
+        trailAtrMultiplier: 2.5
 
-exit:
-  enabled: [profitTarget, trailingStop]
-  maxHoldTime:
-    minutes: 60
-  endOfDay:
-    time: '16:00'
-  strategyOptions:
-    profitTarget:
-      atrMultiplier: 5.0
-    trailingStop:
-      activationAtrMultiplier: 0
-      trailAtrMultiplier: 2.5
-
-execution:
-  slippage:
-    model: fixed
-    value: 0.01
-
-# LLM configuration for intelligent trade analysis
-llmConfirmationScreen:
-  llmProvider: 'anthropic'
-  modelName: 'claude-sonnet-4-20250514'
-  apiKeyEnvVar: 'ANTHROPIC_API_KEY'
-  numCalls: 2
-  agreementThreshold: 2
-  temperatures: [0.1, 1.0]
+  execution:
+    slippage:
+      model: fixed
+      value: 0.01
 ```
 
 Then simply run:
@@ -653,7 +685,7 @@ pnpm dev:start --maxConcurrentDays 1
 **Via Configuration File:**
 
 ```yaml
-default:
+backtest:
   parallelization:
     maxConcurrentDays: 5 # Process up to 5 days concurrently
 ```

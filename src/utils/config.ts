@@ -185,7 +185,6 @@ const ParallelizationOptionsSchema = z.object({
 // but Zod schema is the source of truth for validation and type inference here.
 const LLMScreenConfigSchema = z
   .object({
-    enabled: z.boolean().optional().default(true),
     llmProvider: z.enum(['anthropic', 'openai']).default('anthropic'),
     modelName: z.string().default('claude-sonnet-4-20250514'),
     apiKeyEnvVar: z.string().default('ANTHROPIC_API_KEY'),
@@ -208,7 +207,6 @@ const LLMScreenConfigSchema = z
     timeoutMs: z.number().int().optional(),
   })
   .default({
-    enabled: false,
     llmProvider: 'anthropic',
     modelName: 'claude-sonnet-4-20250514',
     apiKeyEnvVar: 'ANTHROPIC_API_KEY',
@@ -226,21 +224,52 @@ const LLMScreenConfigSchema = z
 // This ensures consistency between Zod validation and TypeScript types.
 export type LLMScreenConfig = z.infer<typeof LLMScreenConfigSchema>;
 
-// Define the root config schema
+// Define the root config schema with new structure
 const ConfigSchema = z
   .object({
-    default: z.object({
-      date: DateRangeSchema.optional(),
-      ticker: z.string(),
-      timeframe: z.string(),
-      direction: z.enum(['long', 'short', 'llm_decides']),
-      patterns: DefaultPatternsSchema.optional(),
-      parallelization: ParallelizationOptionsSchema.optional(),
-      // NEW: Add exitStrategies to default config
-      exitStrategies: ExitStrategiesConfigSchema.optional(),
-    }),
-    entry: EntryRootConfigSchema, // root-level entry configuration (optional)
-    patterns: PatternsConfigSchema, // legacy; defaults to { entry: {} } if missing
+    // New structured config
+    shared: z
+      .object({
+        ticker: z.string(),
+        timeframe: z.string(),
+        direction: z.enum(['long', 'short', 'llm_decides']),
+        entry: EntryRootConfigSchema.optional(),
+        llmConfirmationScreen: LLMScreenConfigSchema.optional(),
+      })
+      .optional(),
+    backtest: z
+      .object({
+        date: DateRangeSchema.optional(),
+        parallelization: ParallelizationOptionsSchema.optional(),
+        exit: ExitStrategiesConfigSchema.optional(),
+        execution: ExecutionConfigSchema.optional(),
+      })
+      .optional(),
+    scout: z
+      .object({
+        polygon: z
+          .object({
+            apiKeyEnvVar: z.string().optional(),
+          })
+          .optional(),
+      })
+      .optional(),
+
+    // Legacy config structure for backward compatibility
+    default: z
+      .object({
+        date: DateRangeSchema.optional(),
+        ticker: z.string(),
+        timeframe: z.string(),
+        direction: z.enum(['long', 'short', 'llm_decides']),
+        patterns: DefaultPatternsSchema.optional(),
+        parallelization: ParallelizationOptionsSchema.optional(),
+        // NEW: Add exitStrategies to default config
+        exitStrategies: ExitStrategiesConfigSchema.optional(),
+      })
+      .optional(),
+    entry: EntryRootConfigSchema.optional(), // root-level entry configuration (optional)
+    patterns: PatternsConfigSchema.optional(), // legacy; defaults to { entry: {} } if missing
     llmConfirmationScreen: LLMScreenConfigSchema.optional(),
     // Prefer 'exit' but accept legacy 'exitStrategies'
     exit: ExitStrategiesConfigSchema.optional(),
@@ -250,8 +279,10 @@ const ConfigSchema = z
   })
   .refine(
     data => {
-      if (data.default.direction === 'llm_decides') {
-        return data.llmConfirmationScreen && typeof data.llmConfirmationScreen === 'object';
+      const direction = data.default?.direction || data.shared?.direction;
+      if (direction === 'llm_decides') {
+        const llmConfig = data.llmConfirmationScreen || data.shared?.llmConfirmationScreen;
+        return llmConfig && typeof llmConfig === 'object';
       }
       return true;
     },
@@ -542,6 +573,27 @@ export const mergeConfigWithCliOptions = (
   loadedConfig: Config,
   cliOptions: Record<string, any>
 ): MergedConfig => {
+  // Handle new config structure by mapping to legacy format for compatibility
+  let compatConfig = loadedConfig;
+
+  if (loadedConfig.shared || loadedConfig.backtest || loadedConfig.scout) {
+    // New structure detected, map to legacy format
+    compatConfig = {
+      ...loadedConfig,
+      default: {
+        ticker: loadedConfig.shared?.ticker || 'SPY',
+        timeframe: loadedConfig.shared?.timeframe || '1min',
+        direction: loadedConfig.shared?.direction || 'long',
+        date: loadedConfig.backtest?.date,
+        parallelization: loadedConfig.backtest?.parallelization,
+      },
+      entry: loadedConfig.shared?.entry,
+      llmConfirmationScreen: loadedConfig.shared?.llmConfirmationScreen,
+      exit: loadedConfig.backtest?.exit,
+      execution: loadedConfig.backtest?.execution,
+    };
+  }
+
   const normalizeEntryName = (name: string | undefined): string | undefined => {
     if (!name) return undefined;
     const map: Record<string, string> = {
@@ -558,13 +610,13 @@ export const mergeConfigWithCliOptions = (
   };
 
   const defaultEntryPattern =
-    normalizeEntryName((loadedConfig.entry as any)?.enabled?.[0] as string | undefined) ||
-    normalizeEntryName(loadedConfig.entry?.pattern as string | undefined) ||
-    loadedConfig.default.patterns?.entry ||
+    normalizeEntryName((compatConfig.entry as any)?.enabled?.[0] as string | undefined) ||
+    normalizeEntryName(compatConfig.entry?.pattern as string | undefined) ||
+    compatConfig.default?.patterns?.entry ||
     'quick-rise';
 
   // Get exit strategies configurations from different sources (prefer new 'exit')
-  const rootFromLoaded = (loadedConfig as any).exit || loadedConfig.exitStrategies;
+  const rootFromLoaded = (compatConfig as any).exit || compatConfig.exitStrategies;
 
   // Exit strategies are configured at the ROOT level only
   const enabledArray = rootFromLoaded?.enabled || [];
@@ -636,18 +688,18 @@ export const mergeConfigWithCliOptions = (
   };
 
   const mergedConfig: MergedConfig = {
-    ticker: cliOptions.ticker || loadedConfig.default.ticker,
-    timeframe: cliOptions.timeframe || loadedConfig.default.timeframe,
-    direction: cliOptions.direction || loadedConfig.default.direction,
-    from: cliOptions.from || loadedConfig.default.date?.from || '2010-01-01',
-    to: cliOptions.to || loadedConfig.default.date?.to || '2025-12-31',
+    ticker: cliOptions.ticker || compatConfig.default?.ticker || 'SPY',
+    timeframe: cliOptions.timeframe || compatConfig.default?.timeframe || '1min',
+    direction: cliOptions.direction || compatConfig.default?.direction || 'long',
+    from: cliOptions.from || compatConfig.default?.date?.from || '2010-01-01',
+    to: cliOptions.to || compatConfig.default?.date?.to || '2025-12-31',
     entryPattern: cliOptions.entryPattern || cliOptions['entry-pattern'] || defaultEntryPattern,
     maxConcurrentDays:
-      cliOptions.maxConcurrentDays || loadedConfig.default.parallelization?.maxConcurrentDays || 1,
-    llmConfirmationScreen: loadedConfig.llmConfirmationScreen
+      cliOptions.maxConcurrentDays || compatConfig.default?.parallelization?.maxConcurrentDays || 1,
+    llmConfirmationScreen: compatConfig.llmConfirmationScreen
       ? {
           ...LLMScreenConfigSchema.parse({}),
-          ...loadedConfig.llmConfirmationScreen,
+          ...compatConfig.llmConfirmationScreen,
         }
       : LLMScreenConfigSchema.parse({}),
     exitStrategies: mergedExitStrategies,
@@ -655,11 +707,11 @@ export const mergeConfigWithCliOptions = (
       slippage: {
         model:
           rootFromLoaded?.slippage?.model ??
-          loadedConfig.execution?.slippage?.model ??
+          compatConfig.execution?.slippage?.model ??
           SlippageConfigSchema.parse({}).model,
         value:
           rootFromLoaded?.slippage?.value ??
-          loadedConfig.execution?.slippage?.value ??
+          compatConfig.execution?.slippage?.value ??
           SlippageConfigSchema.parse({}).value,
       },
     },
@@ -687,48 +739,48 @@ export const mergeConfigWithCliOptions = (
   });
 
   // Seed with legacy patterns.entry configs
-  if (loadedConfig.patterns.entry.quickRise) {
-    mergedConfig.quickRise = { ...loadedConfig.patterns.entry.quickRise };
+  if (compatConfig.patterns?.entry.quickRise) {
+    mergedConfig.quickRise = { ...compatConfig.patterns.entry.quickRise };
   }
-  if (loadedConfig.patterns.entry.quickFall) {
-    mergedConfig.quickFall = { ...loadedConfig.patterns.entry.quickFall };
+  if (compatConfig.patterns?.entry.quickFall) {
+    mergedConfig.quickFall = { ...compatConfig.patterns.entry.quickFall };
   }
-  if (loadedConfig.patterns.entry.fixedTimeEntry) {
-    mergedConfig.fixedTimeEntry = { ...loadedConfig.patterns.entry.fixedTimeEntry };
+  if (compatConfig.patterns?.entry.fixedTimeEntry) {
+    mergedConfig.fixedTimeEntry = { ...compatConfig.patterns.entry.fixedTimeEntry };
   }
-  if (loadedConfig.patterns.entry.randomTimeEntry) {
-    mergedConfig.randomTimeEntry = { ...loadedConfig.patterns.entry.randomTimeEntry };
+  if (compatConfig.patterns?.entry.randomTimeEntry) {
+    mergedConfig.randomTimeEntry = { ...compatConfig.patterns.entry.randomTimeEntry };
   }
 
   // Overlay root-level entry options if provided
-  if (loadedConfig.entry) {
-    if ((loadedConfig.entry as any).quickRise) {
+  if (compatConfig.entry) {
+    if ((compatConfig.entry as any).quickRise) {
       mergedConfig.quickRise = {
         ...(mergedConfig.quickRise || {}),
-        ...(loadedConfig.entry as any).quickRise,
+        ...(compatConfig.entry as any).quickRise,
       };
     }
-    if ((loadedConfig.entry as any).quickFall) {
+    if ((compatConfig.entry as any).quickFall) {
       mergedConfig.quickFall = {
         ...(mergedConfig.quickFall || {}),
-        ...(loadedConfig.entry as any).quickFall,
+        ...(compatConfig.entry as any).quickFall,
       };
     }
-    if ((loadedConfig.entry as any).fixedTimeEntry) {
+    if ((compatConfig.entry as any).fixedTimeEntry) {
       mergedConfig.fixedTimeEntry = {
         ...(mergedConfig.fixedTimeEntry || {}),
-        ...(loadedConfig.entry as any).fixedTimeEntry,
+        ...(compatConfig.entry as any).fixedTimeEntry,
       };
     }
-    if ((loadedConfig.entry as any).randomTimeEntry) {
+    if ((compatConfig.entry as any).randomTimeEntry) {
       mergedConfig.randomTimeEntry = {
         ...(mergedConfig.randomTimeEntry || {}),
-        ...(loadedConfig.entry as any).randomTimeEntry,
+        ...(compatConfig.entry as any).randomTimeEntry,
       };
     }
 
     // Handle new strategyOptions format
-    const strategyOptions = (loadedConfig.entry as any)?.strategyOptions;
+    const strategyOptions = (compatConfig.entry as any)?.strategyOptions;
     if (strategyOptions) {
       // Map quickRise
       if (strategyOptions.quickRise) {
@@ -769,14 +821,14 @@ export const mergeConfigWithCliOptions = (
 
   Object.entries(patternOptions).forEach(([pattern, options]) => {
     if (!mergedConfig[pattern]) {
-      if (pattern === 'quickRise' && loadedConfig.patterns.entry.quickRise) {
-        mergedConfig[pattern] = { ...loadedConfig.patterns.entry.quickRise };
-      } else if (pattern === 'quickFall' && loadedConfig.patterns.entry.quickFall) {
-        mergedConfig[pattern] = { ...loadedConfig.patterns.entry.quickFall };
-      } else if (pattern === 'fixedTimeEntry' && loadedConfig.patterns.entry.fixedTimeEntry) {
-        mergedConfig[pattern] = { ...loadedConfig.patterns.entry.fixedTimeEntry };
-      } else if (pattern === 'randomTimeEntry' && loadedConfig.patterns.entry.randomTimeEntry) {
-        mergedConfig[pattern] = { ...loadedConfig.patterns.entry.randomTimeEntry };
+      if (pattern === 'quickRise' && compatConfig.patterns?.entry.quickRise) {
+        mergedConfig[pattern] = { ...compatConfig.patterns.entry.quickRise };
+      } else if (pattern === 'quickFall' && compatConfig.patterns?.entry.quickFall) {
+        mergedConfig[pattern] = { ...compatConfig.patterns.entry.quickFall };
+      } else if (pattern === 'fixedTimeEntry' && compatConfig.patterns?.entry.fixedTimeEntry) {
+        mergedConfig[pattern] = { ...compatConfig.patterns.entry.fixedTimeEntry };
+      } else if (pattern === 'randomTimeEntry' && compatConfig.patterns?.entry.randomTimeEntry) {
+        mergedConfig[pattern] = { ...compatConfig.patterns.entry.randomTimeEntry };
       } else {
         mergedConfig[pattern] = {};
       }
@@ -794,7 +846,7 @@ export const mergeConfigWithCliOptions = (
     mergedConfig.quickFall.fallPct = parseFloat(cliOptions.fallPct as string);
   }
 
-  const patternNamesFromConfig = Object.keys(loadedConfig.patterns.entry);
+  const patternNamesFromConfig = Object.keys(compatConfig.patterns?.entry || {});
   patternNamesFromConfig.forEach(patternName => {
     if (cliOptions[patternName] && typeof cliOptions[patternName] === 'object') {
       mergedConfig[patternName] = {

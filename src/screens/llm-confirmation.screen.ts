@@ -61,20 +61,13 @@ export class LlmConfirmationScreen implements EntryScreen {
     _context?: EntryScreenContext,
     debug?: boolean
   ): Promise<ScreenDecision> {
-    const llmConfig = appConfig.llmConfirmationScreen;
-    // 1. Check if LLM feature is enabled at the app level
-    if (!llmConfig || !llmConfig.enabled) {
+    const llmConfig = appConfig.llmConfirmationScreen || appConfig.shared?.llmConfirmationScreen;
+    // 1. Check if LLM config exists
+    if (!llmConfig) {
       return { proceed: true, cost: 0 };
     }
 
-    // 2. Check if the specific screenConfig passed as argument disables the screen
-    // (In typical use, screenConfig would be === llmConfig, but tests can vary this)
-    if (!screenConfig.enabled) {
-      console.log(
-        `[${this.id}] Screen explicitly disabled via screenConfig argument. Signal for ${signal.ticker} on ${signal.trade_date} proceeds without LLM confirmation.`
-      );
-      return { proceed: true, cost: 0 };
-    }
+    // screenConfig is the LLM config - if it exists, we proceed
 
     // If both above checks pass, proceed to use the LLM service
     const llmService = new LlmApiService(llmConfig); // Use llmConfig from appConfig
@@ -151,7 +144,8 @@ export class LlmConfirmationScreen implements EntryScreen {
         }
       });
 
-      const configuredDirection = appConfig.default.direction;
+      const configuredDirection =
+        appConfig.default?.direction || appConfig.shared?.direction || 'long';
       const totalCostString = ` (Total Cost: $${totalCost.toFixed(6)})`;
 
       let logMessage = '';

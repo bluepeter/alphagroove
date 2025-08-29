@@ -160,7 +160,14 @@ describe('LLM Trade Screening Tests', () => {
         mockMergedConfigValue,
         currentAppConfig
       );
-      expect(resultDisabled).toEqual({ proceed: true, cost: 0 });
+      expect(resultDisabled).toEqual({
+        proceed: true,
+        cost: 0,
+        chartPath: 'path/to/chart.png',
+        direction: 'long',
+        averagedProposedStopLoss: undefined,
+        averagedProposedProfitTarget: undefined,
+      });
     });
 
     it('should call LLM screen if enabled and return its decision with cost', async () => {
