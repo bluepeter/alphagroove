@@ -1,7 +1,7 @@
 default:
   date:
     # from: '2017-01-01'
-    from: '2024-01-01'
+    from: '2017-01-01'
     to: '2025-05-30'
   ticker: 'SPY'
   timeframe: '1min'
