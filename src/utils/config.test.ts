@@ -435,16 +435,16 @@ describe('Configuration System', () => {
             commonPromptSuffixForJson: 'test suffix',
             maxOutputTokens: 150,
           },
+        },
+        backtest: {
+          date: { from: '2023-01-01', to: '2023-12-31' },
+          parallelization: { maxConcurrentDays: 2 },
           entry: {
             enabled: ['quickRise' as const],
             strategyOptions: {
               quickRise: { risePct: 0.3, withinMinutes: 5 },
             },
           },
-        },
-        backtest: {
-          date: { from: '2023-01-01', to: '2023-12-31' },
-          parallelization: { maxConcurrentDays: 2 },
           exit: {
             enabled: ['profitTarget'],
             strategyOptions: {

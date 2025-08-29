@@ -309,23 +309,6 @@ level as `package.json`):
 shared:
   ticker: 'SPY'
   timeframe: '1min'
-
-  # Entry pattern configuration
-  entry:
-    enabled: [quickRise] # Available: quickRise, quickFall, fixedTimeEntry, randomTimeEntry
-    strategyOptions:
-      quickRise:
-        risePct: 0.3
-        withinMinutes: 5
-      quickFall:
-        fallPct: 0.3
-        withinMinutes: 5
-      fixedTimeEntry:
-        entryTime: '13:00' # Required if using fixedTimeEntry
-      randomTimeEntry:
-        startTime: '09:30' # Start of random time window
-        endTime: '16:00' # End of random time window
-
   # LLM configuration for intelligent trade analysis
   llmConfirmationScreen:
     llmProvider: 'anthropic'
@@ -343,6 +326,22 @@ backtest:
     to: '2025-05-02'
   parallelization:
     maxConcurrentDays: 3 # Process multiple days concurrently for faster execution
+
+  # Entry pattern configuration (backtest only)
+  entry:
+    enabled: [quickRise] # Available: quickRise, quickFall, fixedTimeEntry, randomTimeEntry
+    strategyOptions:
+      quickRise:
+        risePct: 0.3
+        withinMinutes: 5
+      quickFall:
+        fallPct: 0.3
+        withinMinutes: 5
+      fixedTimeEntry:
+        entryTime: '13:00' # Required if using fixedTimeEntry
+      randomTimeEntry:
+        startTime: '09:30' # Start of random time window
+        endTime: '16:00' # End of random time window
 
   # Exit strategies configuration (backtest only)
   exit:
@@ -457,22 +456,6 @@ shared:
   ticker: 'SPY'
   timeframe: '1min'
 
-  # Entry pattern configuration
-  entry:
-    enabled: [randomTimeEntry] # Can also use: quickRise, quickFall, fixedTimeEntry
-    strategyOptions:
-      randomTimeEntry:
-        startTime: '10:00' # Start of random time window
-        endTime: '15:00' # End of random time window
-      fixedTimeEntry:
-        entryTime: '13:00' # Required if using fixedTimeEntry
-      quickRise:
-        risePct: 0.3
-        withinMinutes: 5
-      quickFall:
-        fallPct: 0.3
-        withinMinutes: 5
-
   # LLM configuration for intelligent trade analysis
   llmConfirmationScreen:
     llmProvider: 'anthropic'
@@ -490,6 +473,22 @@ backtest:
     to: '2025-05-02'
   parallelization:
     maxConcurrentDays: 3 # Process up to 3 days concurrently for faster execution
+
+  # Entry pattern configuration (backtest only)
+  entry:
+    enabled: [randomTimeEntry] # Can also use: quickRise, quickFall, fixedTimeEntry
+    strategyOptions:
+      randomTimeEntry:
+        startTime: '10:00' # Start of random time window
+        endTime: '15:00' # End of random time window
+      fixedTimeEntry:
+        entryTime: '13:00' # Required if using fixedTimeEntry
+      quickRise:
+        risePct: 0.3
+        withinMinutes: 5
+      quickFall:
+        fallPct: 0.3
+        withinMinutes: 5
 
   # Exit strategies configuration (backtest only)
   exit:
@@ -689,8 +688,9 @@ backtest:
 
 ### Entry Pattern Options
 
-Entry patterns can be configured under root `entry` in the YAML (preferred) with `enabled` and
-`strategyOptions`, or overridden via CLI dot notation:
+Entry patterns are used by the backtest only (scout uses real-time current price entry). They can be
+configured under `backtest.entry` in the YAML with `enabled` and `strategyOptions`, or overridden
+via CLI dot notation:
 
 ```bash
 pnpm dev:start --quickRise.risePct=0.5 --fixedTimeEntry.entryTime=13:00
@@ -752,8 +752,8 @@ debug info | false | | `--dry-run` | Show query without executing | false |
 | `--randomTimeEntry.endTime`   | End of random time window in HH:MM format   | `16:00`             |
 
 **Note**: Random time entry generates a deterministic random time for each trading day within the
-specified window. Configure in YAML under `entry.strategyOptions.randomTimeEntry` or use CLI
-options.
+specified window. Configure in YAML under `backtest.entry.strategyOptions.randomTimeEntry` or use
+CLI options.
 
 ### Available Timeframes
 
@@ -893,10 +893,11 @@ Ensure the environment variable specified in `apiKeyEnvVar` is set in your envir
 ## Entry Scout
 
 AlphaGroove's entry scout bridges the gap between backtesting insights and live market execution.
-This on-demand analysis tool scouts for entry opportunities using the same LLM configuration and
-exit strategies validated through historical backtesting. Primarily designed for real-time market
-reconnaissance, it's flexible enough to analyze specific historical moments for development and
-testing.
+This on-demand analysis tool scouts for entry opportunities using the same LLM configuration
+validated through historical backtesting.
+
+**Note**: Scout uses real-time current price entry (not pattern-based entry detection like the
+backtest). Entry patterns are backtest-only features for historical analysis.
 
 ### Current Capabilities (Live Market Analysis)
 

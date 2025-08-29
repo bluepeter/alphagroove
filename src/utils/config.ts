@@ -229,8 +229,6 @@ const ConfigSchema = z.object({
     .object({
       ticker: z.string(),
       timeframe: z.string(),
-
-      entry: EntryRootConfigSchema.optional(),
       llmConfirmationScreen: LLMScreenConfigSchema.optional(),
     })
     .optional(),
@@ -238,6 +236,7 @@ const ConfigSchema = z.object({
     .object({
       date: DateRangeSchema.optional(),
       parallelization: ParallelizationOptionsSchema.optional(),
+      entry: EntryRootConfigSchema.optional(),
       exit: ExitStrategiesConfigSchema.optional(),
       execution: ExecutionConfigSchema.optional(),
     })
@@ -565,7 +564,7 @@ export const mergeConfigWithCliOptions = (
         date: loadedConfig.backtest?.date,
         parallelization: loadedConfig.backtest?.parallelization,
       },
-      entry: loadedConfig.shared?.entry,
+      entry: loadedConfig.backtest?.entry,
       llmConfirmationScreen: loadedConfig.shared?.llmConfirmationScreen,
       exit: loadedConfig.backtest?.exit,
       execution: loadedConfig.backtest?.execution,

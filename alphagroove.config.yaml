@@ -3,18 +3,6 @@
 shared:
   ticker: 'SPY'
   timeframe: '1min'
-
-  entry:
-    enabled: [randomTimeEntry]
-    strategyOptions:
-      quickRise:
-        risePct: 0.3
-        withinMinutes: 5
-      quickFall:
-        fallPct: 0.3
-        withinMinutes: 5
-      fixedTimeEntry:
-        entryTime: '13:00'
   llmConfirmationScreen:
     llmProvider: 'anthropic'
     modelName: 'claude-sonnet-4-20250514'
@@ -79,6 +67,19 @@ backtest:
     to: '2025-05-30'
   parallelization:
     maxConcurrentDays: 3 # Process up to 3 days concurrently for faster execution
+
+  # Entry patterns and detection logic (used by backtest only)
+  entry:
+    enabled: [randomTimeEntry]
+    strategyOptions:
+      quickRise:
+        risePct: 0.3
+        withinMinutes: 5
+      quickFall:
+        fallPct: 0.3
+        withinMinutes: 5
+      fixedTimeEntry:
+        entryTime: '13:00'
   exit:
     enabled:
       #- stopLoss
@@ -113,6 +114,5 @@ backtest:
 
 # === SCOUT-SPECIFIC CONFIGURATION ===
 scout:
-  # Future: Polygon.io API settings, alerts, refresh intervals, etc.
   polygon:
     apiKeyEnvVar: 'POLYGON_API_KEY'
