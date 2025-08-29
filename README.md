@@ -1,215 +1,32 @@
-## Project Overview
+# AlphaGroove
 
-AlphaGroove is a comprehensive trading strategy development and execution toolkit that bridges the
-gap between backtesting and live trading. The system consists of two complementary components
-designed for hands-on quant researchers who prefer scripting over spreadsheets, precision over black
-boxes, and intelligent analysis over curve-fitting.
+A comprehensive trading strategy development and execution toolkit that bridges the gap between
+backtesting and live trading. AlphaGroove consists of two complementary tools designed for hands-on
+quant researchers who prefer scripting over spreadsheets, precision over black boxes, and
+intelligent analysis over curve-fitting.
 
-### Dual-System Architecture
+## Tools Overview
 
-**1. Strategy Backtesting Engine (`pnpm dev:start`)**
+**Backtesting Engine (`pnpm dev:start`)**
 
-- Historical analysis of intraday trading patterns using high-resolution datasets (1-minute SPY
-  bars)
-- Built with DuckDB and Node.js for rapid querying and filtering of market behavior
+- Historical analysis of intraday trading patterns using high-resolution datasets
 - LLM-powered trade analysis with automated chart generation for pattern recognition
 - Statistical analysis with comprehensive metrics (mean/median returns, win rates, distribution
   analysis)
-- Modular pattern architecture with consistent CLI interface
+- Modular pattern architecture for entry/exit strategies
 
-**2. Entry Scout (`pnpm scout`)**
+**Entry Scout (`pnpm scout`)**
 
-- Live market analysis using the same LLM configuration and exit strategies validated in backtesting
-- Real-time data integration with Polygon.io API for current market conditions
-- Generates actionable trade signals with specific entry/exit levels for immediate execution
-- Produces the same high-quality chart analysis used in backtesting for current market conditions
+- Real-time market analysis using Polygon.io API
+- Same LLM configuration and analysis methods validated through backtesting
+- Generates actionable trade signals with specific entry/exit levels for manual execution
+- On-demand analysis for any date/time, not just current market conditions
 
-### Workflow Integration
+## Installation & Setup
 
-The typical AlphaGroove workflow involves:
+### Prerequisites
 
-1. **Research Phase**: Use the backtesting engine to analyze historical data, optimize LLM settings,
-   and validate exit strategies
-2. **Validation Phase**: Refine entry patterns, exit parameters, and LLM prompts based on
-   statistical results
-3. **Execution Phase**: Deploy the validated configuration with the entry scout for live market
-   analysis
-4. **Implementation**: Use generated signals and calculated stop loss/profit target levels in your
-   brokerage platform
-
-**Key Features:**
-
-- **LLM-Powered Trade Analysis**: Uses Large Language Models to analyze chart patterns and make
-  trading decisions, providing intelligent filtering beyond simple technical indicators
-- **Automated Chart Generation**: Creates high-quality candlestick charts for every trade signal
-  (both historical and real-time)
-- **Modular Pattern Architecture**: Each strategy condition is encapsulated in code with consistent
-  CLI interface
-- **Statistical Analysis**: Comprehensive metrics including mean/median returns, win rates, and
-  distribution analysis
-- **Real-Time Integration**: Seamless transition from backtesting to live trading with identical
-  analysis methods
-
-## Advanced Exit Strategies
-
-AlphaGroove supports dynamic exit strategies that analyze price action bar-by-bar. The following
-exit strategies are available:
-
-### Stop Loss
-
-Exits the trade when price moves against your position by a specified amount.
-
-**Configuration options:**
-
-- `percentFromEntry`: Exit when price moves against your position by this percentage (e.g., 1.0
-  means 1%)
-- `atrMultiplier`: Alternative to percentFromEntry; exit when price moves against your position by
-  this multiple of ATR (Average True Range)
-- `useLlmProposedPrice`: (boolean, default: `false`) If `true` and the LLM Confirmation Screen is
-  enabled and returns a valid proposed stop loss price (from the `proposedStopLoss` field in its
-  JSON response, averaged across calls), this price will be used. This overrides `percentFromEntry`
-  and `atrMultiplier` if a valid LLM price is available.
-
-### Profit Target
-
-Exits the trade when price moves in your favor by a specified amount.
-
-**Configuration options:**
-
-- `percentFromEntry`: Exit when price moves in your favor by this percentage (e.g., 2.0 means 2%)
-- `atrMultiplier`: Alternative to percentFromEntry; exit when price moves in your favor by this
-  multiple of ATR
-- `useLlmProposedPrice`: (boolean, default: `false`) If `true` and the LLM Confirmation Screen is
-  enabled and returns a valid proposed profit target price (from the `proposedProfitTarget` field in
-  its JSON response, averaged across calls), this price will be used. This overrides
-  `percentFromEntry` and `atrMultiplier` if a valid LLM price is available.
-
-### Trailing Stop
-
-Implements a trailing stop that activates after price moves a certain amount in your favor, then
-follows the price by a specified percentage.
-
-**Configuration options:**
-
-- `activationPercent`: The trailing stop activates after price moves this percent in your favor
-  (e.g., 1.0 means 1%)
-- `trailPercent`: Once activated, the stop trails the best price by this percentage (e.g., 0.5 means
-  0.5%)
-
-### Max Hold Time
-
-Exits the trade after holding for a specified number of minutes, regardless of price action.
-
-**Configuration options:**
-
-- `minutes`: Number of minutes to hold the position before exiting (e.g., 60 for a 1-hour trade)
-
-### End of Day
-
-Exits the trade at a specific time of day, useful for avoiding overnight exposure.
-
-**Configuration options:**
-
-- `time`: Time of day to exit in HH:MM format (e.g., '16:00' for 4:00 PM)
-
-### Time-Based vs Price-Based Strategies
-
-**Time-based constraints** (`maxHoldTime` and `endOfDay`) are fundamentally different from
-price-based strategies:
-
-- **Automatically active**: When configured, they're always used - no need to include them in the
-  `enabled` array
-- **Act as overlays**: They provide time limits/constraints on top of other strategies
-- **Base-level configuration**: Configured directly under `exit:` (not in `strategyOptions`)
-
-**Price-based strategies** (`stopLoss`, `profitTarget`, `trailingStop`) compete with each other:
-
-- **Must be enabled**: Require explicit inclusion in the `enabled` array
-- **Configured under `strategyOptions`**: All settings go in the nested `strategyOptions` section
-- **First one wins**: The first strategy to trigger ends the trade
-
-### Slippage Model
-
-Models realistic trading costs by applying slippage to both entry and exit prices.
-
-**Configuration options:**
-
-- `model`: Type of slippage model to use, either 'percent' or 'fixed'
-- `value`: For percent model, the percentage of slippage (e.g., 0.05 for 0.05%); for fixed model,
-  the absolute amount
-
-### Dynamic Volatility Adjustment (ATR-Based)
-
-To make exit parameters more adaptive to market conditions, Stop Loss, Profit Target, and Trailing
-Stop strategies can optionally use the Average True Range (ATR) calculated from the prior trading
-day to set their levels. The ATR used is the simple average of all 1-minute True Range values from
-the entire prior trading day. This is configured per-strategy:
-
-- **`exit.strategyOptions.stopLoss.atrMultiplier`**: (Optional, e.g., `1.5`) If set and the prior
-  day's ATR (`entryAtrValue`) can be calculated, the stop loss will be
-  `entryPrice - (ATR * atrMultiplier)` for longs, or `entryPrice + (ATR * atrMultiplier)` for
-  shorts.
-- **`exit.strategyOptions.profitTarget.atrMultiplier`**: (Optional, e.g., `3.0`) If set and
-  `entryAtrValue` is available, the profit target will be `entryPrice + (ATR * atrMultiplier)` for
-  longs, or `entryPrice - (ATR * atrMultiplier)` for shorts.
-- **`exit.strategyOptions.trailingStop.activationAtrMultiplier`**: (Optional, e.g., `1.0`) If set
-  and `entryAtrValue` is available, the trailing stop activates after price moves
-  `ATR * activationAtrMultiplier` in your favor.
-- **`exit.strategyOptions.trailingStop.trailAtrMultiplier`**: (Optional, e.g., `0.75`) If set and
-  `entryAtrValue` is available, the stop will trail by `ATR * trailAtrMultiplier` from the peak
-  price (for longs) or trough price (for shorts).
-
-If ATR-based multipliers are not configured for a strategy, or if the prior day's ATR cannot be
-calculated (e.g., insufficient data), the strategies will fall back to their `percentFromEntry`,
-`activationPercent`, and `trailPercent` settings respectively. The trade output will indicate if
-ATR-based parameters were used and their calculated dollar and percentage values.
-
-These strategies can be combined in order of priority, and the first triggered condition will
-execute the exit. The `enabled` array in the configuration defines which strategies are active and
-their order of evaluation.
-
-### Configuration Example
-
-```yaml
-exit:
-  enabled:
-    - stopLoss
-    - profitTarget
-    - trailingStop
-  # Time-based constraints are configured at base level and automatically active
-  maxHoldTime:
-    minutes: 60
-  endOfDay:
-    time: '16:00' # exit by 4:00 PM
-  # Price-based strategies under strategyOptions
-  strategyOptions:
-    stopLoss:
-      percentFromEntry: 1.0
-      # or use ATR-based stop loss with:
-      # atrMultiplier: 1.5
-      useLlmProposedPrice: false # Set to true to use LLM-derived stop loss
-    profitTarget:
-      percentFromEntry: 2.0
-      # or use ATR-based target with:
-      # atrMultiplier: 3.0
-      useLlmProposedPrice: false # Set to true to use LLM-derived profit target
-    trailingStop:
-      activationPercent: 1.0 # activates after 1% favorable move
-      trailPercent: 0.5 # trails by 0.5%
-
-# Execution configuration (applies to both entry and exit)
-execution:
-  slippage:
-    model: 'percent' # or 'fixed'
-    value: 0.05 # 0.05% slippage
-```
-
-## Prerequisites
-
-### Required: DuckDB Installation
-
-AlphaGroove requires DuckDB to be installed on your system. This is a mandatory step before running
-the application.
+**Required: DuckDB Installation**
 
 ```bash
 # Install DuckDB using Homebrew
@@ -221,7 +38,7 @@ duckdb --version
 
 If you don't have Homebrew installed, you can install it from [brew.sh](https://brew.sh).
 
-### Node.js Setup & Dependencies
+**Node.js Setup & Dependencies**
 
 The project requires Node.js 18 or later. We recommend using `pnpm` as the package manager.
 
@@ -237,71 +54,10 @@ installation related to `libvips` or similar missing libraries, you may need to 
 manually using your system's package manager (e.g., `brew install vips` on macOS, or
 `sudo apt-get install libvips-dev` on Debian/Ubuntu) and then try `pnpm install` again.
 
-Note: The project uses a `pnpm-workspace.yaml` file to configure build behavior. This file tells
-pnpm to ignore build scripts for DuckDB since we're using the Homebrew-installed version instead of
-the Node.js package.
+### Configuration
 
-## Quick Start
-
-1. First, ensure DuckDB is installed (see Prerequisites above)
-2. Install project dependencies:
-   ```bash
-   pnpm install
-   ```
-3. **Required:** Create a configuration file named `alphagroove.config.yaml` in the project root
-   directory (see Configuration section below)
-
-4. Run the backtesting application:
-
-   ```bash
-   # Run with development mode (recommended)
-   pnpm dev:start
-
-   # Or run with specific parameters
-   pnpm dev:start --from 2020-01-01 --to 2025-05-02 --entry-pattern quickRise
-
-   # Use random time entry pattern with custom time window
-   pnpm dev:start --entry-pattern randomTimeEntry \
-     --randomTimeEntry.startTime 09:30 \
-     --randomTimeEntry.endTime 15:30
-
-   # Use fixed time entry with debug output
-   pnpm dev:start --entry-pattern fixedTimeEntry \
-     --fixedTimeEntry.entryTime 13:00 \
-     --debug
-   ```
-
-5. For real-time entry scouting:
-
-   ```bash
-   # Scout current market conditions
-   pnpm scout
-
-   # Scout specific date and time
-   pnpm scout --date 2025-05-28 --time 12:30
-   ```
-
-### Running Production Build
-
-- Development (recommended during iteration):
-  - `pnpm dev:start`
-
-- Production build and run:
-  - `pnpm build && pnpm start`
-
-The production start registers a tiny Node ESM loader via `--import` that appends .js at runtime for
-extensionless relative imports. No source edits, no post-build rewriting, ESM preserved.
-
-## Configuration
-
-AlphaGroove uses a centralized configuration system with all settings defined in the
-`alphagroove.config.yaml` file. This is the single source of truth for all configuration values in
-the application.
-
-### Configuration File
-
-**Required:** Create a file named `alphagroove.config.yaml` in the project root directory (same
-level as `package.json`):
+**Required:** Create a configuration file named `alphagroove.config.yaml` in the project root
+directory:
 
 ```yaml
 # === SHARED CONFIGURATION ===
@@ -309,6 +65,7 @@ level as `package.json`):
 shared:
   ticker: 'SPY'
   timeframe: '1min'
+
   # LLM configuration for intelligent trade analysis
   llmConfirmationScreen:
     llmProvider: 'anthropic'
@@ -317,7 +74,13 @@ shared:
     numCalls: 2
     agreementThreshold: 2
     temperatures: [0.1, 1.0]
-    # ... (see full configuration below)
+    prompts:
+      - 'Analyze this chart as a cautious trader. Action: long, short, or do_nothing? Rationale?'
+      - 'Analyze this chart as an aggressive trader. Action: long, short, or do_nothing? Rationale?'
+    commonPromptSuffixForJson:
+      'Respond in JSON: {"action": "<action>", "rationalization": "<one_sentence_rationale>",
+      "proposedStopLoss": <price_or_null>, "proposedProfitTarget": <price_or_null>}'
+    maxOutputTokens: 150
 
 # === BACKTEST-SPECIFIC CONFIGURATION ===
 backtest:
@@ -325,33 +88,36 @@ backtest:
     from: '2023-01-01'
     to: '2025-05-02'
   parallelization:
-    maxConcurrentDays: 3 # Process multiple days concurrently for faster execution
+    maxConcurrentDays: 3
 
   # Entry pattern configuration (backtest only)
   entry:
-    enabled: [quickRise] # Available: quickRise, quickFall, fixedTimeEntry, randomTimeEntry
+    enabled: [randomTimeEntry]
     strategyOptions:
+      randomTimeEntry:
+        startTime: '10:00'
+        endTime: '15:00'
+      fixedTimeEntry:
+        entryTime: '13:00'
       quickRise:
         risePct: 0.3
         withinMinutes: 5
       quickFall:
         fallPct: 0.3
         withinMinutes: 5
-      fixedTimeEntry:
-        entryTime: '13:00' # Required if using fixedTimeEntry
-      randomTimeEntry:
-        startTime: '09:30' # Start of random time window
-        endTime: '16:00' # End of random time window
 
   # Exit strategies configuration (backtest only)
   exit:
-    enabled: [profitTarget] # Available: stopLoss, profitTarget, trailingStop
-    # Time-based constraints (automatically active when configured)
+    enabled: [profitTarget, trailingStop]
     endOfDay:
       time: '16:00'
     strategyOptions:
       profitTarget:
         atrMultiplier: 3.0
+        useLlmProposedPrice: true
+      trailingStop:
+        activationAtrMultiplier: 0
+        trailAtrMultiplier: 2.5
 
   # Execution configuration (backtest only)
   execution:
@@ -361,37 +127,18 @@ backtest:
 
 # === SCOUT-SPECIFIC CONFIGURATION ===
 scout:
-  # Future: Polygon.io API settings, alerts, refresh intervals, etc.
   polygon:
     apiKeyEnvVar: 'POLYGON_API_KEY'
 ```
 
-This configuration structure is organized into three main sections:
+**Environment Variables**
 
-1. **`shared`**: Configuration used by both backtest and scout tools (ticker, entry patterns, LLM
-   settings)
-2. **`backtest`**: Configuration specific to backtesting (date ranges, exit strategies, slippage
-   modeling)
-3. **`scout`**: Configuration specific to real-time entry scouting (API settings, future
-   enhancements)
+Create a `.env.local` file in the project root with your API keys:
 
-### Key Benefits of the New Structure:
-
-- **Clear Separation**: No confusion about which settings apply to which tool
-- **Shared Configuration**: Entry patterns and LLM settings are defined once and used by both tools
-- **Explicit Ownership**: Exit strategies and execution modeling are clearly backtest-only
-- **Future-Ready**: Scout section ready for real-time API integration
-
-All configuration must be explicitly provided - there are no hidden defaults in the code. The system
-follows a clear hierarchy for configuration:
-
-1. Command-line arguments (highest priority)
-2. Values from `alphagroove.config.yaml`
-3. ⚠️ **No system defaults** - missing configuration will cause clear error messages
-
-**Important**: All exit strategies and pattern configurations must be explicitly provided. The
-system will throw descriptive errors if required configuration is missing, rather than silently
-using hidden defaults.
+```bash
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+POLYGON_API_KEY=your_polygon_api_key_here
+```
 
 You can generate a default config file by running:
 
@@ -399,19 +146,15 @@ You can generate a default config file by running:
 pnpm dev:start init
 ```
 
-**Note:** The configuration file must be named exactly `alphagroove.config.yaml` and placed in the
-project root directory for the application to find it.
+## LLM-Powered Analysis
 
-## LLM-Powered Chart Analysis
-
-AlphaGroove's core strength lies in its integration with Large Language Models for intelligent trade
-analysis. Rather than relying solely on technical indicators, the system generates high-quality
+Both tools use Large Language Models to analyze chart patterns and make intelligent trading
+decisions. Rather than relying solely on technical indicators, the system generates high-quality
 charts for every potential trade and sends them to an LLM for analysis.
 
 **How it Works:**
 
-- **Automatic Chart Generation**: Every entry signal triggers creation of anonymized candlestick
-  charts
+- **Automatic Chart Generation**: Every signal triggers creation of anonymized candlestick charts
 - **Multi-Model Analysis**: Configurable number of LLM calls with different temperature settings
 - **Consensus Decision Making**: Trades execute only when LLMs reach agreement threshold
 - **Dynamic Direction**: LLM can decide whether to go long, short, or skip the trade entirely
@@ -424,607 +167,279 @@ charts for every potential trade and sends them to an LLM for analysis.
 - **Risk Management**: Conservative approach - only trades when confident
 - **Eliminates Bias**: Anonymized charts prevent historical knowledge from influencing decisions
 
-The LLM analysis acts as a sophisticated filter, significantly improving trade quality over purely
-mechanical systems.
+---
 
-### Configuration Validation & Error Messages
+# Backtesting Engine
 
-The system now enforces explicit configuration and will provide clear error messages for missing
-settings:
+Historical analysis of trading patterns with comprehensive statistical reporting.
 
-```bash
-# Missing exit strategies
-Error: Exit strategies must be configured - no defaults provided to avoid hidden behavior
-
-# Missing strategy configuration
-Error: stopLoss strategy enabled but no configuration provided
-
-# Missing entry time for fixed-time-entry pattern
-Error: Fixed Time Entry pattern requires an entry time to be configured
-```
-
-These errors guide you to add the required configuration to your `alphagroove.config.yaml` file.
-
-### Modern Configuration Example
-
-Here's a comprehensive example showing the new structured configuration format:
-
-```yaml
-# === SHARED CONFIGURATION ===
-# Used by both backtest and scout tools
-shared:
-  ticker: 'SPY'
-  timeframe: '1min'
-
-  # LLM configuration for intelligent trade analysis
-  llmConfirmationScreen:
-    llmProvider: 'anthropic'
-    modelName: 'claude-sonnet-4-20250514'
-    apiKeyEnvVar: 'ANTHROPIC_API_KEY'
-    numCalls: 2
-    agreementThreshold: 2
-    temperatures: [0.1, 1.0]
-    # ... (prompts configuration)
-
-# === BACKTEST-SPECIFIC CONFIGURATION ===
-backtest:
-  date:
-    from: '2023-01-01'
-    to: '2025-05-02'
-  parallelization:
-    maxConcurrentDays: 3 # Process up to 3 days concurrently for faster execution
-
-  # Entry pattern configuration (backtest only)
-  entry:
-    enabled: [randomTimeEntry] # Can also use: quickRise, quickFall, fixedTimeEntry
-    strategyOptions:
-      randomTimeEntry:
-        startTime: '10:00' # Start of random time window
-        endTime: '15:00' # End of random time window
-      fixedTimeEntry:
-        entryTime: '13:00' # Required if using fixedTimeEntry
-      quickRise:
-        risePct: 0.3
-        withinMinutes: 5
-      quickFall:
-        fallPct: 0.3
-        withinMinutes: 5
-
-  # Exit strategies configuration (backtest only)
-  exit:
-    enabled: [profitTarget, trailingStop]
-    # Time-based constraints (automatically active when configured)
-    endOfDay:
-      time: '16:00'
-    strategyOptions:
-      profitTarget:
-        atrMultiplier: 3.0
-        useLlmProposedPrice: true
-      trailingStop:
-        activationAtrMultiplier: 0 # Immediate activation
-        trailAtrMultiplier: 2.5
-
-  # Execution configuration (backtest only)
-  execution:
-    slippage:
-      model: 'fixed'
-      value: 0.01
-
-# === SCOUT-SPECIFIC CONFIGURATION ===
-scout:
-  # Future: Polygon.io API settings, alerts, refresh intervals, etc.
-  polygon:
-    apiKeyEnvVar: 'POLYGON_API_KEY'
-```
-
-#### Why No Hidden Defaults?
-
-This design choice ensures:
-
-- **Predictable behavior**: No surprise defaults that might not match your intentions
-- **Clear configuration**: You see exactly what settings are being used
-- **Maintainable code**: No hidden behavior to debug or discover later
-- **Explicit intent**: Every configuration choice is deliberate and visible
-
-### Exit Strategies Location
-
-Exit strategies are now configured under the `backtest` section, as they are specific to
-backtesting:
-
-```yaml
-backtest:
-  exit:
-    enabled: [profitTarget, trailingStop]
-    # Time-based constraints are configured at base level and automatically active
-    maxHoldTime:
-      minutes: 60
-    endOfDay:
-      time: '16:00'
-    # Price-based strategies are configured under strategyOptions
-    strategyOptions:
-      profitTarget:
-        atrMultiplier: 5.0
-      trailingStop:
-        activationAtrMultiplier: 0
-        trailAtrMultiplier: 2.5
-
-  # Execution configuration (also backtest-specific)
-execution:
-  slippage:
-    model: fixed
-    value: 0.01
-```
-
-**Important**: Time-based constraints (`maxHoldTime` and `endOfDay`) are configured at the base
-level and are **automatically active when configured** - they don't need to be in the `enabled`
-array. These act as overlays/constraints on top of other strategies.
-
-Price-based strategies (`stopLoss`, `profitTarget`, `trailingStop`) must be configured under
-`strategyOptions` and explicitly enabled in the `enabled` array.
-
-## Usage Examples
-
-### Using Configuration File Only
-
-Create `alphagroove.config.yaml` with your desired settings:
-
-```yaml
-# === SHARED CONFIGURATION ===
-shared:
-  ticker: 'SPY'
-
-  entry:
-    enabled: [quickRise]
-    strategyOptions:
-      quickRise:
-        risePct: 0.3
-        withinMinutes: 5
-
-  # LLM configuration for intelligent trade analysis
-  llmConfirmationScreen:
-    llmProvider: 'anthropic'
-    modelName: 'claude-sonnet-4-20250514'
-    apiKeyEnvVar: 'ANTHROPIC_API_KEY'
-    numCalls: 2
-    agreementThreshold: 2
-    temperatures: [0.1, 1.0]
-
-# === BACKTEST-SPECIFIC CONFIGURATION ===
-backtest:
-  date:
-    from: '2020-01-01'
-    to: '2025-05-02'
-  parallelization:
-    maxConcurrentDays: 3
-
-  exit:
-    enabled: [profitTarget, trailingStop]
-    maxHoldTime:
-      minutes: 60
-    endOfDay:
-      time: '16:00'
-    strategyOptions:
-      profitTarget:
-        atrMultiplier: 5.0
-      trailingStop:
-        activationAtrMultiplier: 0
-        trailAtrMultiplier: 2.5
-
-  execution:
-    slippage:
-      model: fixed
-      value: 0.01
-```
-
-Then simply run:
+## Usage
 
 ```bash
+# Basic usage with config file
 pnpm dev:start
-```
 
-### Using Command Line Arguments
-
-Override config file settings or run without a config file:
-
-```bash
 # Override specific settings
 pnpm dev:start --from 2023-01-01 --to 2023-12-31
 
-# Override entry pattern parameters
+# Use different entry pattern
+pnpm dev:start --entry-pattern quickFall
+
+# Override pattern parameters
 pnpm dev:start --quickRise.risePct=0.5 --fixedTimeEntry.entryTime=13:00
 
-# Use different patterns
-pnpm dev:start --entry-pattern quickFall
+# Process multiple days concurrently for faster execution
+pnpm dev:start --maxConcurrentDays 5
+
+# Show debug information
+pnpm dev:start --debug --verbose
+
+# Dry run (show query without executing)
+pnpm dev:start --dry-run
 ```
 
-### Command Line Priority
+## Entry Patterns
 
-Command line arguments always override config file settings. The hierarchy is:
+Entry patterns detect specific market conditions for trade initiation:
 
-1. **Command line arguments** (highest priority)
-2. **Config file settings**
-3. ⚠️ **No system defaults** - explicit configuration required
+- **`quickRise`**: Detects a percentage rise in the first few minutes of trading
+- **`quickFall`**: Detects a percentage fall in the first few minutes of trading
+- **`fixedTimeEntry`**: Triggers entry at a specific time of day
+- **`randomTimeEntry`**: Triggers entry at a random time within a configured window (eliminates
+  time-based biases)
 
-**Note**: The system no longer provides fallback defaults. If required configuration is missing,
-you'll receive clear error messages indicating exactly what needs to be configured.
+## Exit Strategies
+
+Dynamic exit strategies analyze price action bar-by-bar:
+
+### Stop Loss
+
+Exits when price moves against your position by a specified amount.
+
+- `percentFromEntry`: Exit when price moves against position by this percentage
+- `atrMultiplier`: Alternative using Average True Range multiplier
+- `useLlmProposedPrice`: Use LLM-suggested stop loss price if available
+
+### Profit Target
+
+Exits when price moves in your favor by a specified amount.
+
+- `percentFromEntry`: Exit when price moves in favor by this percentage
+- `atrMultiplier`: Alternative using ATR multiplier
+- `useLlmProposedPrice`: Use LLM-suggested profit target price if available
+
+### Trailing Stop
+
+Follows price movement with a dynamic stop loss.
+
+- `activationPercent`: Trailing stop activates after this favorable move
+- `trailPercent`: Stop trails best price by this percentage
+
+### Time-Based Exits
+
+- **Max Hold Time**: Exit after holding for specified minutes
+- **End of Day**: Exit at specific time to avoid overnight exposure
+
+### ATR-Based Dynamic Adjustment
+
+Exit parameters can use Average True Range from the prior trading day for volatility-adaptive
+levels:
+
+```yaml
+exit:
+  strategyOptions:
+    stopLoss:
+      atrMultiplier: 1.5 # Stop at 1.5x ATR below entry (longs)
+    profitTarget:
+      atrMultiplier: 3.0 # Target at 3.0x ATR above entry (longs)
+```
+
+### Slippage Modeling
+
+Models realistic trading costs:
+
+- `model`: 'percent' or 'fixed'
+- `value`: Percentage (e.g., 0.05 for 0.05%) or fixed amount
 
 ## Performance Optimization
 
-### Parallel Processing
-
-AlphaGroove supports parallel processing to significantly speed up backtests by processing multiple
-trading days concurrently. This is especially beneficial for:
-
-- **Multi-year backtests** with hundreds of trading days
-- **LLM-enabled strategies** where each day involves expensive API calls
-- **Large date ranges** that would otherwise take hours to process
-
-#### How It Works
-
-- **Year-Sequential, Day-Parallel**: Each year is processed sequentially to maintain proper yearly
-  statistics, but individual trading days within each year are processed concurrently
-- **Configurable Concurrency**: Control how many days are processed simultaneously (1-20)
-- **Memory Efficient**: Uses Promise-based concurrency rather than spawning separate processes
-
-#### Configuration
-
-**Via Command Line:**
+**Parallel Processing**: Process multiple trading days concurrently for faster backtests:
 
 ```bash
-# Process up to 5 days concurrently
+# Process up to 5 days simultaneously
 pnpm dev:start --maxConcurrentDays 5
-
-# Sequential processing (default, backward compatible)
-pnpm dev:start --maxConcurrentDays 1
 ```
 
-**Via Configuration File:**
+Configuration:
 
 ```yaml
 backtest:
   parallelization:
-    maxConcurrentDays: 5 # Process up to 5 days concurrently
+    maxConcurrentDays: 5
 ```
 
-### Entry Pattern Options
+## Command Line Options
 
-Entry patterns are used by the backtest only (scout uses real-time current price entry). They can be
-configured under `backtest.entry` in the YAML with `enabled` and `strategyOptions`, or overridden
-via CLI dot notation:
-
-```bash
-pnpm dev:start --quickRise.risePct=0.5 --fixedTimeEntry.entryTime=13:00
-
-# Combining standard and pattern-specific options
-pnpm dev:start --from 2023-01-01 --to 2023-12-31 --quickRise.risePct=0.7
-```
-
-## Available Options
-
-CLI options override values from the configuration file.
-
-| Option                                 | Description                                 | Default     |
-| -------------------------------------- | ------------------------------------------- | ----------- | ----------- | ------------------------------- | ----- |
-| `--from <YYYY-MM-DD>`                  | Start date (inclusive)                      | From config |
-| `--to <YYYY-MM-DD>`                    | End date (inclusive)                        | From config |
-| `--entry-pattern <pattern>`            | Entry pattern to use                        | quickRise   |
-| `--ticker <symbol>`                    | Ticker to analyze                           | SPY         |
-| `--timeframe <period>`                 | Data resolution                             | 1min        |
-| `--maxConcurrentDays <number>`         | Maximum days to process concurrently (1-20) | 3           |             | `--debug`                       |
-| Show debug information and SQL queries | false                                       |             | `--verbose` | Show detailed LLM responses and |
-| debug info                             | false                                       |             | `--dry-run` | Show query without executing    | false |
+| Option                         | Description                  | Default     |
+| ------------------------------ | ---------------------------- | ----------- |
+| `--from <YYYY-MM-DD>`          | Start date (inclusive)       | From config |
+| `--to <YYYY-MM-DD>`            | End date (inclusive)         | From config |
+| `--entry-pattern <pattern>`    | Entry pattern to use         | From config |
+| `--ticker <symbol>`            | Ticker to analyze            | SPY         |
+| `--timeframe <period>`         | Data resolution              | 1min        |
+| `--maxConcurrentDays <number>` | Max concurrent days (1-20)   | 3           |
+| `--debug`                      | Show debug information       | false       |
+| `--verbose`                    | Show detailed LLM responses  | false       |
+| `--dry-run`                    | Show query without executing | false       |
 
 ### Pattern-Specific Options
 
-#### Quick Rise Pattern Options
+**Quick Rise/Fall:**
 
-| Option                      | Description                                | Default from Config |
-| --------------------------- | ------------------------------------------ | ------------------- |
-| `--quickRise.risePct`       | Minimum percentage rise to trigger pattern | 0.3                 |
-| `--quickRise.withinMinutes` | Number of minutes to look for the rise     | 5                   |
+- `--quickRise.risePct=0.5` - Minimum percentage rise to trigger
+- `--quickRise.withinMinutes=5` - Minutes to look for the rise
+- `--quickFall.fallPct=0.3` - Minimum percentage fall to trigger
+- `--quickFall.withinMinutes=5` - Minutes to look for the fall
 
-#### Quick Fall Pattern Options
+**Fixed Time Entry:**
 
-| Option                      | Description                                | Default from Config |
-| --------------------------- | ------------------------------------------ | ------------------- |
-| `--quickFall.fallPct`       | Minimum percentage fall to trigger pattern | 0.3                 |
-| `--quickFall.withinMinutes` | Number of minutes to look for the fall     | 5                   |
+- `--fixedTimeEntry.entryTime=13:00` - Entry time in HH:MM format (required)
 
-<!-- Exit pattern CLI options removed; exit strategies are configured in YAML under root `exit`. -->
+**Random Time Entry:**
 
-#### Fixed Time Entry Pattern Options
+- `--randomTimeEntry.startTime=09:30` - Start of random window
+- `--randomTimeEntry.endTime=16:00` - End of random window
 
-| Option                       | Description                                | Default from Config |
-| ---------------------------- | ------------------------------------------ | ------------------- |
-| `--fixedTimeEntry.entryTime` | Entry time in HH:MM format (e.g., "13:00") | **Required**        |
+---
 
-**Note**: Entry time must be configured - no default provided. Configure in YAML under
-`entry.strategyOptions.fixedTimeEntry.entryTime` or use CLI option.
+# Entry Scout
 
-#### Random Time Entry Pattern Options
+Real-time market analysis for live trading decisions.
 
-| Option                        | Description                                 | Default from Config |
-| ----------------------------- | ------------------------------------------- | ------------------- |
-| `--randomTimeEntry.startTime` | Start of random time window in HH:MM format | `09:30`             |
-| `--randomTimeEntry.endTime`   | End of random time window in HH:MM format   | `16:00`             |
-
-**Note**: Random time entry generates a deterministic random time for each trading day within the
-specified window. Configure in YAML under `backtest.entry.strategyOptions.randomTimeEntry` or use
-CLI options.
-
-### Available Timeframes
-
-The system supports any timeframe granularity using the format `<number><unit>`, where:
-
-- `<number>` is the duration (e.g., 1, 5, 15, 30)
-- `<unit>` is the time unit (min, hour, day)
-
-Common timeframes include:
-
-- `1min`: 1-minute bars
-- `5min`: 5-minute bars
-- `15min`: 15-minute bars
-- `30min`: 30-minute bars
-- `1hour`: 1-hour bars
-- `1day`: Daily bars
-
-### Available Patterns
-
-#### Entry Patterns
-
-- `quickRise`: Detects a percentage rise in the first 5 minutes of trading (configurable)
-
-- `quickFall`: Detects a percentage fall in the first 5 minutes of trading (configurable)
-
-- `fixedTimeEntry`: Triggers an entry at a specific configured time of day (e.g., "13:00")
-
-- `randomTimeEntry`: Triggers an entry at a random time each day within a configured time window.
-  Each trading day gets a unique random entry time (deterministic based on date), useful for
-  eliminating time-based biases in backtesting.
-
-### Trading Direction
-
-AlphaGroove uses LLM (Large Language Model) analysis to dynamically determine trade direction for
-every signal. When an entry pattern triggers:
-
-1. **Chart Analysis**: The system generates a chart and sends it to the LLM
-2. **LLM Decision**: The LLM analyzes the chart pattern and market context to decide whether to go
-   **long** (buy) or **short** (sell)
-3. **Consensus Logic**: Based on `numCalls` and `agreementThreshold` in the configuration, multiple
-   LLM calls reach consensus on direction
-4. **Execution**: If consensus is reached, the trade executes in the determined direction;
-   otherwise, no trade occurs
-
-**Metrics Reporting:**
-
-Trade summaries are automatically split by the LLM's actual execution decisions:
-
-- **Long Trades Summary**: Metrics for all LLM-decided long positions
-- **Short Trades Summary**: Metrics for all LLM-decided short positions
-
-This provides clear performance visibility for each direction as determined by the AI analysis.
-
-### Chart Generation
-
-AlphaGroove automatically generates high-quality candlestick charts for each entry signal, saved to
-the `./charts` directory organized by pattern name. Charts display the current day (up to entry
-point) plus 1 previous trading day, essential for LLM analysis.
-
-Two PNG images are created for each signal:
-
-- **Standard Chart**: Anonymized version used for LLM analysis (prevents data leakage)
-- **Complete Chart**: Full two-day view for manual review
-
-### LLM Configuration Details
-
-The LLM chart analysis system is AlphaGroove's primary trade filtering mechanism. This section
-covers the technical configuration details for the LLM integration.
-
-**How it Works:**
-
-- **Chart Analysis:** The LLM analyzes the provided chart image. The content of this chart image is
-  anonymized (ticker, header date, and X-axis date labels are masked or made generic) to prevent
-  data leakage. The filename of the image sent to the LLM is also randomized.
-- **Multiple Calls:** The system makes a configurable number of parallel calls to the LLM,
-  potentially with different temperature settings for varied responses.
-- **JSON Response:** The LLM is prompted to return its decision (long, short, or do_nothing) and a
-  rationalization in a structured JSON format. If `useLlmProposedPrice` is enabled for stop loss or
-  profit targets in the exit strategy configuration, the prompt should also instruct the LLM to
-  return `proposedStopLoss` and `proposedProfitTarget` numeric values (or null) within its JSON
-  response. The system will average valid prices from responses that align with the consensus trade
-  action.
-- **Consensus Logic:**
-  - The LLM's consensus determines the actual trade direction. If a sufficient number of LLMs
-    (`agreementThreshold`) vote for `long` (and more than `short`), a long trade is initiated.
-    Similarly for `short`. If there's no clear consensus or "do_nothing" is favored, no trade
-    occurs.
-- **Cost Tracking:** The cost of LLM calls is tracked and reported.
-
-**Configuration:**
-
-This feature is configured within the `alphagroove.config.yaml` file under the
-`llmConfirmationScreen` key. Key options include:
-
-- `llmProvider`: (string) The LLM provider to use (e.g., `'anthropic'`, `'openai'`). Default:
-  `'anthropic'`.
-- `modelName`: (string) The specific model to use (e.g., `'claude-sonnet-4-20250514'`).
-- `apiKeyEnvVar`: (string) The name of the environment variable that holds the API key for the LLM
-  provider (e.g., `'ANTHROPIC_API_KEY'`).
-- `numCalls`: (number) The number of parallel calls to make to the LLM for each signal. **Must be
-  configured explicitly - no default provided.**
-- `agreementThreshold`: (number) The minimum number of LLM responses that must agree on an action
-  for the signal to proceed. Default: `2`.
-- `temperatures`: (array of numbers) An array of temperature settings, one for each LLM call. Length
-  should match `numCalls`. **Must be configured explicitly - no default provided.**
-- `prompts`: (string or array of strings) The prompt(s) to send to the LLM. If an array, its length
-  should match `numCalls`.
-- `commonPromptSuffixForJson`: (string, optional) A suffix appended to each prompt to instruct the
-  LLM on JSON output format.
-- `systemPrompt`: (string, optional) A system-level prompt for the LLM.
-- `maxOutputTokens`: (number) Maximum number of tokens the LLM should generate. Default: `150`.
-- `timeoutMs`: (number, optional) Timeout in milliseconds for LLM API calls.
-
-Example snippet for `alphagroove.config.yaml`:
-
-```yaml
-llmConfirmationScreen:
-  llmProvider: 'anthropic'
-  modelName: 'claude-3-haiku-20240307' # Or your preferred model
-  apiKeyEnvVar: 'ANTHROPIC_API_KEY'
-  numCalls: 3
-  agreementThreshold: 2
-  temperatures: [0.3, 0.6, 0.9]
-  prompts:
-    - 'Analyze this chart as a cautious trader. Action: long, short, or do_nothing? Rationale?'
-    - 'Analyze this chart as an aggressive trader. Action: long, short, or do_nothing? Rationale?'
-    - 'Analyze this chart as a neutral analyst. Action: long, short, or do_nothing? Rationale?'
-  commonPromptSuffixForJson:
-    'Respond in JSON: {"action": "<action>", "rationalization": "<one_sentence_rationale>",
-    "proposedStopLoss": <price_or_null>, "proposedProfitTarget": <price_or_null>}'
-  maxOutputTokens: 100
-```
-
-Ensure the environment variable specified in `apiKeyEnvVar` is set in your environment (e.g., in an
-`.env.local` file that is gitignored) for the LLM service to function.
-
-## Entry Scout
-
-AlphaGroove's entry scout bridges the gap between backtesting insights and live market execution.
-This on-demand analysis tool scouts for entry opportunities using the same LLM configuration
-validated through historical backtesting.
-
-**Note**: Scout uses real-time current price entry (not pattern-based entry detection like the
-backtest). Entry patterns are backtest-only features for historical analysis.
-
-### Current Capabilities (Live Market Analysis)
-
-The entry scout provides real-time market analysis using the Polygon.io API, generating charts and
-LLM analysis for current market conditions:
-
-**Usage:**
+## Usage
 
 ```bash
-# Scout current market conditions (uses config for ticker and current time)
+# Scout current market conditions
 pnpm scout
 
-# Scout with verbose LLM output showing individual responses
+# Scout with verbose LLM output
 pnpm scout --verbose
 
-# Scout specific ticker (overrides config)
+# Scout specific ticker
 pnpm scout --ticker AAPL
 
 # Scout specific date and time
 pnpm scout --date 2025-05-28 --time 12:30
 
-# Scout with custom ticker and specific time
-pnpm scout --ticker SPY --date 2025-05-28 --time 14:30
-
-# Scout current market conditions for different ticker
-pnpm scout --ticker QQQ --verbose
+# Scout with custom ticker and time
+pnpm scout --ticker SPY --date 2025-05-28 --time 14:30 --verbose
 ```
 
-**Features:**
+## Features
 
-- **Real-Time Data**: Uses Polygon.io API for current and previous day market data
-- **Automatic Chart Generation**: Creates charts identical to backtesting format (2-day view up to
-  current time)
-- **LLM Analysis**: Same LLM configuration and consensus logic as backtesting
-- **Trade Recommendations**: Provides entry/exit levels, stop loss, and profit targets for manual
-  execution
+- **Real-Time Data**: Uses Polygon.io API for current and historical market data
+- **Identical Analysis**: Same LLM configuration and chart generation as backtesting
+- **Trade Recommendations**: Provides entry/exit levels, stop loss, and profit targets
 - **Risk/Reward Analysis**: Calculates risk-reward ratios and percentage moves
-- **Flexible Timing**: Can analyze any date/time, not just current market conditions
+- **Flexible Timing**: Analyze any date/time, not just current market conditions
 
-**Options:**
+## Command Line Options
 
-- `--ticker <symbol>`: Ticker symbol (overrides config)
-- `--date <YYYY-MM-DD>`: Trade date (default: today)
-- `--time <HH:MM>`: Entry time in Eastern Time (default: current time)
-- `-v, --verbose`: Show detailed LLM responses and rationales
+| Option                | Description                      | Default      |
+| --------------------- | -------------------------------- | ------------ |
+| `--ticker <symbol>`   | Ticker symbol (overrides config) | From config  |
+| `--date <YYYY-MM-DD>` | Trade date                       | Today        |
+| `--time <HH:MM>`      | Entry time in Eastern Time       | Current time |
+| `-v, --verbose`       | Show detailed LLM responses      | false        |
 
-**Requirements:**
+## Requirements
 
-- Polygon.io API key set in environment variable (configured in `alphagroove.config.yaml`)
-- Market hours: Works during trading hours and shows data up to current time
+- Polygon.io API key set in environment variable
+- Market data availability for requested date/time
 
-**Target Workflow:**
+## Integration with Backtesting
 
-1. Run backtesting to validate strategy parameters and LLM configuration
-2. Use entry scout for real-time market analysis
-3. Get LLM analysis of current market conditions with specific entry/exit levels
-4. Execute trades in your brokerage using the provided parameters
+The scout uses identical methods as the backtesting engine:
 
-### Integration with Backtesting
+- Same LLM configuration and consensus logic
+- Identical exit strategy calculations (stop loss, profit target, trailing stop)
+- Same chart format and anonymization
+- ATR-based calculations using real-time data
 
-The entry scout uses identical configuration and analysis methods as the backtesting engine:
+## Typical Workflow
 
-- **Same LLM Configuration**: Uses your validated `llmConfirmationScreen` settings
-- **Identical Exit Strategies**: Applies the same stop loss, profit target, and trailing stop
-  calculations
-- **Consistent Chart Analysis**: Generates charts with the same format and anonymization used in
-  backtesting
-- **ATR-Based Calculations**: Uses real-time ATR calculations for dynamic exit levels
+1. **Backtest**: Validate strategy parameters and LLM configuration using historical data
+2. **Scout**: Use real-time analysis for current market conditions
+3. **Execute**: Apply LLM recommendations and calculated levels in your brokerage platform
 
-### Command Examples
+---
 
-```bash
-# Use values from config file
-pnpm dev:start
+# Configuration Reference
 
-# Override date range
-pnpm dev:start --from 2020-01-01 --to 2025-05-02
+## Configuration Structure
 
-# Specify pattern options
-pnpm dev:start --quickRise.risePct=0.5 --fixedTimeEntry.entryTime=13:00
+The `alphagroove.config.yaml` file is organized into three sections:
 
-# Use the quickFall pattern
-pnpm dev:start --entry-pattern quickFall --quickFall.fallPct=0.4
+1. **`shared`**: Settings used by both tools (ticker, LLM configuration)
+2. **`backtest`**: Backtest-specific settings (date ranges, entry patterns, exit strategies)
+3. **`scout`**: Scout-specific settings (API configuration)
 
-# Analyze a different ticker with specific timeframe
-pnpm dev:start --ticker QQQ --timeframe 5min
+## No Hidden Defaults
 
-# Run backtest analysis
-pnpm dev:start
+All configuration must be explicitly provided. The system will provide clear error messages for
+missing settings rather than using hidden defaults. This ensures:
 
-# Process multiple days concurrently for faster execution
-pnpm dev:start --maxConcurrentDays 5
+- Predictable behavior
+- Clear configuration visibility
+- Maintainable code
+- Explicit intent for every setting
 
-# List available patterns
-pnpm dev:start list-patterns
+## LLM Configuration Details
 
-# Entry scout examples
-pnpm scout
-pnpm scout --verbose
-pnpm scout --date 2025-05-28 --time 12:30
-pnpm scout --ticker AAPL --verbose
+```yaml
+shared:
+  llmConfirmationScreen:
+    llmProvider: 'anthropic' # or 'openai'
+    modelName: 'claude-sonnet-4-20250514'
+    apiKeyEnvVar: 'ANTHROPIC_API_KEY'
+    numCalls: 2 # Number of parallel LLM calls (required)
+    agreementThreshold: 2 # Minimum agreement for consensus
+    temperatures: [0.1, 1.0] # Temperature for each call (required)
+    prompts: # Prompts for each call
+      - 'Analyze this chart as a cautious trader...'
+      - 'Analyze this chart as an aggressive trader...'
+    commonPromptSuffixForJson: 'Respond in JSON: {...}'
+    maxOutputTokens: 150
+    timeoutMs: 30000 # Optional timeout
 ```
 
-### Directory Structure
+## Available Timeframes
+
+Format: `<number><unit>` where unit is min, hour, or day
+
+- `1min`, `5min`, `15min`, `30min`, `1hour`, `1day`
+
+## Command Line Priority
+
+Configuration hierarchy (highest to lowest priority):
+
+1. Command line arguments
+2. Config file settings
+3. ⚠️ **No system defaults** - explicit configuration required
+
+## Directory Structure
 
 ```
 alphagroove/
 ├── src/                # Source code
-│   ├── index.ts        # Main entry point (backtesting engine)
-│   ├── scout.ts        # Entry scout for on-demand analysis
+│   ├── index.ts        # Backtesting engine
+│   ├── scout.ts        # Entry scout
 │   ├── patterns/       # Entry and exit pattern implementations
-│   │   ├── entry/      # Entry patterns (quickRise, quickFall, etc.)
-│   │   └── exit/       # Exit strategies (stopLoss, profitTarget, etc.)
-│   ├── screens/        # LLM confirmation screen
-│   ├── services/       # External service integrations (LLM APIs)
-│   ├── utils/          # Utility functions and helpers
-│   └── *.test.ts       # Test files
-├── tickers/            # Market data organized by ticker and timeframe
-│   ├── SPY/            # SPY ticker data
-│   │   ├── 1min.csv    # 1-minute timeframe data
-│   │   └── ...         # Other timeframes
-│   └── README.md       # Documentation for the data structure
-├── charts/             # Generated chart outputs (created when used)
-├── results/            # Backtest result outputs
-├── scripts/            # Build and development scripts
-├── dist/               # Compiled output (generated)
-├── package.json        # Project metadata and dependencies
-├── tsconfig.json       # TypeScript configuration
-├── eslint.config.ts    # ESLint configuration
-├── vitest.config.ts    # Vitest configuration
+│   ├── services/       # External service integrations
+│   └── utils/          # Utility functions
+├── tickers/            # Market data (SPY, TEST, etc.)
+├── charts/             # Generated chart outputs
+├── results/            # Backtest results
 ├── alphagroove.config.yaml # Configuration file (you create this)
-└── README.md           # Project documentation
+└── README.md           # This documentation
 ```
