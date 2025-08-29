@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import { join } from 'path';
-// import chalk from 'chalk'; // Removed as it's no longer used after deleting debug logs
 
 import {
   getAvailableEntryPatterns,
