@@ -8,7 +8,6 @@ import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 import { loadConfig } from './utils/config';
-import { generateSvgChart } from './utils/chart-generator';
 import { Signal, Bar } from './patterns/types';
 
 // Polygon.io API interfaces
@@ -546,7 +545,6 @@ const generateScoutSvgChart = (
 
   // Signal day label
   if (chartData.length > 0) {
-    const signalDay = chartData[0].trade_date;
     svg += `<text x="${marginLeft + 10}" y="${marginTop + 20}" font-size="12" fill="gray">Signal Day</text>`;
   }
 
