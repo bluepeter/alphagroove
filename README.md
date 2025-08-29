@@ -3,15 +3,22 @@
 AlphaGroove is a command-line research and strategy toolkit for exploring intraday trading
 patterns—particularly focused on high-resolution datasets like 1-minute SPY bars. Built with DuckDB
 and Node.js, it enables rapid querying, filtering, and analysis of market behavior around key time
-windows (e.g. first and last 10 minutes of the trading day). The tool is designed to surface
-conditional setups—such as sharp opens followed by reversals—and evaluate them using statistical
-summaries, match scanning, and optional visualization.
+windows (e.g. first and last 10 minutes of the trading day).
 
-The project supports a modular "pattern" architecture where each strategy condition is encapsulated
-in code and run via a consistent CLI interface. Developers can define and test new patterns, run
-batched analyses across date ranges, and output metrics like mean/median returns, win rate, and
-distribution buckets. AlphaGroove is intended for hands-on quant researchers who prefer scripting
-over spreadsheets, precision over black boxes, and clarity over curve-fitting.
+**Key Features:**
+
+- **LLM-Powered Trade Analysis**: Uses Large Language Models to analyze chart patterns and make
+  trading decisions, providing intelligent filtering beyond simple technical indicators
+- **Automated Chart Generation**: Creates high-quality candlestick charts for every trade signal
+- **Modular Pattern Architecture**: Each strategy condition is encapsulated in code with consistent
+  CLI interface
+- **Statistical Analysis**: Comprehensive metrics including mean/median returns, win rates, and
+  distribution analysis
+
+The tool is designed to surface conditional setups—such as sharp opens followed by reversals—and
+evaluate them using both statistical summaries and AI-powered chart analysis. AlphaGroove is
+intended for hands-on quant researchers who prefer scripting over spreadsheets, precision over black
+boxes, and intelligent analysis over curve-fitting.
 
 ## Advanced Exit Strategies
 
@@ -263,12 +270,11 @@ default:
     to: '2025-05-02'
   ticker: 'SPY'
   timeframe: '1min'
-  direction: 'long'
+  direction: 'llm_decides' # LLM analyzes charts and decides trade direction
   charts:
-    generate: false # Set to true to automatically generate charts for each entry
-    outputDir: './charts' # Directory to store chart outputs
+    outputDir: './charts'
   parallelization:
-    maxConcurrentDays: 1 # Process days sequentially by default
+    maxConcurrentDays: 3 # Process multiple days concurrently for faster execution
 
 # Entry pattern configuration
 entry:
@@ -301,15 +307,25 @@ execution:
   slippage:
     model: 'fixed'
     value: 0.01
+
+# LLM configuration for intelligent trade analysis
+llmConfirmationScreen:
+  llmProvider: 'anthropic'
+  modelName: 'claude-sonnet-4-20250514'
+  apiKeyEnvVar: 'ANTHROPIC_API_KEY'
+  numCalls: 2
+  agreementThreshold: 2
+  temperatures: [0.1, 1.0]
+  # ... (see full configuration below)
 ```
 
 This configuration structure allows you to:
 
-1. Configure entry patterns and their parameters
-2. Set up exit strategies with ATR-based or percentage-based levels
-3. Enable parallel processing for faster backtests
-4. Set default chart generation options
-5. Configure LLM integration for trade confirmation
+1. **Configure LLM analysis** for intelligent trade decisions
+2. **Automatic chart generation** (enabled by default)
+3. Configure entry patterns and their parameters
+4. Set up exit strategies with ATR-based or percentage-based levels
+5. Enable parallel processing for faster backtests
 
 All pattern configuration must be explicitly provided - there are no hidden defaults in the code.
 The system follows a clear hierarchy for configuration:
@@ -330,6 +346,31 @@ pnpm dev:start init
 
 **Note:** The configuration file must be named exactly `alphagroove.config.yaml` and placed in the
 project root directory for the application to find it.
+
+## LLM-Powered Chart Analysis
+
+AlphaGroove's core strength lies in its integration with Large Language Models for intelligent trade
+analysis. Rather than relying solely on technical indicators, the system generates high-quality
+charts for every potential trade and sends them to an LLM for analysis.
+
+**How it Works:**
+
+- **Automatic Chart Generation**: Every entry signal triggers creation of anonymized candlestick
+  charts
+- **Multi-Model Analysis**: Configurable number of LLM calls with different temperature settings
+- **Consensus Decision Making**: Trades execute only when LLMs reach agreement threshold
+- **Dynamic Direction**: LLM can decide whether to go long, short, or skip the trade entirely
+- **Price Target Suggestions**: LLMs can propose stop loss and profit target levels
+
+**Key Benefits:**
+
+- **Pattern Recognition**: LLMs excel at identifying complex chart patterns humans might miss
+- **Context Awareness**: Considers volume, prior day action, and intraday dynamics
+- **Risk Management**: Conservative approach - only trades when confident
+- **Eliminates Bias**: Anonymized charts prevent historical knowledge from influencing decisions
+
+The LLM analysis acts as a sophisticated filter, significantly improving trade quality over purely
+mechanical systems.
 
 ### Configuration Validation & Error Messages
 
@@ -361,9 +402,8 @@ default:
     to: '2025-05-02'
   ticker: 'SPY'
   timeframe: '1min'
-  direction: 'llm_decides'
+  direction: 'llm_decides' # LLM analyzes charts and decides trade direction
   charts:
-    generate: true
     outputDir: './charts'
   parallelization:
     maxConcurrentDays: 3 # Process up to 3 days concurrently for faster execution
@@ -404,9 +444,8 @@ execution:
     model: 'fixed'
     value: 0.01
 
-# LLM configuration for trade confirmation
+# LLM configuration for intelligent trade analysis
 llmConfirmationScreen:
-  enabled: true
   llmProvider: 'anthropic'
   modelName: 'claude-sonnet-4-20250514'
   apiKeyEnvVar: 'ANTHROPIC_API_KEY'
@@ -471,16 +510,21 @@ default:
     from: '2020-01-01'
     to: '2025-05-02'
   ticker: 'SPY'
-  direction: 'long'
+  direction: 'llm_decides' # LLM analyzes charts and decides trade direction
+  charts:
+    outputDir: './charts'
+  parallelization:
+    maxConcurrentDays: 3
+
 entry:
   enabled: [quickRise]
   strategyOptions:
     quickRise:
       risePct: 0.3
       withinMinutes: 5
+
 exit:
   enabled: [profitTarget, trailingStop]
-  # Time-based constraints (automatically active when configured)
   maxHoldTime:
     minutes: 60
   endOfDay:
@@ -492,11 +536,19 @@ exit:
       activationAtrMultiplier: 0
       trailAtrMultiplier: 2.5
 
-# Execution configuration
 execution:
   slippage:
     model: fixed
     value: 0.01
+
+# LLM configuration for intelligent trade analysis
+llmConfirmationScreen:
+  llmProvider: 'anthropic'
+  modelName: 'claude-sonnet-4-20250514'
+  apiKeyEnvVar: 'ANTHROPIC_API_KEY'
+  numCalls: 2
+  agreementThreshold: 2
+  temperatures: [0.1, 1.0]
 ```
 
 Then simply run:
@@ -585,21 +637,21 @@ pnpm dev:start --from 2023-01-01 --to 2023-12-31 --direction short --quickRise.r
 
 CLI options override values from the configuration file.
 
-| Option                         | Description                                    | Default                   |
-| ------------------------------ | ---------------------------------------------- | ------------------------- |
-| `--from <YYYY-MM-DD>`          | Start date (inclusive)                         | From config               |
-| `--to <YYYY-MM-DD>`            | End date (inclusive)                           | From config               |
-| `--entry-pattern <pattern>`    | Entry pattern to use                           | quickRise                 |
-| `--ticker <symbol>`            | Ticker to analyze                              | SPY                       |
-| `--timeframe <period>`         | Data resolution                                | 1min                      |
-| `--direction <direction>`      | Trading direction for position (long or short) | long                      |
-| `--config <path>`              | Path to custom configuration file              | ./alphagroove.config.yaml |
-| `--generate-charts`            | Generate multiday charts for each entry        | false                     |
-| `--charts-dir <path>`          | Directory for chart output                     | ./charts                  |
-| `--maxConcurrentDays <number>` | Maximum days to process concurrently (1-20)    | 1                         |
-| `--debug`                      | Show debug information and SQL queries         | false                     |
-| `--verbose`                    | Show detailed LLM responses and debug info     | false                     |
-| `--dry-run`                    | Show query without executing                   | false                     |
+| Option                         | Description                                  | Default                   |
+| ------------------------------ | -------------------------------------------- | ------------------------- |
+| `--from <YYYY-MM-DD>`          | Start date (inclusive)                       | From config               |
+| `--to <YYYY-MM-DD>`            | End date (inclusive)                         | From config               |
+| `--entry-pattern <pattern>`    | Entry pattern to use                         | quickRise                 |
+| `--ticker <symbol>`            | Ticker to analyze                            | SPY                       |
+| `--timeframe <period>`         | Data resolution                              | 1min                      |
+| `--direction <direction>`      | Trading direction (long/short/llm_decides)   | llm_decides               |
+| `--config <path>`              | Path to custom configuration file            | ./alphagroove.config.yaml |
+| `--no-generate-charts`         | Disable chart generation (also disables LLM) | false (charts enabled)    |
+| `--charts-dir <path>`          | Directory for chart output                   | ./charts                  |
+| `--maxConcurrentDays <number>` | Maximum days to process concurrently (1-20)  | 3                         |
+| `--debug`                      | Show debug information and SQL queries       | false                     |
+| `--verbose`                    | Show detailed LLM responses and debug info   | false                     |
+| `--dry-run`                    | Show query without executing                 | false                     |
 
 ### Pattern-Specific Options
 
@@ -712,7 +764,8 @@ initial `direction` setting.
 
 ### Chart Generation
 
-AlphaGroove can generate high-quality chart images for each entry signal it detects. These charts:
+AlphaGroove automatically generates high-quality chart images for each entry signal it detects.
+Chart generation is enabled by default. These charts:
 
 - Show the current day (up to the entry point) and 1 previous trading day
 - Are rendered as Candlestick charts for detailed OHLC analysis
@@ -738,15 +791,14 @@ for each signal:
 
 Both charts share the same visual style and are saved in the pattern-specific output directory.
 
-To generate charts:
+Charts are generated automatically by default. To customize chart output:
 
 ```bash
-# Generate charts for all entry signals with specific output directory
-pnpm dev:start --generate-charts --charts-dir ./my-charts
+# Use custom output directory
+pnpm dev:start --charts-dir ./my-charts
 
-# Using configuration file settings
-# (Set default.charts.generate: true in alphagroove.config.yaml)
-pnpm dev:start
+# Disable chart generation (will also disable LLM analysis)
+pnpm dev:start --no-generate-charts
 ```
 
 Chart images are automatically generated and saved to the specified directory, with folders
@@ -764,12 +816,10 @@ The image formats make it easy to:
 - Document market behavior around specific entry conditions
 - Compare patterns visually across multiple days
 
-### LLM Chart Confirmation Screen
+### LLM Configuration Details
 
-AlphaGroove includes an optional screening step that utilizes a Large Language Model (LLM) to
-provide an additional layer of confirmation for trading signals. When enabled, this screen sends the
-generated chart (the version truncated up to the entry signal) to a configured LLM provider for
-analysis.
+The LLM chart analysis system is AlphaGroove's primary trade filtering mechanism. This section
+covers the technical configuration details for the LLM integration.
 
 **How it Works:**
 
@@ -799,7 +849,6 @@ analysis.
 This feature is configured within the `alphagroove.config.yaml` file under the
 `llmConfirmationScreen` key. Key options include:
 
-- `enabled`: (boolean) Set to `true` to enable this screen. Default: `false`.
 - `llmProvider`: (string) The LLM provider to use (e.g., `'anthropic'`, `'openai'`). Default:
   `'anthropic'`.
 - `modelName`: (string) The specific model to use (e.g., `'claude-sonnet-4-20250514'`).
@@ -823,7 +872,6 @@ Example snippet for `alphagroove.config.yaml`:
 
 ```yaml
 llmConfirmationScreen:
-  enabled: true
   llmProvider: 'anthropic'
   modelName: 'claude-3-haiku-20240307' # Or your preferred model
   apiKeyEnvVar: 'ANTHROPIC_API_KEY'
@@ -952,11 +1000,11 @@ pnpm dev:start --ticker QQQ --timeframe 5min
 pnpm dev:start --direction long
 pnpm dev:start --direction short
 
-# Generate charts for entry signals
-pnpm dev:start --generate-charts
-
 # Process multiple days concurrently for faster execution
 pnpm dev:start --maxConcurrentDays 5
+
+# Use custom chart output directory
+pnpm dev:start --charts-dir ./my-analysis
 
 # List available patterns
 pnpm dev:start list-patterns

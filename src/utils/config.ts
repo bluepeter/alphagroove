@@ -177,7 +177,7 @@ const DefaultPatternsSchema = z.object({
 
 // Schema for chart options
 const ChartOptionsSchema = z.object({
-  generate: z.boolean().default(false),
+  generate: z.boolean().optional().default(true),
   outputDir: z.string().default('./charts'),
 });
 
@@ -191,7 +191,7 @@ const ParallelizationOptionsSchema = z.object({
 // but Zod schema is the source of truth for validation and type inference here.
 const LLMScreenConfigSchema = z
   .object({
-    enabled: z.boolean().default(false),
+    enabled: z.boolean().optional().default(true),
     llmProvider: z.enum(['anthropic', 'openai']).default('anthropic'),
     modelName: z.string().default('claude-sonnet-4-20250514'),
     apiKeyEnvVar: z.string().default('ANTHROPIC_API_KEY'),
@@ -237,9 +237,9 @@ const ConfigSchema = z
   .object({
     default: z.object({
       date: DateRangeSchema.optional(),
-      ticker: z.string().default('SPY'),
-      timeframe: z.string().default('1min'),
-      direction: z.enum(['long', 'short', 'llm_decides']).default('long'),
+      ticker: z.string(),
+      timeframe: z.string(),
+      direction: z.enum(['long', 'short', 'llm_decides']),
       patterns: DefaultPatternsSchema.optional(),
       charts: ChartOptionsSchema.optional(),
       parallelization: ParallelizationOptionsSchema.optional(),
@@ -258,13 +258,13 @@ const ConfigSchema = z
   .refine(
     data => {
       if (data.default.direction === 'llm_decides') {
-        return data.llmConfirmationScreen?.enabled === true;
+        return data.llmConfirmationScreen && typeof data.llmConfirmationScreen === 'object';
       }
       return true;
     },
     {
       message:
-        "If default.direction is 'llm_decides', then llmConfirmationScreen.enabled must be true",
+        "If default.direction is 'llm_decides', then llmConfirmationScreen must be configured",
       path: ['default', 'direction'], // Path to report error on
     }
   );
@@ -659,7 +659,7 @@ export const mergeConfigWithCliOptions = (
     generateCharts:
       cliOptions.generateCharts !== undefined
         ? cliOptions.generateCharts
-        : loadedConfig.default.charts?.generate || false,
+        : (loadedConfig.default.charts?.generate ?? true),
     chartsDir: cliOptions.chartsDir || loadedConfig.default.charts?.outputDir || './charts',
     maxConcurrentDays:
       cliOptions.maxConcurrentDays || loadedConfig.default.parallelization?.maxConcurrentDays || 1,

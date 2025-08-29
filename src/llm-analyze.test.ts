@@ -122,7 +122,7 @@ describe('LLM Analyze Tool', () => {
 
     // Check that we exited with error
     expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('Error: LLM configuration not found or not enabled')
+      expect.stringContaining('Error: LLM configuration not found in config file')
     );
     expect(process.exit).toHaveBeenCalledWith(1);
   });

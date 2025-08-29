@@ -54,11 +54,11 @@ export async function main(imagePath?: string, cmdOptions?: any) {
     const rawConfig = loadConfig(options.config);
 
     // Check if LLM configuration exists
-    if (!rawConfig.llmConfirmationScreen || !rawConfig.llmConfirmationScreen.enabled) {
-      console.error(chalk.red(`Error: LLM configuration not found or not enabled in config file.`));
+    if (!rawConfig.llmConfirmationScreen) {
+      console.error(chalk.red(`Error: LLM configuration not found in config file.`));
       console.log(
         chalk.yellow(
-          `Make sure 'llmConfirmationScreen.enabled' is set to true in your alphagroove.config.yaml`
+          `Make sure 'llmConfirmationScreen' is configured in your alphagroove.config.yaml`
         )
       );
       process.exit(1);
