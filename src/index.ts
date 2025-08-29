@@ -738,7 +738,6 @@ const parseCLI = async () => {
     .option('--timeframe <period>', 'Data timeframe (e.g., 1min, 5min)')
     .option('--entry-pattern <name>', 'Entry pattern name')
     .option('--exit-pattern <name>', 'Exit pattern name')
-    .option('--config <path>', 'Path to configuration file')
 
     .option(
       '--maxConcurrentDays <number>',

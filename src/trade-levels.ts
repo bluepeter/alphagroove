@@ -37,8 +37,7 @@ program
     '<csvPath>',
     'Path to the CSV file with minute bar data (e.g., previous day data for ATR)'
   )
-  .option('-p, --price <price>', 'Current execution price', parseFloat)
-  .option('-c, --config <path>', 'Path to configuration file (default: alphagroove.config.yaml)');
+  .option('-p, --price <price>', 'Current execution price', parseFloat);
 
 program.parse(process.argv);
 
@@ -252,7 +251,7 @@ export async function main() {
     const currentPrice = options.price;
 
     console.log(chalk.dim('Loading configuration...'));
-    const config = loadConfig(options.config);
+    const config = loadConfig('alphagroove.config.yaml');
 
     console.log(chalk.dim('Parsing CSV data...'));
     const bars = parseCSVData(csvPath);

@@ -274,11 +274,11 @@ the Node.js package.
 5. For real-time entry scouting:
 
    ```bash
-   # Scout entry opportunities from chart images
-   pnpm scout /path/to/chart.png
+   # Scout current market conditions
+   pnpm scout
 
-   # Include trading context
-   pnpm scout /path/to/chart.png --ticker SPY --price 587.54
+   # Scout specific date and time
+   pnpm scout --date 2025-05-28 --time 12:30
    ```
 
 ### Running Production Build
@@ -710,9 +710,6 @@ CLI options override values from the configuration file.
 | `--entry-pattern <pattern>` | Entry pattern to use   | quickRise   |
 | `--ticker <symbol>`         | Ticker to analyze      | SPY         |
 | `--timeframe <period>`      | Data resolution        | 1min        |
-
-| `--config <path>` | Path to custom configuration file | ./alphagroove.config.yaml |
-
 | `--maxConcurrentDays <number>` | Maximum days to process concurrently (1-20) | 3 | | `--debug` |
 Show debug information and SQL queries | false | | `--verbose` | Show detailed LLM responses and
 debug info | false | | `--dry-run` | Show query without executing | false |
@@ -907,11 +904,23 @@ LLM analysis for current market conditions:
 **Usage:**
 
 ```bash
-# Scout current market conditions (uses config for ticker)
+# Scout current market conditions (uses config for ticker and current time)
 pnpm scout
 
-# Scout with verbose LLM output
+# Scout with verbose LLM output showing individual responses
 pnpm scout --verbose
+
+# Scout specific ticker (overrides config)
+pnpm scout --ticker AAPL
+
+# Scout specific date and time
+pnpm scout --date 2025-05-28 --time 12:30
+
+# Scout with custom ticker and specific time
+pnpm scout --ticker SPY --date 2025-05-28 --time 14:30
+
+# Scout current market conditions for different ticker
+pnpm scout --ticker QQQ --verbose
 ```
 
 **Features:**
@@ -923,10 +932,13 @@ pnpm scout --verbose
 - **Trade Recommendations**: Provides entry/exit levels, stop loss, and profit targets for manual
   execution
 - **Risk/Reward Analysis**: Calculates risk-reward ratios and percentage moves
+- **Flexible Timing**: Can analyze any date/time, not just current market conditions
 
 **Options:**
 
-- `-c, --config <path>`: Path to configuration file (default: `alphagroove.config.yaml`)
+- `--ticker <symbol>`: Ticker symbol (overrides config)
+- `--date <YYYY-MM-DD>`: Trade date (default: today)
+- `--time <HH:MM>`: Entry time in Eastern Time (default: current time)
 - `-v, --verbose`: Show detailed LLM responses and rationales
 
 **Requirements:**
@@ -973,7 +985,6 @@ pnpm levels charts/adhoc/recent-data-from-fidelity.csv --price 587.54 > PRICE.tx
 
 - `<csvPath>`: Path to the CSV file with minute bar data (required)
 - `-p, --price <price>`: Current execution price (required)
-- `-c, --config <path>`: Path to configuration file (default: `alphagroove.config.yaml`)
 
 **CSV Format:**
 
@@ -1049,12 +1060,11 @@ pnpm dev:start --maxConcurrentDays 5
 # List available patterns
 pnpm dev:start list-patterns
 
-# Use a custom config file
-pnpm dev:start --config custom-config.yaml
-
 # Entry scout examples
 pnpm scout
 pnpm scout --verbose
+pnpm scout --date 2025-05-28 --time 12:30
+pnpm scout --ticker AAPL --verbose
 ```
 
 ### Directory Structure
