@@ -1,29 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * AlphaGroove Entry Scout
- *
- * On-demand entry analysis tool that scouts for trading opportunities using the same
- * LLM configuration and exit strategies validated through historical backtesting.
- * Primarily designed for real-time market reconnaissance, but flexible enough to
- * analyze specific historical moments for development and testing.
- *
- * Current capabilities:
- * - Scout entry opportunities from chart images using validated LLM configuration
- * - Generate entry recommendations with specific stop loss and profit target levels
- * - Support both real-time analysis and historical point-in-time evaluation
- *
- * Planned capabilities:
- * - Real-time data integration with Polygon.io API for live market scouting
- * - Automated chart generation for current market conditions
- * - Entry pattern detection (quickRise, quickFall, fixedTimeEntry) for live data
- * - Historical date/time analysis for strategy development and validation
- *
- * Usage:
- *   pnpm scout /path/to/chart.png [--direction <long|short>]
- *   pnpm scout --date 2025-01-15 --time 13:30 --ticker SPY  # planned
- */
-
 import fs from 'fs';
 import path from 'path';
 import chalk from 'chalk';
