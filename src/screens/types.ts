@@ -5,9 +5,9 @@ export interface LLMScreenConfig {
   llmProvider: 'anthropic' | 'openai'; // Made stricter to match Zod schema
   modelName: string;
   apiKeyEnvVar: string;
-  numCalls: number;
+  numCalls?: number;
   agreementThreshold: number;
-  temperatures: number[];
+  temperatures?: number[];
   prompts: string | string[];
   commonPromptSuffixForJson: string;
   systemPrompt?: string;

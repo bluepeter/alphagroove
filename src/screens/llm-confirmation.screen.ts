@@ -70,7 +70,7 @@ export class LlmConfirmationScreen implements EntryScreen {
     // screenConfig is the LLM config - if it exists, we proceed
 
     // If both above checks pass, proceed to use the LLM service
-    const llmService = new LlmApiService(llmConfig); // Use llmConfig from appConfig
+    const llmService = new LlmApiService(screenConfig); // Use screenConfig which has the correct values
     let totalCost = 0;
     const debugMode = debug ?? false;
     let tempChartPath: string | undefined;

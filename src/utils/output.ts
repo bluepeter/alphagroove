@@ -84,7 +84,8 @@ export const printHeader = (
   toDate: string,
   entryPatternName: string,
   exitStrategiesConfig: ExitStrategiesConfig | undefined,
-  direction: 'long' | 'short' | 'llm_decides'
+  direction: 'long' | 'short' | 'llm_decides',
+  llmConfig?: { numCalls?: number; temperatures?: number[]; agreementThreshold?: number }
 ) => {
   console.log(chalk.bold(`\n${ticker} Analysis (${fromDate} to ${toDate}):`));
   console.log(chalk.bold(`Entry Pattern: ${entryPatternName}`));
@@ -144,11 +145,17 @@ export const printHeader = (
   }
   console.log(chalk.bold(`Exit Strategies: ${exitStrategyDetails}`));
 
-  let directionDisplay = 'Unknown';
-  if (direction === 'long') directionDisplay = 'Long ↗️';
-  else if (direction === 'short') directionDisplay = 'Short ↘️';
-  else if (direction === 'llm_decides') directionDisplay = 'LLM Decides 🧠';
-  console.log(chalk.bold(`Direction Strategy: ${directionDisplay}`));
+  // Display LLM configuration if available
+  if (llmConfig) {
+    const numCalls = llmConfig.numCalls || 'N/A';
+    const temperatures = llmConfig.temperatures ? `[${llmConfig.temperatures.join(', ')}]` : 'N/A';
+    const threshold = llmConfig.agreementThreshold || 'N/A';
+    console.log(
+      chalk.bold(
+        `LLM Analysis: ${numCalls} calls, temps ${temperatures}, threshold ${threshold} 🧠`
+      )
+    );
+  }
   console.log('');
   console.log(
     chalk.gray('═══════════════════════════════════════════════════════════════════════')

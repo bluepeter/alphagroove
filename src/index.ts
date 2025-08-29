@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 
+import dotenv from 'dotenv';
 import { join } from 'path';
+
+// Load environment variables
+dotenv.config({ path: '.env.local' });
+dotenv.config(); // fallback to .env
 
 import {
   getAvailableEntryPatterns,
@@ -377,9 +382,7 @@ const processDayTrades = async (
     llmCost += screeningCost;
 
     if (!proceedFromLlm || !llmDirection) {
-      console.warn(
-        `[processTradesLoop] LLM did not confirm trade or provide direction for ${rawTradeData.trade_date}. Skipping.`
-      );
+      // LLM returned do_nothing - silently skip this trade
       continue;
     }
 
@@ -668,7 +671,14 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
       mergedConfig.to,
       entryPattern.name,
       mergedConfig.exitStrategies,
-      'llm_decides'
+      'llm_decides',
+      mergedConfig.llmConfirmationScreen
+        ? {
+            numCalls: mergedConfig.llmConfirmationScreen.numCalls,
+            temperatures: mergedConfig.llmConfirmationScreen.temperatures,
+            agreementThreshold: mergedConfig.llmConfirmationScreen.agreementThreshold,
+          }
+        : undefined
     );
 
     // Ensure distinct arrays for long_stats and short_stats

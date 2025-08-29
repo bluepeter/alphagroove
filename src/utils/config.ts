@@ -188,9 +188,9 @@ const LLMScreenConfigSchema = z
     llmProvider: z.enum(['anthropic', 'openai']).default('anthropic'),
     modelName: z.string().default('claude-sonnet-4-20250514'),
     apiKeyEnvVar: z.string().default('ANTHROPIC_API_KEY'),
-    numCalls: z.number().int().min(1).default(3),
+    numCalls: z.number().int().min(1).optional(),
     agreementThreshold: z.number().int().min(1).default(2),
-    temperatures: z.array(z.number()).default([0.2, 0.5, 0.8]),
+    temperatures: z.array(z.number()).optional(),
     prompts: z
       .union([z.string(), z.array(z.string())])
       .default(
@@ -210,9 +210,7 @@ const LLMScreenConfigSchema = z
     llmProvider: 'anthropic',
     modelName: 'claude-sonnet-4-20250514',
     apiKeyEnvVar: 'ANTHROPIC_API_KEY',
-    numCalls: 3,
     agreementThreshold: 2,
-    temperatures: [0.2, 0.5, 0.8],
     prompts:
       'You are an experienced day trader. Based on this chart, what action would you take: go long, short, or do nothing? Provide a brief one-sentence rationalization for your decision.',
     commonPromptSuffixForJson:
@@ -340,10 +338,7 @@ const DEFAULT_CONFIG: Config = {
       },
     },
   },
-  llmConfirmationScreen: LLMScreenConfigSchema.parse({
-    // systemPrompt will be undefined by default due to .optional()
-    // Explicitly set a default system prompt if desired when creating the config file
-  }),
+  // llmConfirmationScreen: removed - should come from config file only
   exitStrategies: {
     enabled: [],
     maxHoldTime: {
@@ -680,11 +675,8 @@ export const mergeConfigWithCliOptions = (
     maxConcurrentDays:
       cliOptions.maxConcurrentDays || compatConfig.default?.parallelization?.maxConcurrentDays || 1,
     llmConfirmationScreen: compatConfig.llmConfirmationScreen
-      ? {
-          ...LLMScreenConfigSchema.parse({}),
-          ...compatConfig.llmConfirmationScreen,
-        }
-      : LLMScreenConfigSchema.parse({}),
+      ? LLMScreenConfigSchema.parse(compatConfig.llmConfirmationScreen)
+      : undefined,
     exitStrategies: mergedExitStrategies,
     execution: {
       slippage: {

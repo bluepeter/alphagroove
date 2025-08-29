@@ -1,15 +1,10 @@
 import fs from 'node:fs/promises';
-import path from 'node:path';
 
 import Anthropic from '@anthropic-ai/sdk';
-import dotenv from 'dotenv';
 
 import { type LLMScreenConfig } from '../screens/types'; // Assuming path to LLMScreenConfig
 
-// Initialize dotenv to load .env files (e.g., .env.local)
-// This will load variables into process.env
-dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
-dotenv.config(); // Load .env as a fallback if .env.local is not found or for general vars
+// Note: dotenv.config() is called by the main application (scout.ts) before using this service
 
 export interface LLMResponse {
   action: 'long' | 'short' | 'do_nothing';
@@ -76,7 +71,7 @@ export class LlmApiService {
   public async getTradeDecisions(chartPath: string): Promise<LLMResponse[]> {
     if (!this.isEnabled() || !this.anthropic) {
       console.warn('LLM API service is not enabled or not configured correctly.');
-      return Array.from({ length: this.config.numCalls }, () => ({
+      return Array.from({ length: this.config.numCalls || 1 }, () => ({
         action: 'do_nothing',
         error: 'Service not enabled or not configured.',
         cost: 0, // Ensure cost is present even for error cases
@@ -90,27 +85,27 @@ export class LlmApiService {
         ? 'image/jpeg'
         : 'application/octet-stream';
 
+    const numCalls = this.config.numCalls || 1;
     const promptsToUse: string[] = [];
     if (Array.isArray(this.config.prompts)) {
-      if (this.config.prompts.length !== this.config.numCalls) {
+      if (this.config.prompts.length !== numCalls) {
         console.warn(
           'Number of prompts does not match numCalls. Using the first prompt for all calls.'
         );
         const firstPrompt = this.config.prompts[0] || 'Analyze this chart for a trade.';
-        for (let i = 0; i < this.config.numCalls; i++) promptsToUse.push(firstPrompt);
+        for (let i = 0; i < numCalls; i++) promptsToUse.push(firstPrompt);
       } else {
         promptsToUse.push(...this.config.prompts);
       }
     } else {
-      for (let i = 0; i < this.config.numCalls; i++) promptsToUse.push(this.config.prompts);
+      for (let i = 0; i < numCalls; i++) promptsToUse.push(this.config.prompts);
     }
-
     const apiCalls: Promise<LLMResponse>[] = [];
 
-    for (let i = 0; i < this.config.numCalls; i++) {
+    for (let i = 0; i < numCalls; i++) {
       const currentPrompt = promptsToUse[i];
       const fullPrompt = `${currentPrompt}${this.config.commonPromptSuffixForJson || ''}`;
-      const temperature = this.config.temperatures[i] || this.config.temperatures[0] || 0.5;
+      const temperature = this.config.temperatures?.[i] || this.config.temperatures?.[0] || 0.5;
 
       const call = async (): Promise<LLMResponse> => {
         let callCost = 0;

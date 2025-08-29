@@ -63,13 +63,14 @@ describe('output utilities', () => {
         '2025-05-05',
         'quick-rise',
         exitStrategiesConfig,
-        'llm_decides'
+        'llm_decides',
+        { numCalls: 2, temperatures: [0.1, 1.0], agreementThreshold: 2 }
       );
       const output = consoleLogSpy.mock.calls.map((call: any[]) => call[0]).join('\n');
       expect(output).toContain('SPY Analysis (2025-05-02 to 2025-05-05)');
       expect(output).toContain('Entry Pattern: quick-rise');
       expect(output).toContain('Exit Strategies: Stop Loss (LLM), Profit Target (ATR), End of Day');
-      expect(output).toContain('Direction Strategy: LLM Decides 🧠');
+      expect(output).toContain('LLM Analysis: 2 calls, temps [0.1, 1], threshold 2 🧠');
       consoleLogSpy.mockRestore();
     });
 
@@ -85,7 +86,6 @@ describe('output utilities', () => {
       expect(output).toContain('QQQ Analysis (2024-01-01 to 2024-01-02)');
       expect(output).toContain('Entry Pattern: quick-fall');
       expect(output).toContain('Exit Strategies: Stop Loss (Percent), Profit Target (Percent)');
-      expect(output).toContain('Direction Strategy: Short ↘️');
       consoleLogSpy.mockRestore();
     });
 

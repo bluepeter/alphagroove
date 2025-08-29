@@ -9,6 +9,8 @@ import path from 'path';
 import sharp from 'sharp';
 import { loadConfig } from './utils/config';
 import { Signal, Bar } from './patterns/types';
+import { LlmConfirmationScreen } from './screens/llm-confirmation.screen';
+import type { EnrichedSignal } from './screens/types';
 
 // Polygon.io API interfaces
 interface PolygonBar {
@@ -372,6 +374,137 @@ export const main = async (cmdOptions?: any) => {
         console.error(chalk.red('Error: Chart generation returned empty path'));
         process.exit(1);
       }
+
+      // LLM Analysis - using same logic as backtest
+      console.log(chalk.dim('\nAnalyzing chart with LLM...'));
+
+      try {
+        const enrichedSignal: EnrichedSignal = {
+          ticker,
+          trade_date: tradeDate,
+          price: entrySignal.price,
+          timestamp: entrySignal.timestamp,
+          type: 'entry',
+        };
+
+        // Get LLM configuration from shared config
+        const llmScreenConfig = rawConfig.shared?.llmConfirmationScreen;
+
+        if (!llmScreenConfig) {
+          console.log(chalk.yellow('⚠️  No LLM configuration found. Skipping LLM analysis.'));
+          return;
+        }
+
+        const llmScreen = new LlmConfirmationScreen();
+        const llmDecision = await llmScreen.shouldSignalProceed(
+          enrichedSignal,
+          chartPath,
+          llmScreenConfig,
+          rawConfig,
+          undefined, // context
+          options.verbose // debug
+        );
+
+        // Display LLM Decision
+        console.log(chalk.bold('\n🤖 LLM Analysis Results:'));
+        console.log(
+          `${chalk.bold('Decision:')} ${llmDecision.proceed ? chalk.green('✅ ENTER TRADE') : chalk.red('❌ DO NOT ENTER')}`
+        );
+
+        if (llmDecision.direction) {
+          const directionColor = llmDecision.direction === 'long' ? chalk.green : chalk.red;
+          const directionEmoji = llmDecision.direction === 'long' ? '🔼' : '🔽';
+          console.log(
+            `${chalk.bold('Direction:')} ${directionColor(llmDecision.direction.toUpperCase())} ${directionEmoji}`
+          );
+        }
+
+        if (llmDecision.proceed && llmDecision.direction) {
+          console.log(chalk.bold('\n📋 Manual Trading Instructions:'));
+          console.log(`${chalk.bold('Entry Price:')} $${entrySignal.price.toFixed(2)}`);
+
+          if (llmDecision.averagedProposedStopLoss) {
+            const stopLossDistance = Math.abs(
+              entrySignal.price - llmDecision.averagedProposedStopLoss
+            );
+            const stopLossPercent = ((stopLossDistance / entrySignal.price) * 100).toFixed(2);
+            console.log(
+              `${chalk.bold('Stop Loss:')} $${llmDecision.averagedProposedStopLoss.toFixed(2)} (${stopLossPercent}% risk)`
+            );
+          }
+
+          if (llmDecision.averagedProposedProfitTarget) {
+            const profitDistance = Math.abs(
+              llmDecision.averagedProposedProfitTarget - entrySignal.price
+            );
+            const profitPercent = ((profitDistance / entrySignal.price) * 100).toFixed(2);
+            console.log(
+              `${chalk.bold('Profit Target:')} $${llmDecision.averagedProposedProfitTarget.toFixed(2)} (${profitPercent}% gain)`
+            );
+          }
+
+          if (llmDecision.averagedProposedStopLoss && llmDecision.averagedProposedProfitTarget) {
+            const riskAmount = Math.abs(entrySignal.price - llmDecision.averagedProposedStopLoss);
+            const rewardAmount = Math.abs(
+              llmDecision.averagedProposedProfitTarget - entrySignal.price
+            );
+            const riskRewardRatio = (rewardAmount / riskAmount).toFixed(2);
+            console.log(`${chalk.bold('Risk/Reward Ratio:')} 1:${riskRewardRatio}`);
+          }
+        }
+
+        if (llmDecision.rationale) {
+          console.log(`\n${chalk.bold('🧠 LLM Rationale:')} ${llmDecision.rationale}`);
+        }
+
+        // Show detailed LLM responses for transparency
+        if (llmDecision._debug?.responses) {
+          console.log(chalk.bold('\n📝 Individual LLM Responses:'));
+          llmDecision._debug.responses.forEach((response: any, index: number) => {
+            const actionEmoji =
+              response.action === 'long' ? '🔼' : response.action === 'short' ? '🔽' : '⏸️';
+            const actionColor =
+              response.action === 'long'
+                ? chalk.green
+                : response.action === 'short'
+                  ? chalk.red
+                  : chalk.yellow;
+
+            console.log(
+              `${chalk.dim(`LLM ${index + 1}:`)} ${actionEmoji} ${actionColor(response.action?.toUpperCase() || 'NO ACTION')}`
+            );
+
+            if (response.rationalization) {
+              console.log(`   ${chalk.dim('Reasoning:')} ${response.rationalization}`);
+            }
+
+            if (response.confidence) {
+              console.log(`   ${chalk.dim('Confidence:')} ${response.confidence}/10`);
+            }
+
+            if (response.proposedStopLoss) {
+              console.log(`   ${chalk.dim('Proposed Stop:')} $${response.proposedStopLoss}`);
+            }
+
+            if (response.proposedProfitTarget) {
+              console.log(`   ${chalk.dim('Proposed Target:')} $${response.proposedProfitTarget}`);
+            }
+
+            if (response.cost) {
+              console.log(`   ${chalk.dim('Cost:')} $${response.cost.toFixed(6)}`);
+            }
+
+            console.log(''); // Empty line between responses
+          });
+        }
+
+        if (llmDecision.cost) {
+          console.log(chalk.dim(`Total LLM Cost: $${llmDecision.cost.toFixed(6)}`));
+        }
+      } catch (llmError) {
+        console.error(chalk.red('Error in LLM analysis:'), llmError);
+        console.log(chalk.yellow('Chart generated successfully, but LLM analysis failed.'));
+      }
     } catch (chartError) {
       console.error(chalk.red('Error generating chart:'), chartError);
       process.exit(1);
@@ -500,15 +633,7 @@ const generateScoutSvgChart = (
     svg += `<rect x="${x - candleWidth / 2}" y="${bodyTop}" width="${candleWidth}" height="${Math.max(1, bodyHeight)}" fill="${color}" stroke="${color}"/>`;
   });
 
-  // Entry signal marker
-  const entryIndex = chartData.findIndex(bar => bar.timestamp === entrySignal.timestamp);
-  if (entryIndex >= 0) {
-    const entryX = marginLeft + timeScale(entryIndex);
-    const entryY = marginTop + priceScale(entrySignal.price);
-    svg += `<line x1="${entryX}" y1="${marginTop}" x2="${entryX}" y2="${marginTop + chartHeight}" stroke="blue" stroke-width="2"/>`;
-    svg += `<circle cx="${entryX}" cy="${entryY}" r="5" fill="blue"/>`;
-    svg += `<text x="${entryX + 10}" y="${entryY - 10}" font-size="12" fill="blue">Entry</text>`;
-  }
+  // No entry marker - we haven't decided to enter yet!
 
   // Volume chart
   svg += `<rect x="${marginLeft}" y="${volumeTop}" width="${chartWidth}" height="${volumeHeight}" fill="none" stroke="#ccc"/>`;
