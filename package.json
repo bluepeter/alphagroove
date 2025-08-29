@@ -6,7 +6,7 @@
   "main": "dist/index.js",
   "bin": {
     "alphagroove": "./dist/index.js",
-    "llm-analyze": "./dist/llm-analyze.js",
+    "scout": "./dist/scout.js",
     "trade-levels": "./dist/trade-levels.js"
   },
   "files": [
@@ -29,7 +29,7 @@
     "dev": "tsc --watch",
     "start": "node --import ./scripts/register-esm-loader.mjs dist/index.js",
     "dev:start": "tsx src/index.ts",
-    "analyze": "tsx src/llm-analyze.ts",
+    "scout": "tsx src/scout.ts",
     "levels": "tsx src/trade-levels.ts",
     "test": "vitest run",
     "test:watch": "vitest",

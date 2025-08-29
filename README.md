@@ -1,24 +1,54 @@
 ## Project Overview
 
-AlphaGroove is a command-line research and strategy toolkit for exploring intraday trading
-patterns—particularly focused on high-resolution datasets like 1-minute SPY bars. Built with DuckDB
-and Node.js, it enables rapid querying, filtering, and analysis of market behavior around key time
-windows (e.g. first and last 10 minutes of the trading day).
+AlphaGroove is a comprehensive trading strategy development and execution toolkit that bridges the
+gap between backtesting and live trading. The system consists of two complementary components
+designed for hands-on quant researchers who prefer scripting over spreadsheets, precision over black
+boxes, and intelligent analysis over curve-fitting.
+
+### Dual-System Architecture
+
+**1. Strategy Backtesting Engine (`pnpm dev:start`)**
+
+- Historical analysis of intraday trading patterns using high-resolution datasets (1-minute SPY
+  bars)
+- Built with DuckDB and Node.js for rapid querying and filtering of market behavior
+- LLM-powered trade analysis with automated chart generation for pattern recognition
+- Statistical analysis with comprehensive metrics (mean/median returns, win rates, distribution
+  analysis)
+- Modular pattern architecture with consistent CLI interface
+
+**2. Entry Scout (`pnpm scout`)**
+
+- Live market analysis using the same LLM configuration and exit strategies validated in backtesting
+- Real-time data integration with Polygon.io API for current market conditions
+- Generates actionable trade signals with specific entry/exit levels for immediate execution
+- Produces the same high-quality chart analysis used in backtesting for current market conditions
+
+### Workflow Integration
+
+The typical AlphaGroove workflow involves:
+
+1. **Research Phase**: Use the backtesting engine to analyze historical data, optimize LLM settings,
+   and validate exit strategies
+2. **Validation Phase**: Refine entry patterns, exit parameters, and LLM prompts based on
+   statistical results
+3. **Execution Phase**: Deploy the validated configuration with the entry scout for live market
+   analysis
+4. **Implementation**: Use generated signals and calculated stop loss/profit target levels in your
+   brokerage platform
 
 **Key Features:**
 
 - **LLM-Powered Trade Analysis**: Uses Large Language Models to analyze chart patterns and make
   trading decisions, providing intelligent filtering beyond simple technical indicators
 - **Automated Chart Generation**: Creates high-quality candlestick charts for every trade signal
+  (both historical and real-time)
 - **Modular Pattern Architecture**: Each strategy condition is encapsulated in code with consistent
   CLI interface
 - **Statistical Analysis**: Comprehensive metrics including mean/median returns, win rates, and
   distribution analysis
-
-The tool is designed to surface conditional setups—such as sharp opens followed by reversals—and
-evaluate them using both statistical summaries and AI-powered chart analysis. AlphaGroove is
-intended for hands-on quant researchers who prefer scripting over spreadsheets, precision over black
-boxes, and intelligent analysis over curve-fitting.
+- **Real-Time Integration**: Seamless transition from backtesting to live trading with identical
+  analysis methods
 
 ## Advanced Exit Strategies
 
@@ -221,7 +251,7 @@ the Node.js package.
 3. **Required:** Create a configuration file named `alphagroove.config.yaml` in the project root
    directory (see Configuration section below)
 
-4. Run the application:
+4. Run the backtesting application:
 
    ```bash
    # Run with development mode (recommended)
@@ -239,6 +269,16 @@ the Node.js package.
    pnpm dev:start --entry-pattern fixedTimeEntry \
      --fixedTimeEntry.entryTime 13:00 \
      --debug
+   ```
+
+5. For real-time entry scouting:
+
+   ```bash
+   # Scout entry opportunities from chart images
+   pnpm scout /path/to/chart.png
+
+   # Include trading context
+   pnpm scout /path/to/chart.png --ticker SPY --price 587.54 --direction long
    ```
 
 ### Running Production Build
@@ -891,17 +931,30 @@ llmConfirmationScreen:
 Ensure the environment variable specified in `apiKeyEnvVar` is set in your environment (e.g., in an
 `.env.local` file that is gitignored) for the LLM service to function.
 
-### Standalone LLM Chart Analyzer
+## Entry Scout
 
-AlphaGroove includes a standalone CLI tool for analyzing chart images with the LLM configuration
-defined in your `alphagroove.config.yaml` file. This allows you to get LLM analysis of any chart
-image without running a full backtest.
+AlphaGroove's entry scout bridges the gap between backtesting insights and live market execution.
+This on-demand analysis tool scouts for entry opportunities using the same LLM configuration and
+exit strategies validated through historical backtesting. Primarily designed for real-time market
+reconnaissance, it's flexible enough to analyze specific historical moments for development and
+testing.
+
+### Current Capabilities (Chart Analysis Mode)
+
+The entry scout currently operates in chart analysis mode, allowing you to scout entry opportunities
+from existing chart images using your validated LLM configuration:
 
 **Usage:**
 
 ```bash
-# Basic usage
-pnpm analyze /path/to/chart.png
+# Scout entry opportunities from chart images
+pnpm scout /path/to/chart.png
+
+# Specify trading direction preference
+pnpm scout /path/to/chart.png --direction long
+
+# Include additional context for logging
+pnpm scout /path/to/chart.png --ticker SPY --date 2025-01-15 --price 587.54
 ```
 
 **Options:**
@@ -909,6 +962,44 @@ pnpm analyze /path/to/chart.png
 - `<imagePath>`: Path to the chart image to analyze (required)
 - `-d, --direction <direction>`: Suggested direction (`long` or `short`, default: `long`)
 - `-c, --config <path>`: Path to configuration file (default: `alphagroove.config.yaml`)
+- `--ticker <symbol>`: Ticker symbol (for logging only)
+- `--date <YYYY-MM-DD>`: Trade date (for logging only)
+- `--price <number>`: Current price (for logging only)
+- `-v, --verbose`: Show detailed LLM responses including rationales
+
+### Planned Live Scouting Features
+
+The entry scout is being enhanced to support full live market scouting:
+
+**Upcoming Capabilities:**
+
+- **Real-Time Data Integration**: Direct integration with Polygon.io API for live market data
+- **Entry Pattern Detection**: Real-time monitoring for quickRise, quickFall, and fixedTimeEntry
+  patterns
+- **Automated Chart Generation**: Generate current market charts identical to backtesting format
+- **Live Signal Generation**: Provide actionable trade signals with calculated stop loss and profit
+  target levels
+- **Brokerage Integration**: Export trade parameters in formats compatible with major trading
+  platforms
+
+**Target Workflow:**
+
+1. Run backtesting to validate strategy parameters and LLM configuration
+2. Deploy entry scout with live market monitoring
+3. Receive real-time alerts when entry patterns trigger
+4. Get LLM analysis of current market conditions with specific entry/exit levels
+5. Execute trades in your brokerage using the provided parameters
+
+### Integration with Backtesting
+
+The entry scout uses identical configuration and analysis methods as the backtesting engine:
+
+- **Same LLM Configuration**: Uses your validated `llmConfirmationScreen` settings
+- **Identical Exit Strategies**: Applies the same stop loss, profit target, and trailing stop
+  calculations
+- **Consistent Chart Analysis**: Generates charts with the same format and anonymization used in
+  backtesting
+- **ATR-Based Calculations**: Uses real-time ATR calculations for dynamic exit levels
 
 ### Trade Levels Calculator
 
@@ -1011,6 +1102,10 @@ pnpm dev:start list-patterns
 
 # Use a custom config file
 pnpm dev:start --config custom-config.yaml
+
+# Entry scout examples
+pnpm scout /path/to/chart.png --ticker SPY --direction long
+pnpm scout /path/to/chart.png --price 587.54 --verbose
 ```
 
 ## Project Setup
@@ -1029,8 +1124,8 @@ The project has been initialized with the following structure:
 ```
 alphagroove/
 ├── src/                # Source code
-│   ├── index.ts        # Main entry point
-│   ├── llm-analyze.ts  # Standalone LLM chart analyzer
+│   ├── index.ts        # Main entry point (backtesting engine)
+│   ├── scout.ts        # Entry scout for on-demand analysis
 │   ├── trade-levels.ts # Standalone trade levels calculator
 │   ├── patterns/       # Entry and exit pattern implementations
 │   │   ├── entry/      # Entry patterns (quickRise, quickFall, etc.)
