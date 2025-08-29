@@ -14,7 +14,11 @@ vi.mock('./screens/llm-confirmation.screen');
 import { loadConfig } from './utils/config';
 import { PolygonApiService } from './services/polygon-api.service';
 import { getPreviousTradingDay } from './utils/date-helpers';
-import { convertPolygonData, filterTradingData } from './utils/polygon-data-converter';
+import {
+  convertPolygonData,
+  filterTradingData,
+  filterTradingHoursOnly,
+} from './utils/polygon-data-converter';
 import { generateScoutChart } from './utils/scout-chart-generator';
 import { LlmConfirmationScreen } from './screens/llm-confirmation.screen';
 
@@ -23,6 +27,7 @@ const mockedPolygonApiService = vi.mocked(PolygonApiService);
 const mockedGetPreviousTradingDay = vi.mocked(getPreviousTradingDay);
 const mockedConvertPolygonData = vi.mocked(convertPolygonData);
 const mockedFilterTradingData = vi.mocked(filterTradingData);
+const mockedFilterTradingHoursOnly = vi.mocked(filterTradingHoursOnly);
 const mockedGenerateScoutChart = vi.mocked(generateScoutChart);
 const mockedLlmConfirmationScreen = vi.mocked(LlmConfirmationScreen);
 
@@ -86,6 +91,17 @@ describe('Scout Main Function', () => {
       },
     ]);
     mockedFilterTradingData.mockReturnValue([
+      {
+        timestamp: '2024-01-03 14:30:00',
+        open: 100,
+        high: 105,
+        low: 95,
+        close: 102,
+        volume: 1000,
+        trade_date: '2024-01-03',
+      },
+    ]);
+    mockedFilterTradingHoursOnly.mockReturnValue([
       {
         timestamp: '2024-01-03 14:30:00',
         open: 100,

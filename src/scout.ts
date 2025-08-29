@@ -9,7 +9,12 @@ import { LlmConfirmationScreen } from './screens/llm-confirmation.screen';
 import type { EnrichedSignal } from './screens/types';
 import { PolygonApiService } from './services/polygon-api.service';
 import { getPreviousTradingDay } from './utils/date-helpers';
-import { convertPolygonData, filterTradingData } from './utils/polygon-data-converter';
+import {
+  convertPolygonData,
+  filterTradingData,
+  filterTradingHoursOnly,
+  parseTimestampAsET,
+} from './utils/polygon-data-converter';
 import { generateScoutChart, type ScoutChartOptions } from './utils/scout-chart-generator';
 
 // Initialize command line interface
@@ -73,7 +78,7 @@ const fetchMarketData = async (
 const createEntrySignal = (bars: Bar[], tradeDate: string, currentTime: Date): Signal => {
   // Find the last bar before or at current time for entry price
   const tradingHoursBars = bars.filter(bar => {
-    const barTimestamp = new Date(bar.timestamp).getTime();
+    const barTimestamp = parseTimestampAsET(bar.timestamp);
     return barTimestamp <= currentTime.getTime();
   });
 
@@ -97,7 +102,8 @@ const generateAnalysisChart = async (
   ticker: string,
   tradeDate: string,
   entrySignal: Signal,
-  filteredBars: Bar[]
+  filteredBars: Bar[],
+  allBars: Bar[]
 ): Promise<string> => {
   const chartOptions: ScoutChartOptions = {
     ticker,
@@ -105,6 +111,7 @@ const generateAnalysisChart = async (
     tradeDate,
     entrySignal,
     data: filteredBars,
+    allData: allBars,
   };
 
   return await generateScoutChart(chartOptions);
@@ -281,14 +288,32 @@ export const main = async (cmdOptions?: any): Promise<void> => {
     // Determine parameters
     const ticker = options.ticker || rawConfig.shared?.ticker;
     const tradeDate = options.date || new Date().toISOString().split('T')[0];
-    const currentTime = options.time ? new Date(`${tradeDate}T${options.time}:00`) : new Date();
+
+    // Create currentTime in Eastern Time, not local time
+    let currentTime: Date;
+    if (options.time) {
+      // Parse the time as Eastern Time, not local time
+      const [hours, minutes] = options.time.split(':').map(Number);
+      const [year, month, day] = tradeDate.split('-').map(Number);
+
+      // Create UTC date then adjust for ET (EDT in May is UTC-4)
+      const utcDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0));
+      const etOffsetHours = 4; // EDT offset
+      currentTime = new Date(utcDate.getTime() + etOffsetHours * 60 * 60 * 1000);
+    } else {
+      currentTime = new Date();
+    }
 
     // Calculate date range
     const previousDate = getPreviousTradingDay(new Date(tradeDate));
 
     console.log(chalk.bold(`\n🔍 AlphaGroove Entry Scout`));
     console.log(chalk.dim(`Ticker: ${ticker}`));
-    console.log(chalk.dim(`Analysis Time: ${currentTime.toLocaleString()}`));
+    console.log(
+      chalk.dim(
+        `Analysis Time: ${currentTime.toLocaleString('en-US', { timeZone: 'America/New_York' })}`
+      )
+    );
 
     // Fetch and process market data
     const allBars = await fetchMarketData(polygonService, ticker, tradeDate, previousDate);
@@ -299,6 +324,9 @@ export const main = async (cmdOptions?: any): Promise<void> => {
     // Filter data to show only trading hours and up to current time
     const filteredBars = filterTradingData(allBars, tradeDate, currentTime);
 
+    // Filter all data to only trading hours (for complete chart)
+    const tradingHoursBars = filterTradingHoursOnly(allBars);
+
     console.log(
       chalk.dim(`Filtered to ${filteredBars.length} bars (trading hours, up to current time)`)
     );
@@ -307,7 +335,13 @@ export const main = async (cmdOptions?: any): Promise<void> => {
     );
 
     // Generate chart for analysis
-    const chartPath = await generateAnalysisChart(ticker, tradeDate, entrySignal, filteredBars);
+    const chartPath = await generateAnalysisChart(
+      ticker,
+      tradeDate,
+      entrySignal,
+      filteredBars,
+      tradingHoursBars
+    );
 
     if (chartPath) {
       // Perform LLM analysis and display results

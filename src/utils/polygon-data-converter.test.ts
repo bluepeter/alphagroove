@@ -1,7 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
-import { convertPolygonData, filterTradingData } from './polygon-data-converter';
+import {
+  convertPolygonData,
+  filterTradingData,
+  filterTradingHoursOnly,
+  parseTimestampAsET,
+} from './polygon-data-converter';
 import { PolygonBar } from '../services/polygon-api.service';
 import { Bar } from '../patterns/types';
+import { isTradingHours } from './date-helpers';
 
 // Mock the date-helpers module
 vi.mock('./date-helpers', () => ({
@@ -176,7 +182,7 @@ describe('Polygon Data Converter', () => {
 
       // Verify all returned bars meet the criteria
       result.forEach(bar => {
-        const barTimestamp = new Date(bar.timestamp).getTime();
+        const barTimestamp = parseTimestampAsET(bar.timestamp);
         expect(barTimestamp).toBeLessThanOrEqual(entryTime.getTime());
       });
     });
@@ -228,6 +234,78 @@ describe('Polygon Data Converter', () => {
         expect(firstBar).toHaveProperty('volume');
         expect(firstBar).toHaveProperty('trade_date');
       }
+    });
+  });
+
+  describe('filterTradingHoursOnly', () => {
+    it('should filter bars to only include trading hours', () => {
+      const mockBars: Bar[] = [
+        {
+          timestamp: '2024-01-03 09:00:00', // Premarket
+          open: 100,
+          high: 105,
+          low: 95,
+          close: 102,
+          volume: 1000,
+          trade_date: '2024-01-03',
+        },
+        {
+          timestamp: '2024-01-03 10:00:00', // Trading hours
+          open: 102,
+          high: 108,
+          low: 100,
+          close: 106,
+          volume: 2000,
+          trade_date: '2024-01-03',
+        },
+        {
+          timestamp: '2024-01-03 17:00:00', // After hours
+          open: 106,
+          high: 110,
+          low: 104,
+          close: 108,
+          volume: 1500,
+          trade_date: '2024-01-03',
+        },
+      ];
+
+      // Mock isTradingHours to return true only for the 10:00:00 ET bar
+      // The parseTimestampAsET function converts '2024-01-03 10:00:00' to a specific UTC timestamp
+      const expectedTimestamp = parseTimestampAsET('2024-01-03 10:00:00');
+      vi.mocked(isTradingHours).mockImplementation((timestamp: number) => {
+        return timestamp === expectedTimestamp;
+      });
+
+      const result = filterTradingHoursOnly(mockBars);
+
+      expect(result).toHaveLength(1);
+      expect(result[0].timestamp).toBe('2024-01-03 10:00:00');
+    });
+
+    it('should return empty array when no bars are in trading hours', () => {
+      const mockBars: Bar[] = [
+        {
+          timestamp: '2024-01-03 08:00:00', // Premarket
+          open: 100,
+          high: 105,
+          low: 95,
+          close: 102,
+          volume: 1000,
+          trade_date: '2024-01-03',
+        },
+      ];
+
+      // Mock isTradingHours to always return false
+      vi.mocked(isTradingHours).mockReturnValue(false);
+
+      const result = filterTradingHoursOnly(mockBars);
+
+      expect(result).toHaveLength(0);
+    });
+
+    it('should handle empty input array', () => {
+      const result = filterTradingHoursOnly([]);
+      expect(result).toHaveLength(0);
     });
   });
 });
