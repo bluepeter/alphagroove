@@ -46,7 +46,7 @@ describe.skip('Scout Main Function', () => {
     vi.setSystemTime(new Date('2025-08-29T18:40:12.000Z'));
 
     // Setup default mocks
-    mockedGetPreviousTradingDay.mockReturnValue('2025-08-28');
+    mockedGetPreviousTradingDay.mockResolvedValue('2025-08-28');
     mockedLoadConfig.mockResolvedValue({
       shared: {
         ticker: 'SPY',

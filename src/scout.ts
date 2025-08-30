@@ -55,6 +55,15 @@ const loadScoutConfig = async () => {
 };
 
 /**
+ * Validate that the requested trade date has actual trading data
+ */
+const validateTradingDate = (bars: Bar[], requestedDate: string): boolean => {
+  // Check if any bars exist for the exact requested date
+  const requestedDateBars = bars.filter(bar => bar.timestamp.startsWith(requestedDate));
+  return requestedDateBars.length > 0;
+};
+
+/**
  * Fetch and process market data from Polygon API
  */
 const fetchMarketData = async (
@@ -69,6 +78,14 @@ const fetchMarketData = async (
   const convertedBars = convertPolygonData(polygonBars);
 
   console.log(chalk.dim(`Converted ${convertedBars.length} bars from Polygon data`));
+
+  // Validate that the requested trade date has actual trading data
+  if (!validateTradingDate(convertedBars, tradeDate)) {
+    throw new Error(
+      `No trading data available for requested date ${tradeDate}. This may be a weekend, holiday, or market closure.`
+    );
+  }
+
   return convertedBars;
 };
 
@@ -304,8 +321,12 @@ export const main = async (cmdOptions?: any): Promise<void> => {
       currentTime = new Date();
     }
 
-    // Calculate date range
-    const previousDate = getPreviousTradingDay(new Date(tradeDate));
+    // Calculate date range - use actual trading data to find prior day
+    const previousDate = await getPreviousTradingDay(
+      new Date(tradeDate),
+      ticker,
+      rawConfig.shared?.timeframe || '1min'
+    );
 
     console.log(chalk.bold(`\n🔍 AlphaGroove Entry Scout`));
     console.log(chalk.dim(`Ticker: ${ticker}`));

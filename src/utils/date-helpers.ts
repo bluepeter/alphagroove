@@ -3,9 +3,31 @@
  */
 
 /**
- * Get the previous trading day (skips weekends)
+ * Get the previous trading day (skips weekends and finds actual trading data)
+ * This function queries the actual data to find the most recent trading day with data,
+ * not just skip weekends. This handles holidays and other non-trading days properly.
  */
-export const getPreviousTradingDay = (date: Date): string => {
+export const getPreviousTradingDay = async (
+  date: Date,
+  ticker: string = 'SPY',
+  timeframe: string = '1min'
+): Promise<string> => {
+  const { getPriorDayTradingBars } = await import('./data-loader');
+  const signalDate = date.toISOString().split('T')[0];
+
+  try {
+    const priorBars = await getPriorDayTradingBars(ticker, timeframe, signalDate);
+    if (priorBars.length > 0) {
+      // Extract date from the first bar's timestamp
+      return priorBars[0].trade_date as string;
+    }
+  } catch {
+    console.warn(
+      `Failed to find actual prior trading day for ${signalDate}, falling back to weekend-skip logic`
+    );
+  }
+
+  // Fallback to old logic if data lookup fails
   const prevDate = new Date(date);
   prevDate.setDate(prevDate.getDate() - 1);
 
