@@ -252,6 +252,7 @@ export class LlmApiService {
       };
       apiCalls.push(call());
     }
+
     return Promise.all(apiCalls);
   }
 
