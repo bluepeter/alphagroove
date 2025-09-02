@@ -15,6 +15,7 @@ import {
   filterTradingHoursOnly,
   parseTimestampAsET,
 } from './utils/polygon-data-converter';
+import { calculateEntryAtr } from './utils/trade-processing';
 import { generateScoutChart, type ScoutChartOptions } from './utils/scout-chart-generator';
 
 // Initialize command line interface
@@ -224,7 +225,14 @@ const performLLMAnalysis = async (
     }
 
     if (llmDecision.proceed && llmDecision.direction) {
-      displayTradingInstructions(entrySignal, llmDecision, rawConfig);
+      await displayTradingInstructions(
+        entrySignal,
+        llmDecision,
+        rawConfig,
+        ticker,
+        rawConfig.shared?.timeframe || '1min',
+        tradeDate
+      );
     }
 
     if (llmDecision.rationale) {
@@ -247,11 +255,14 @@ const performLLMAnalysis = async (
 /**
  * Display manual trading instructions
  */
-const displayTradingInstructions = (
+const displayTradingInstructions = async (
   entrySignal: Signal,
   llmDecision: any,
-  rawConfig: any
-): void => {
+  rawConfig: any,
+  ticker: string,
+  timeframe: string,
+  tradeDate: string
+): Promise<void> => {
   console.log(chalk.bold('\n📋 Manual Trading Instructions:'));
   console.log(`${chalk.bold('Entry Price:')} $${entrySignal.price.toFixed(2)}`);
 
@@ -286,30 +297,64 @@ const displayTradingInstructions = (
   if (trailingStopConfig && isTrailingStopEnabled) {
     console.log(chalk.bold('Trailing Stop:'));
 
+    // Use the same ATR calculation as the backtest
+    const atrValue = await calculateEntryAtr(ticker, timeframe, tradeDate);
+    const isLong = llmDecision.direction === 'long';
+
+    if (atrValue) {
+      console.log(`  ${chalk.bold('ATR:')} $${atrValue.toFixed(2)}`);
+    }
+
     // Activation level
     if (trailingStopConfig.activationAtrMultiplier !== undefined) {
       if (trailingStopConfig.activationAtrMultiplier === 0) {
         console.log(`  ${chalk.bold('Activation:')} Immediate (0x ATR)`);
       } else {
+        const activationAmount = atrValue
+          ? atrValue * trailingStopConfig.activationAtrMultiplier
+          : 0;
+        const activationPrice = isLong
+          ? entrySignal.price + activationAmount
+          : entrySignal.price - activationAmount;
+        const activationChange = activationPrice - entrySignal.price;
+        const activationPercent = ((Math.abs(activationChange) / entrySignal.price) * 100).toFixed(
+          2
+        );
+        const changeSign = activationChange >= 0 ? '+' : '';
+
         console.log(
-          `  ${chalk.bold('Activation:')} ${trailingStopConfig.activationAtrMultiplier}x ATR from entry`
+          `  ${chalk.bold('Activation:')} ${trailingStopConfig.activationAtrMultiplier}x ATR (${changeSign}$${activationChange.toFixed(2)}, ${activationPercent}%) at $${activationPrice.toFixed(2)}`
         );
       }
     } else if (trailingStopConfig.activationPercent !== undefined) {
       if (trailingStopConfig.activationPercent === 0) {
         console.log(`  ${chalk.bold('Activation:')} Immediate (0% from entry)`);
       } else {
+        const activationAmount = entrySignal.price * (trailingStopConfig.activationPercent / 100);
+        const activationPrice = isLong
+          ? entrySignal.price + activationAmount
+          : entrySignal.price - activationAmount;
+        const activationChange = activationPrice - entrySignal.price;
+        const changeSign = activationChange >= 0 ? '+' : '';
+
         console.log(
-          `  ${chalk.bold('Activation:')} ${trailingStopConfig.activationPercent}% from entry`
+          `  ${chalk.bold('Activation:')} ${trailingStopConfig.activationPercent}% (${changeSign}$${activationChange.toFixed(2)}) at $${activationPrice.toFixed(2)}`
         );
       }
     }
 
     // Trail amount
     if (trailingStopConfig.trailAtrMultiplier !== undefined) {
-      console.log(`  ${chalk.bold('Trail Amount:')} ${trailingStopConfig.trailAtrMultiplier}x ATR`);
+      const trailAmount = atrValue ? atrValue * trailingStopConfig.trailAtrMultiplier : 0;
+      const trailPercent = atrValue ? ((trailAmount / entrySignal.price) * 100).toFixed(2) : '0.00';
+      console.log(
+        `  ${chalk.bold('Trail Amount:')} ${trailingStopConfig.trailAtrMultiplier}x ATR ($${trailAmount.toFixed(2)}, ${trailPercent}%)`
+      );
     } else if (trailingStopConfig.trailPercent !== undefined) {
-      console.log(`  ${chalk.bold('Trail Amount:')} ${trailingStopConfig.trailPercent}% of price`);
+      const trailAmount = entrySignal.price * (trailingStopConfig.trailPercent / 100);
+      console.log(
+        `  ${chalk.bold('Trail Amount:')} ${trailingStopConfig.trailPercent}% ($${trailAmount.toFixed(2)})`
+      );
     }
   }
 
