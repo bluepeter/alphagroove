@@ -178,9 +178,9 @@ const performLLMAnalysis = async (
   options: any
 ): Promise<void> => {
   console.log(chalk.green(`\n✅ Chart generated successfully!`));
-  console.log(chalk.bold(`Chart saved to: ${chartPath}`));
-  const completeChartPath = chartPath.replace('.png', '_complete.png');
-  console.log(chalk.dim(`Complete chart: ${completeChartPath}`));
+  console.log(chalk.bold(`Masked chart (for LLM): ${chartPath}`));
+  const completeChartPath = chartPath.replace('_masked.png', '_complete.png');
+  console.log(chalk.dim(`Complete chart (for review): ${completeChartPath}`));
 
   // LLM Analysis - using same logic as backtest
   console.log(chalk.dim('\nAnalyzing chart with LLM...'));

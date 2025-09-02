@@ -92,7 +92,7 @@ describe('Chart Generator', () => {
     // REMOVED: expect(fs.writeFileSync).toHaveBeenCalledWith(expect.stringContaining('.svg'), ...);
 
     // Output path should now be the PNG path
-    expect(outputPath).toContain('SPY_quick-rise_20230501.png');
+    expect(outputPath).toContain('SPY_quick-rise_20230501_masked.png');
   });
 
   it('should generate charts for multiple entry signals', async () => {
@@ -115,8 +115,8 @@ describe('Chart Generator', () => {
 
     expect(chartPaths.length).toBe(2);
     // Paths should now be PNG paths
-    expect(chartPaths[0]).toContain('20230501.png');
-    expect(chartPaths[1]).toContain('20230502.png');
+    expect(chartPaths[0]).toContain('20230501_masked.png');
+    expect(chartPaths[1]).toContain('20230502_masked.png');
   });
 
   it('should correctly fetch prior trading day data across a weekend', async () => {
@@ -148,7 +148,7 @@ describe('Chart Generator', () => {
       entrySignal: mondaySignal,
     });
 
-    expect(pngPath).toContain('SPY_WEEKEND_TEST_weekend-skip-test_20250127.png');
+    expect(pngPath).toContain('SPY_WEEKEND_TEST_weekend-skip-test_20250127_masked.png');
 
     // Implicitly, if no error, fetchMultiDayData and generateSvgChart handled the dates correctly.
     // To be more explicit (requires more complex SVG parsing or visual diff, which is out of scope for this unit test):
@@ -194,7 +194,7 @@ describe('Chart Generator', () => {
       entrySignal: tuesdaySignal,
     });
 
-    expect(pngPath).toContain('SPY_HOLIDAY_TEST_holiday-skip-test_20250121.png');
+    expect(pngPath).toContain('SPY_HOLIDAY_TEST_holiday-skip-test_20250121_masked.png');
 
     // Check that no warnings about missing data for the expected 2 days occurred
     const consoleWarnSpy = vi.spyOn(console, 'warn');
@@ -255,7 +255,7 @@ describe('Chart Generator', () => {
       // Check that market data is included
       expect(svgContent).toContain('Prev Close: $101.50'); // Previous day close
       expect(svgContent).toContain('Today Open: $103.00'); // Current day open
-      expect(svgContent).toContain('Gap: +$1.50'); // Gap calculation
+      expect(svgContent).toContain('GAP UP: +$1.50 (+1.48%)'); // Enhanced gap calculation
       expect(svgContent).toContain('Today H/L: $106.00/$102.00'); // Current day high/low
       expect(svgContent).toContain('Current: $104.50'); // Current price from signal
     });
@@ -288,7 +288,7 @@ describe('Chart Generator', () => {
 
       expect(svgContent).toContain('Prev Close: $102.00');
       expect(svgContent).toContain('Today Open: $98.00');
-      expect(svgContent).toContain('Gap: $-4.00'); // Gap down
+      expect(svgContent).toContain('GAP DOWN: $-4.00 (-3.92%)'); // Enhanced gap down
     });
 
     it('should anonymize only ticker and date, not market data', () => {
@@ -324,7 +324,7 @@ describe('Chart Generator', () => {
       // Should NOT anonymize market data
       expect(svgContent).toContain('Prev Close: $100.50');
       expect(svgContent).toContain('Today Open: $103.00');
-      expect(svgContent).toContain('Gap: +$2.50');
+      expect(svgContent).toContain('GAP UP: +$2.50 (+2.49%)');
       expect(svgContent).toContain('Current: $104.50');
     });
 
@@ -352,7 +352,7 @@ describe('Chart Generator', () => {
       // Should show N/A for missing previous close
       expect(svgContent).toContain('Prev Close: N/A');
       expect(svgContent).toContain('Today Open: $103.00');
-      expect(svgContent).not.toContain('Gap:'); // No gap info when prev close missing
+      expect(svgContent).toContain('Gap: N/A'); // Shows N/A when prev close missing
     });
 
     it('should handle empty current day data gracefully', () => {
@@ -476,7 +476,7 @@ describe('Chart Generator', () => {
       // Today open should be from 9:30 AM (first trading bar), not 8:30 AM (pre-market)
       expect(svgContent).toContain('Today Open: $103.00');
       // Gap should be calculated from market hours data: 103.00 - 101.50 = +1.50
-      expect(svgContent).toContain('Gap: +$1.50');
+      expect(svgContent).toContain('GAP UP: +$1.50 (+1.48%)');
       // High/Low should be from trading hours only: high=106, low=102
       expect(svgContent).toContain('Today H/L: $106.00/$102.00');
     });

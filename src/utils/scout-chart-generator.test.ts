@@ -136,7 +136,7 @@ describe('Scout Chart Generator', () => {
       await generateScoutChart(chartOptions);
 
       expect(mockedFs.unlinkSync).toHaveBeenCalledTimes(2);
-      expect(mockedFs.unlinkSync).toHaveBeenCalledWith(expect.stringContaining('_llm_temp.svg'));
+      expect(mockedFs.unlinkSync).toHaveBeenCalledWith(expect.stringContaining('_masked_temp.svg'));
       expect(mockedFs.unlinkSync).toHaveBeenCalledWith(
         expect.stringContaining('_complete_temp.svg')
       );

@@ -8,6 +8,53 @@ import { Bar, Signal } from '../patterns/types';
 import { parseTimestampAsET } from './polygon-data-converter';
 import { isTradingHours } from './date-helpers';
 
+/**
+ * Parse timestamp correctly for both CSV (already in ET) and Polygon (UTC) data
+ * This function ensures both backtest (CSV) and scout (Polygon) use the same logic
+ */
+const parseTimestampForChart = (timestamp: string): number => {
+  // Check if this looks like CSV data (simple YYYY-MM-DD HH:mm:ss format)
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(timestamp)) {
+    // CSV data is already in Eastern Time - parse it as such
+    const [datePart, timePart] = timestamp.split(' ');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes, seconds = 0] = timePart.split(':').map(Number);
+
+    // Create the timestamp as if it were UTC, then we'll adjust for ET
+    const utcTime = Date.UTC(year, month - 1, day, hours, minutes, seconds);
+
+    // Since CSV data is in ET, we need to add the ET offset to get the correct UTC timestamp
+    // that represents this ET time. ET is UTC-5 (EST) or UTC-4 (EDT)
+    // For simplicity, we'll determine if it's EST or EDT based on the date
+    const date = new Date(year, month - 1, day);
+    const isDST = isDaylightSavingTime(date);
+    const etOffsetHours = isDST ? 4 : 5; // EDT = UTC-4, EST = UTC-5
+
+    return utcTime + etOffsetHours * 60 * 60 * 1000;
+  }
+
+  // Otherwise, assume it's Polygon data that needs UTC->ET conversion
+  return parseTimestampAsET(timestamp);
+};
+
+/**
+ * Simple daylight saving time check for US Eastern Time
+ */
+const isDaylightSavingTime = (date: Date): boolean => {
+  const year = date.getFullYear();
+
+  // DST starts second Sunday in March, ends first Sunday in November
+  const march = new Date(year, 2, 1); // March 1
+  const november = new Date(year, 10, 1); // November 1
+
+  // Find second Sunday in March
+  const dstStart = new Date(year, 2, 8 + ((7 - march.getDay()) % 7));
+  // Find first Sunday in November
+  const dstEnd = new Date(year, 10, 1 + ((7 - november.getDay()) % 7));
+
+  return date >= dstStart && date < dstEnd;
+};
+
 interface MarketDataContext {
   previousClose?: number;
   currentOpen?: number;
@@ -22,15 +69,15 @@ interface MarketDataContext {
 const calculateMarketDataContext = (allData: Bar[], entryDate: string): MarketDataContext => {
   // Get current day data (trading hours only)
   const currentDayBars = allData.filter(bar => {
-    const barDate = new Date(parseTimestampAsET(bar.timestamp)).toISOString().split('T')[0];
-    const barTimestamp = new Date(parseTimestampAsET(bar.timestamp)).getTime();
+    const barTimestamp = parseTimestampForChart(bar.timestamp);
+    const barDate = new Date(barTimestamp).toISOString().split('T')[0];
     return barDate === entryDate && isTradingHours(barTimestamp);
   });
 
   // Get previous day data (trading hours only)
   const previousDayBars = allData.filter(bar => {
-    const barDate = new Date(parseTimestampAsET(bar.timestamp)).toISOString().split('T')[0];
-    const barTimestamp = new Date(parseTimestampAsET(bar.timestamp)).getTime();
+    const barTimestamp = parseTimestampForChart(bar.timestamp);
+    const barDate = new Date(barTimestamp).toISOString().split('T')[0];
     return barDate < entryDate && isTradingHours(barTimestamp);
   });
 
@@ -46,9 +93,7 @@ const calculateMarketDataContext = (allData: Bar[], entryDate: string): MarketDa
   if (currentDayBars.length > 0) {
     // Sort by timestamp to ensure we get the first trading bar (9:30 AM)
     const sortedCurrentDayBars = currentDayBars.sort(
-      (a, b) =>
-        new Date(parseTimestampAsET(a.timestamp)).getTime() -
-        new Date(parseTimestampAsET(b.timestamp)).getTime()
+      (a, b) => parseTimestampForChart(a.timestamp) - parseTimestampForChart(b.timestamp)
     );
 
     currentOpen = sortedCurrentDayBars[0].open; // First trading bar of the day
@@ -88,9 +133,9 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
   fs.mkdirSync(patternDir, { recursive: true });
 
   const baseFileName = `${ticker}_${entryPatternName}_${tradeDate.replace(/-/g, '')}`;
-  const svgOutputPathLlm = path.join(patternDir, `${baseFileName}_llm_temp.svg`); // Temp SVG for LLM
+  const svgOutputPathLlm = path.join(patternDir, `${baseFileName}_masked_temp.svg`); // Temp SVG for LLM
   const svgOutputPathComplete = path.join(patternDir, `${baseFileName}_complete_temp.svg`); // Temp SVG for Complete
-  const pngOutputPath = path.join(patternDir, `${baseFileName}.png`);
+  const pngOutputPath = path.join(patternDir, `${baseFileName}_masked.png`);
   const completePngOutputPath = path.join(patternDir, `${baseFileName}_complete.png`);
 
   // Fetch data for the tradeDate and 1 prior actual trading day
@@ -144,7 +189,7 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
 
     fs.unlinkSync(svgOutputPathLlm); // Re-enable deletion of temp SVG
     fs.unlinkSync(svgOutputPathComplete); // Re-enable deletion of temp SVG
-    return pngOutputPath; // Return path of the original chart
+    return pngOutputPath; // Return path of the masked chart (for LLM)
   } catch (err) {
     console.error(`Error generating PNG from SVG for ${baseFileName}:`, err);
     throw err;
@@ -530,13 +575,28 @@ export const generateSvgChart = (
 
   // Format market data for display
   marketData.currentPrice = entrySignal.price;
-  const gapInfo =
-    marketData.previousClose && marketData.currentOpen
-      ? `Gap: ${marketData.currentOpen > marketData.previousClose ? '+' : ''}$${(marketData.currentOpen - marketData.previousClose).toFixed(2)}`
-      : '';
+
+  // Enhanced gap information with clear directional language
+  let gapInfo = '';
+  let gapDirection = '';
+  if (marketData.previousClose && marketData.currentOpen) {
+    const gapAmount = marketData.currentOpen - marketData.previousClose;
+    const gapPercent = ((Math.abs(gapAmount) / marketData.previousClose) * 100).toFixed(2);
+
+    if (gapAmount > 0) {
+      gapDirection = 'GAP UP';
+      gapInfo = `${gapDirection}: +$${gapAmount.toFixed(2)} (+${gapPercent}%)`;
+    } else if (gapAmount < 0) {
+      gapDirection = 'GAP DOWN';
+      gapInfo = `${gapDirection}: $${gapAmount.toFixed(2)} (-${gapPercent}%)`;
+    } else {
+      gapDirection = 'NO GAP';
+      gapInfo = `${gapDirection}: $0.00 (0.00%)`;
+    }
+  }
 
   // Market data should always be shown - only ticker and date are anonymized
-  const marketDataLine1 = `Prev Close: ${marketData.previousClose ? '$' + marketData.previousClose.toFixed(2) : 'N/A'} | Today Open: ${marketData.currentOpen ? '$' + marketData.currentOpen.toFixed(2) : 'N/A'} ${gapInfo ? '(' + gapInfo + ')' : ''}`;
+  const marketDataLine1 = `Prev Close: ${marketData.previousClose ? '$' + marketData.previousClose.toFixed(2) : 'N/A'} | Today Open: ${marketData.currentOpen ? '$' + marketData.currentOpen.toFixed(2) : 'N/A'} | ${gapInfo || 'Gap: N/A'}`;
 
   const marketDataLine2 = `Today H/L: ${marketData.currentHigh ? '$' + marketData.currentHigh.toFixed(2) : 'N/A'}/${marketData.currentLow ? '$' + marketData.currentLow.toFixed(2) : 'N/A'} | Current: $${marketData.currentPrice.toFixed(2)} @ ${entryTime}`;
 

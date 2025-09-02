@@ -26,9 +26,9 @@ export const generateScoutChart = async (options: ScoutChartOptions): Promise<st
   fs.mkdirSync(patternDir, { recursive: true });
 
   const baseFileName = `${timestamp}_${ticker}_${tradeDate.replace(/-/g, '')}`;
-  const svgOutputPathLlm = path.join(patternDir, `${baseFileName}_llm_temp.svg`);
+  const svgOutputPathLlm = path.join(patternDir, `${baseFileName}_masked_temp.svg`);
   const svgOutputPathComplete = path.join(patternDir, `${baseFileName}_complete_temp.svg`);
-  const pngOutputPath = path.join(patternDir, `${baseFileName}.png`);
+  const pngOutputPath = path.join(patternDir, `${baseFileName}_masked.png`);
   const completePngOutputPath = path.join(patternDir, `${baseFileName}_complete.png`);
 
   if (!allData || allData.length === 0) {
@@ -60,7 +60,7 @@ export const generateScoutChart = async (options: ScoutChartOptions): Promise<st
 
     fs.unlinkSync(svgOutputPathLlm);
     fs.unlinkSync(svgOutputPathComplete);
-    return pngOutputPath;
+    return pngOutputPath; // Return the masked chart path (for LLM)
   } catch (err) {
     console.error(`Error generating PNG from SVG for ${baseFileName}:`, err);
     throw err;
