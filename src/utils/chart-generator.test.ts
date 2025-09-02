@@ -210,10 +210,11 @@ describe('Chart Generator', () => {
   describe('Market Data Context in Chart Headers', () => {
     const createMockBars = (
       date: string,
-      ohlc: { open: number; high: number; low: number; close: number }[]
+      ohlc: { open: number; high: number; low: number; close: number }[],
+      startHour: number = 9 // Default to 9:30 AM (market open)
     ): Bar[] => {
       return ohlc.map((bar, index) => ({
-        timestamp: `${date} ${9 + index}:30:00`,
+        timestamp: `${date} ${String(startHour + index).padStart(2, '0')}:30:00`,
         open: bar.open,
         high: bar.high,
         low: bar.low,
@@ -380,6 +381,104 @@ describe('Chart Generator', () => {
       expect(svgContent).toContain('Today Open: N/A');
       expect(svgContent).toContain('Today H/L: N/A/N/A');
       expect(svgContent).toContain('Current: $104.50'); // From signal
+    });
+
+    it('should filter out pre-market and after-hours data for market context', () => {
+      // Create bars that include pre-market (8:00 AM) and regular market hours (9:30 AM)
+      const previousDayBars = [
+        // Pre-market data (should be ignored)
+        {
+          timestamp: '2023-05-01 08:00:00',
+          open: 98,
+          high: 99,
+          low: 97,
+          close: 98.5,
+          volume: 500,
+          trade_date: '2023-05-01',
+        },
+        // Regular market hours (should be used for context)
+        {
+          timestamp: '2023-05-01 09:30:00',
+          open: 100,
+          high: 101,
+          low: 99,
+          close: 100.5,
+          volume: 1000,
+          trade_date: '2023-05-01',
+        },
+        {
+          timestamp: '2023-05-01 15:30:00',
+          open: 100.5,
+          high: 102,
+          low: 100,
+          close: 101.5,
+          volume: 1200,
+          trade_date: '2023-05-01',
+        },
+        // After-hours data (should be ignored)
+        {
+          timestamp: '2023-05-01 17:00:00',
+          open: 101.5,
+          high: 102.5,
+          low: 101,
+          close: 102,
+          volume: 300,
+          trade_date: '2023-05-01',
+        },
+      ];
+
+      const currentDayBars = [
+        // Pre-market data (should be ignored for open calculation)
+        {
+          timestamp: '2023-05-02 08:30:00',
+          open: 102.5,
+          high: 103,
+          low: 102,
+          close: 102.8,
+          volume: 400,
+          trade_date: '2023-05-02',
+        },
+        // Regular market hours (should be used - this should be the "Today Open")
+        {
+          timestamp: '2023-05-02 09:30:00',
+          open: 103,
+          high: 105,
+          low: 102,
+          close: 104,
+          volume: 1000,
+          trade_date: '2023-05-02',
+        },
+        {
+          timestamp: '2023-05-02 10:30:00',
+          open: 104,
+          high: 106,
+          low: 103.5,
+          close: 105.5,
+          volume: 1100,
+          trade_date: '2023-05-02',
+        },
+      ];
+
+      const allBars = [...previousDayBars, ...currentDayBars];
+
+      const svgContent = generateSvgChart(
+        'SPY',
+        'test-pattern',
+        allBars,
+        { timestamp: '2023-05-02 10:30:00', price: 104.5, type: 'entry' },
+        false, // showFullDayData
+        false // not anonymized
+      );
+
+      // Should use regular market hours data only:
+      // Previous close should be from 15:30 (last trading bar), not 17:00 (after-hours)
+      expect(svgContent).toContain('Prev Close: $101.50');
+      // Today open should be from 9:30 AM (first trading bar), not 8:30 AM (pre-market)
+      expect(svgContent).toContain('Today Open: $103.00');
+      // Gap should be calculated from market hours data: 103.00 - 101.50 = +1.50
+      expect(svgContent).toContain('Gap: +$1.50');
+      // High/Low should be from trading hours only: high=106, low=102
+      expect(svgContent).toContain('Today H/L: $106.00/$102.00');
     });
   });
 });

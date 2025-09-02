@@ -6,6 +6,7 @@ import sharp from 'sharp';
 
 import { Bar, Signal } from '../patterns/types';
 import { parseTimestampAsET } from './polygon-data-converter';
+import { isTradingHours } from './date-helpers';
 
 interface MarketDataContext {
   previousClose?: number;
@@ -19,29 +20,38 @@ interface MarketDataContext {
  * Calculate market data context for chart headers
  */
 const calculateMarketDataContext = (allData: Bar[], entryDate: string): MarketDataContext => {
-  // Get current day data
+  // Get current day data (trading hours only)
   const currentDayBars = allData.filter(bar => {
     const barDate = new Date(parseTimestampAsET(bar.timestamp)).toISOString().split('T')[0];
-    return barDate === entryDate;
+    const barTimestamp = new Date(parseTimestampAsET(bar.timestamp)).getTime();
+    return barDate === entryDate && isTradingHours(barTimestamp);
   });
 
-  // Get previous day data
+  // Get previous day data (trading hours only)
   const previousDayBars = allData.filter(bar => {
     const barDate = new Date(parseTimestampAsET(bar.timestamp)).toISOString().split('T')[0];
-    return barDate < entryDate;
+    const barTimestamp = new Date(parseTimestampAsET(bar.timestamp)).getTime();
+    return barDate < entryDate && isTradingHours(barTimestamp);
   });
 
-  // Calculate previous day close (last bar of previous day)
+  // Calculate previous day close (last trading bar of previous day)
   const previousClose =
     previousDayBars.length > 0 ? previousDayBars[previousDayBars.length - 1].close : undefined;
 
-  // Calculate current day OHLC
+  // Calculate current day OHLC (trading hours only)
   let currentOpen: number | undefined;
   let currentHigh: number | undefined;
   let currentLow: number | undefined;
 
   if (currentDayBars.length > 0) {
-    currentOpen = currentDayBars[0].open;
+    // Sort by timestamp to ensure we get the first trading bar (9:30 AM)
+    const sortedCurrentDayBars = currentDayBars.sort(
+      (a, b) =>
+        new Date(parseTimestampAsET(a.timestamp)).getTime() -
+        new Date(parseTimestampAsET(b.timestamp)).getTime()
+    );
+
+    currentOpen = sortedCurrentDayBars[0].open; // First trading bar of the day
     currentHigh = Math.max(...currentDayBars.map(bar => bar.high));
     currentLow = Math.min(...currentDayBars.map(bar => bar.low));
   }
