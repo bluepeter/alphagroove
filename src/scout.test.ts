@@ -20,13 +20,13 @@ vi.mock('./screens/llm-confirmation.screen');
 vi.mock('./utils/date-helpers');
 
 const mockedLoadConfig = vi.mocked(loadConfig);
-const mockedPolygonApiService = vi.mocked(PolygonApiService);
-const mockedConvertPolygonData = vi.mocked(convertPolygonData);
-const mockedFilterTradingData = vi.mocked(filterTradingData);
-const mockedFilterTradingHoursOnly = vi.mocked(filterTradingHoursOnly);
-const mockedGenerateScoutChart = vi.mocked(generateScoutChart);
-const mockedLlmConfirmationScreen = vi.mocked(LlmConfirmationScreen);
-const mockedGetPreviousTradingDay = vi.mocked(getPreviousTradingDay);
+const _mockedPolygonApiService = vi.mocked(PolygonApiService);
+const _mockedConvertPolygonData = vi.mocked(convertPolygonData);
+const _mockedFilterTradingData = vi.mocked(filterTradingData);
+const _mockedFilterTradingHoursOnly = vi.mocked(filterTradingHoursOnly);
+const _mockedGenerateScoutChart = vi.mocked(generateScoutChart);
+const _mockedLlmConfirmationScreen = vi.mocked(LlmConfirmationScreen);
+const _mockedGetPreviousTradingDay = vi.mocked(getPreviousTradingDay);
 
 describe('Scout Main Function', () => {
   let consoleSpy: any;
@@ -60,7 +60,7 @@ describe('Scout Main Function', () => {
 
     try {
       await main({ date: '2025-08-29', time: '10:40' });
-    } catch (error) {
+    } catch {
       // Expected to throw
     }
 
@@ -80,7 +80,7 @@ describe('Scout Main Function', () => {
 
     try {
       await main({ date: '2025-08-29', time: '10:40' });
-    } catch (error) {
+    } catch {
       // Expected to throw
     }
 

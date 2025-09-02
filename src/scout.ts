@@ -16,6 +16,7 @@ import {
   parseTimestampAsET,
 } from './utils/polygon-data-converter';
 import { calculateEntryAtr } from './utils/trade-processing';
+import { calculateExitPrices } from './utils/exit-price-calculator';
 import { generateScoutChart, type ScoutChartOptions } from './utils/scout-chart-generator';
 
 // Initialize command line interface
@@ -266,26 +267,78 @@ const displayTradingInstructions = async (
   console.log(chalk.bold('\n📋 Manual Trading Instructions:'));
   console.log(`${chalk.bold('Entry Price:')} $${entrySignal.price.toFixed(2)}`);
 
-  if (llmDecision.averagedProposedStopLoss) {
-    const stopLossDistance = Math.abs(entrySignal.price - llmDecision.averagedProposedStopLoss);
+  // Calculate ATR for exit price calculations
+  const atrValue = await calculateEntryAtr(ticker, timeframe, tradeDate);
+  const isLong = llmDecision.direction === 'long';
+
+  // Use centralized exit price calculation
+  const stopLossConfig = rawConfig?.backtest?.exit?.strategyOptions?.stopLoss;
+  const profitTargetConfig = rawConfig?.backtest?.exit?.strategyOptions?.profitTarget;
+
+  const exitPrices = calculateExitPrices(
+    entrySignal.price,
+    atrValue,
+    isLong,
+    stopLossConfig,
+    profitTargetConfig,
+    llmDecision.averagedProposedStopLoss,
+    llmDecision.averagedProposedProfitTarget
+  );
+  // Display stop loss
+  if (exitPrices.stopLoss.price) {
+    const stopLossPrice = exitPrices.stopLoss.price;
+    const stopLossDistance = Math.abs(entrySignal.price - stopLossPrice);
     const stopLossPercent = ((stopLossDistance / entrySignal.price) * 100).toFixed(2);
-    const stopLossDollarChangeRaw = llmDecision.averagedProposedStopLoss - entrySignal.price;
+    const stopLossDollarChangeRaw = stopLossPrice - entrySignal.price;
     const stopLossDollarChange = stopLossDollarChangeRaw.toFixed(2);
     const changeSign = stopLossDollarChangeRaw >= 0 ? '+' : '';
     console.log(
-      `${chalk.bold('Stop Loss:')} $${llmDecision.averagedProposedStopLoss.toFixed(2)} (${changeSign}$${stopLossDollarChange}, ${stopLossPercent}% risk)`
+      `${chalk.bold('Stop Loss:')} $${stopLossPrice.toFixed(2)} (${changeSign}$${stopLossDollarChange}, ${stopLossPercent}% risk)`
     );
   }
 
-  if (llmDecision.averagedProposedProfitTarget) {
-    const profitDistance = Math.abs(llmDecision.averagedProposedProfitTarget - entrySignal.price);
+  // Display profit target
+  if (exitPrices.profitTarget.price) {
+    const profitTargetPrice = exitPrices.profitTarget.price;
+    const profitDistance = Math.abs(profitTargetPrice - entrySignal.price);
     const profitPercent = ((profitDistance / entrySignal.price) * 100).toFixed(2);
-    const profitDollarChangeRaw = llmDecision.averagedProposedProfitTarget - entrySignal.price;
+    const profitDollarChangeRaw = profitTargetPrice - entrySignal.price;
     const profitDollarChange = profitDollarChangeRaw.toFixed(2);
     const changeSign = profitDollarChangeRaw >= 0 ? '+' : '';
     console.log(
-      `${chalk.bold('Profit Target:')} $${llmDecision.averagedProposedProfitTarget.toFixed(2)} (${changeSign}$${profitDollarChange}, ${profitPercent}% gain)`
+      `${chalk.bold('Profit Target:')} $${profitTargetPrice.toFixed(2)} (${changeSign}$${profitDollarChange}, ${profitPercent}% gain)`
     );
+  }
+
+  // Calculate and display risk/reward ratio
+  if (exitPrices.stopLoss.price && exitPrices.profitTarget.price) {
+    const riskAmount = Math.abs(entrySignal.price - exitPrices.stopLoss.price);
+    const rewardAmount = Math.abs(exitPrices.profitTarget.price - entrySignal.price);
+    const riskRewardRatio = rewardAmount / riskAmount;
+    console.log(`${chalk.bold('Risk/Reward Ratio:')} 1:${riskRewardRatio.toFixed(2)}`);
+  }
+
+  // Display LLM proposed prices as additional information
+  if (llmDecision.averagedProposedStopLoss || llmDecision.averagedProposedProfitTarget) {
+    console.log(chalk.bold('\n🤖 LLM Proposed Prices (FYI):'));
+
+    if (llmDecision.averagedProposedStopLoss) {
+      const llmStopDiff = llmDecision.averagedProposedStopLoss - entrySignal.price;
+      const llmStopPercent = ((Math.abs(llmStopDiff) / entrySignal.price) * 100).toFixed(2);
+      const llmStopSign = llmStopDiff >= 0 ? '+' : '';
+      console.log(
+        `  ${chalk.dim('LLM Stop Loss:')} $${llmDecision.averagedProposedStopLoss.toFixed(2)} (${llmStopSign}$${llmStopDiff.toFixed(2)}, ${llmStopPercent}%)`
+      );
+    }
+
+    if (llmDecision.averagedProposedProfitTarget) {
+      const llmTargetDiff = llmDecision.averagedProposedProfitTarget - entrySignal.price;
+      const llmTargetPercent = ((Math.abs(llmTargetDiff) / entrySignal.price) * 100).toFixed(2);
+      const llmTargetSign = llmTargetDiff >= 0 ? '+' : '';
+      console.log(
+        `  ${chalk.dim('LLM Profit Target:')} $${llmDecision.averagedProposedProfitTarget.toFixed(2)} (${llmTargetSign}$${llmTargetDiff.toFixed(2)}, ${llmTargetPercent}%)`
+      );
+    }
   }
 
   // Display trailing stop information if configured
@@ -296,10 +349,6 @@ const displayTradingInstructions = async (
 
   if (trailingStopConfig && isTrailingStopEnabled) {
     console.log(chalk.bold('Trailing Stop:'));
-
-    // Use the same ATR calculation as the backtest
-    const atrValue = await calculateEntryAtr(ticker, timeframe, tradeDate);
-    const isLong = llmDecision.direction === 'long';
 
     if (atrValue) {
       console.log(`  ${chalk.bold('ATR:')} $${atrValue.toFixed(2)}`);
@@ -356,13 +405,6 @@ const displayTradingInstructions = async (
         `  ${chalk.bold('Trail Amount:')} ${trailingStopConfig.trailPercent}% ($${trailAmount.toFixed(2)})`
       );
     }
-  }
-
-  if (llmDecision.averagedProposedStopLoss && llmDecision.averagedProposedProfitTarget) {
-    const riskAmount = Math.abs(entrySignal.price - llmDecision.averagedProposedStopLoss);
-    const rewardAmount = Math.abs(llmDecision.averagedProposedProfitTarget - entrySignal.price);
-    const riskRewardRatio = (rewardAmount / riskAmount).toFixed(2);
-    console.log(`${chalk.bold('Risk/Reward Ratio:')} 1:${riskRewardRatio}`);
   }
 };
 
