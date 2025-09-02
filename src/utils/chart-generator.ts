@@ -373,7 +373,7 @@ export const generateSvgChart = (
 
   const width = 1200;
   const height = 800;
-  const marginTop = 120; // Increased to accommodate VWAP/SMA lines and comparison
+  const marginTop = 135; // Increased to accommodate separate VWAP and SMA lines
   const marginRight = 50;
   const marginBottom = 150;
   const marginLeft = 70;
@@ -692,15 +692,16 @@ export const generateSvgChart = (
     smaInfo = '20-Day SMA: N/A';
   }
 
-  const marketDataLine3 = `${vwapInfo} | ${smaInfo}`;
+  const marketDataLine3 = `${vwapInfo}`;
+  const marketDataLine4 = `${smaInfo}`;
 
   // Format VWAP vs SMA comparison for clear LLM interpretation
-  let marketDataLine4 = '';
+  let marketDataLine5 = '';
   if (marketData.vwap && marketData.sma20) {
     const vwapVsSmaDiff = marketData.vwap - marketData.sma20;
     const sign = vwapVsSmaDiff >= 0 ? '+' : '';
     const position = vwapVsSmaDiff > 0 ? 'ABOVE' : vwapVsSmaDiff < 0 ? 'BELOW' : 'AT';
-    marketDataLine4 = `VWAP ${sign}$${Math.abs(vwapVsSmaDiff).toFixed(2)} ${position} SMA`;
+    marketDataLine5 = `VWAP ${sign}$${Math.abs(vwapVsSmaDiff).toFixed(2)} ${position} SMA`;
   }
 
   return `
@@ -718,10 +719,13 @@ export const generateSvgChart = (
   <text x="${width / 2}" y="85" text-anchor="middle" font-size="11">
     ${marketDataLine3}
   </text>
-  ${
-    marketDataLine4
-      ? `<text x="${width / 2}" y="100" text-anchor="middle" font-size="11" font-weight="bold" fill="#2196F3">
+  <text x="${width / 2}" y="100" text-anchor="middle" font-size="11">
     ${marketDataLine4}
+  </text>
+  ${
+    marketDataLine5
+      ? `<text x="${width / 2}" y="115" text-anchor="middle" font-size="11">
+    ${marketDataLine5}
   </text>`
       : ''
   }
