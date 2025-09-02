@@ -481,4 +481,174 @@ describe('Chart Generator', () => {
       expect(svgContent).toContain('Today H/L: $106.00/$102.00');
     });
   });
+
+  describe('VWAP Integration', () => {
+    it('should include VWAP in chart headers and visualization', () => {
+      const barsWithVolume = [
+        // Previous day data
+        {
+          timestamp: '2023-05-01 15:30:00', // 3:30 PM ET
+          open: 100.5,
+          high: 102,
+          low: 100,
+          close: 101.5,
+          volume: 1200,
+          trade_date: '2023-05-01',
+        },
+        // Current day data with volume for VWAP calculation
+        {
+          timestamp: '2023-05-02 09:30:00', // 9:30 AM ET - market open
+          open: 103,
+          high: 105,
+          low: 102,
+          close: 104,
+          volume: 10000,
+          trade_date: '2023-05-02',
+        },
+        {
+          timestamp: '2023-05-02 10:00:00', // 10:00 AM ET
+          open: 104,
+          high: 106,
+          low: 103.5,
+          close: 105.5,
+          volume: 8000,
+          trade_date: '2023-05-02',
+        },
+        {
+          timestamp: '2023-05-02 10:30:00', // 10:30 AM ET - entry time
+          open: 105.5,
+          high: 107,
+          low: 105,
+          close: 106,
+          volume: 12000,
+          trade_date: '2023-05-02',
+        },
+      ];
+
+      const svgContent = generateSvgChart(
+        'SPY',
+        'vwap-test-pattern',
+        barsWithVolume,
+        { timestamp: '2023-05-02 10:30:00', price: 106, type: 'entry' },
+        false, // showFullDayData
+        false // not anonymized
+      );
+
+      // Should contain VWAP information in header
+      expect(svgContent).toContain('VWAP:');
+      expect(svgContent).toMatch(/VWAP: \$\d+\.\d{2}/); // Format: VWAP: $104.XX
+      expect(svgContent).toMatch(/\$\d+\.\d{2} (ABOVE|BELOW|AT)\)/); // Position relative to VWAP
+
+      // Should contain VWAP line visualization (SVG path element)
+      expect(svgContent).toContain('stroke="#ff6b35"'); // VWAP line color
+      expect(svgContent).toContain('stroke-width="3"'); // VWAP line width
+
+      // Should contain VWAP legend
+      expect(svgContent).toContain('<text'); // Legend text
+      expect(svgContent).toContain('VWAP</text>'); // Legend label
+    });
+
+    it('should handle missing VWAP data gracefully', () => {
+      const barsWithoutVolume = [
+        {
+          timestamp: '2023-05-01 15:30:00',
+          open: 100.5,
+          high: 102,
+          low: 100,
+          close: 101.5,
+          volume: 0, // No volume
+          trade_date: '2023-05-01',
+        },
+        {
+          timestamp: '2023-05-02 10:30:00',
+          open: 103,
+          high: 105,
+          low: 102,
+          close: 104,
+          volume: 0, // No volume
+          trade_date: '2023-05-02',
+        },
+      ];
+
+      const svgContent = generateSvgChart(
+        'SPY',
+        'no-vwap-pattern',
+        barsWithoutVolume,
+        { timestamp: '2023-05-02 10:30:00', price: 104, type: 'entry' },
+        false,
+        false
+      );
+
+      // Should show VWAP as N/A when no volume data available
+      expect(svgContent).toContain('VWAP: N/A');
+
+      // Should not contain VWAP line visualization or legend
+      expect(svgContent).not.toContain('stroke="#ff6b35"');
+      expect(svgContent).not.toContain('VWAP</text>'); // No legend when no VWAP
+    });
+
+    it('should calculate VWAP correctly with realistic trading data', () => {
+      const realisticBars = [
+        // Previous day close
+        {
+          timestamp: '2023-05-01 16:00:00',
+          open: 419.9,
+          high: 420.5,
+          low: 419.8,
+          close: 420.25,
+          volume: 150000,
+          trade_date: '2023-05-01',
+        },
+        // Current day trading session
+        {
+          timestamp: '2023-05-02 09:30:00', // Opening bar
+          open: 420.5,
+          high: 421.2,
+          low: 420.1,
+          close: 420.8,
+          volume: 250000,
+          trade_date: '2023-05-02',
+        },
+        {
+          timestamp: '2023-05-02 09:31:00',
+          open: 420.8,
+          high: 421.5,
+          low: 420.6,
+          close: 421.2,
+          volume: 180000,
+          trade_date: '2023-05-02',
+        },
+        {
+          timestamp: '2023-05-02 09:32:00',
+          open: 421.2,
+          high: 421.8,
+          low: 420.9,
+          close: 421.4,
+          volume: 220000,
+          trade_date: '2023-05-02',
+        },
+      ];
+
+      const svgContent = generateSvgChart(
+        'SPY',
+        'realistic-vwap-test',
+        realisticBars,
+        { timestamp: '2023-05-02 09:32:00', price: 421.4, type: 'entry' },
+        false,
+        false
+      );
+
+      // VWAP should be calculated and displayed
+      expect(svgContent).toContain('VWAP:');
+      expect(svgContent).toMatch(/VWAP: \$42\d\.\d{2}/); // Should be in the 420s range
+
+      // Should show position relative to VWAP
+      expect(svgContent).toMatch(/(ABOVE|BELOW|AT)/);
+
+      // Should include VWAP line visualization and legend
+      expect(svgContent).toContain('stroke="#ff6b35"');
+      expect(svgContent).toContain('<path d="M ');
+      expect(svgContent).toContain('VWAP</text>'); // Legend should be present
+    });
+  });
 });

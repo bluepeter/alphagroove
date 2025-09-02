@@ -7,6 +7,7 @@ import sharp from 'sharp';
 import { Bar, Signal } from '../patterns/types';
 import { parseTimestampAsET } from './polygon-data-converter';
 import { isTradingHours } from './date-helpers';
+import { calculateVWAPResult, calculateVWAPLine, filterCurrentDayBars } from './vwap-calculator';
 
 /**
  * Parse timestamp correctly for both CSV (already in ET) and Polygon (UTC) data
@@ -61,6 +62,10 @@ interface MarketDataContext {
   currentHigh?: number;
   currentLow?: number;
   currentPrice: number;
+  vwap?: number;
+  vwapPosition?: 'above' | 'below' | 'at';
+  vwapDifference?: number;
+  vwapDifferencePercent?: number;
 }
 
 /**
@@ -107,6 +112,10 @@ const calculateMarketDataContext = (allData: Bar[], entryDate: string): MarketDa
     currentHigh,
     currentLow,
     currentPrice: 0, // Will be set from entrySignal.price
+    vwap: undefined, // Will be calculated separately with current day data
+    vwapPosition: undefined,
+    vwapDifference: undefined,
+    vwapDifferencePercent: undefined,
   };
 };
 
@@ -332,7 +341,7 @@ export const generateSvgChart = (
 
   const width = 1200;
   const height = 800;
-  const marginTop = 90;
+  const marginTop = 105; // Increased to accommodate VWAP line
   const marginRight = 50;
   const marginBottom = 150;
   const marginLeft = 70;
@@ -576,6 +585,16 @@ export const generateSvgChart = (
   // Format market data for display
   marketData.currentPrice = entrySignal.price;
 
+  // Calculate VWAP for current day
+  const currentDayBars = filterCurrentDayBars(allDataInput, entryDate);
+  const vwapResult = calculateVWAPResult(currentDayBars, marketData.currentPrice);
+  if (vwapResult) {
+    marketData.vwap = vwapResult.vwap;
+    marketData.vwapPosition = vwapResult.position;
+    marketData.vwapDifference = vwapResult.priceVsVwap;
+    marketData.vwapDifferencePercent = vwapResult.priceVsVwapPercent;
+  }
+
   // Enhanced gap information with clear directional language
   let gapInfo = '';
   let gapDirection = '';
@@ -598,7 +617,21 @@ export const generateSvgChart = (
   // Market data should always be shown - only ticker and date are anonymized
   const marketDataLine1 = `Prev Close: ${marketData.previousClose ? '$' + marketData.previousClose.toFixed(2) : 'N/A'} | Today Open: ${marketData.currentOpen ? '$' + marketData.currentOpen.toFixed(2) : 'N/A'} | ${gapInfo || 'Gap: N/A'}`;
 
+  // Format VWAP information
+  let vwapInfo = '';
+  if (marketData.vwap) {
+    const vwapDiff = marketData.vwapDifference || 0;
+    const sign = vwapDiff >= 0 ? '+' : '';
+    const position =
+      marketData.vwapPosition === 'at' ? 'AT' : marketData.vwapPosition?.toUpperCase();
+    vwapInfo = `VWAP: $${marketData.vwap.toFixed(2)} (${sign}$${vwapDiff.toFixed(2)} ${position})`;
+  } else {
+    vwapInfo = 'VWAP: N/A';
+  }
+
   const marketDataLine2 = `Today H/L: ${marketData.currentHigh ? '$' + marketData.currentHigh.toFixed(2) : 'N/A'}/${marketData.currentLow ? '$' + marketData.currentLow.toFixed(2) : 'N/A'} | Current: $${marketData.currentPrice.toFixed(2)} @ ${entryTime}`;
+
+  const marketDataLine3 = vwapInfo;
 
   return `
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
@@ -611,6 +644,9 @@ export const generateSvgChart = (
   </text>
   <text x="${width / 2}" y="70" text-anchor="middle" font-size="11">
     ${marketDataLine2}
+  </text>
+  <text x="${width / 2}" y="85" text-anchor="middle" font-size="11">
+    ${marketDataLine3}
   </text>
   
   <rect x="${marginLeft}" y="${marginTop}" width="${chartWidth}" height="${chartHeight}" fill="none" stroke="none" />
@@ -699,6 +735,34 @@ export const generateSvgChart = (
   }).join('\n  ')}
   <line x1="${marginLeft}" y1="${volumeTop + volumeHeight}" x2="${marginLeft + chartWidth}" y2="${volumeTop + volumeHeight}" stroke="#333" stroke-width="1" />
   
+  ${(() => {
+    // Generate VWAP line if available
+    if (marketData.vwap) {
+      const vwapLine = calculateVWAPLine(currentDayBars);
+      if (vwapLine.length > 1) {
+        // Map VWAP points to chart coordinates
+        const vwapPath = vwapLine
+          .map((point, i) => {
+            const barIndex = finalDataForChart.findIndex(bar => bar.timestamp === point.timestamp);
+            if (barIndex === -1) return '';
+
+            const x = getXPosition(barIndex);
+            const y =
+              marginTop +
+              chartHeight -
+              ((point.vwap - minPrice) / (maxPrice - minPrice)) * chartHeight;
+
+            return i === 0 ? `M ${x} ${y}` : `L ${x} ${y}`;
+          })
+          .filter(Boolean)
+          .join(' ');
+
+        return `<path d="${vwapPath}" stroke="#ff6b35" stroke-width="3" fill="none" opacity="0.8" />`;
+      }
+    }
+    return '';
+  })()}
+  
   ${uniqueXTicksAndLabels
     .map(label => {
       if (label.isTick && !label.isTime) {
@@ -714,6 +778,21 @@ export const generateSvgChart = (
   <text x="${marginLeft - 45}" y="${marginTop + chartHeight / 2}" text-anchor="middle" transform="rotate(-90, ${marginLeft - 45}, ${marginTop + chartHeight / 2})" font-size="14">Price ($)</text>
   <text x="${marginLeft - 45}" y="${volumeTop + volumeHeight / 2}" text-anchor="middle" transform="rotate(-90, ${marginLeft - 45}, ${volumeTop + volumeHeight / 2})" font-size="12">Volume</text>
   <text x="${marginLeft + chartWidth / 2}" y="${height - 25}" text-anchor="middle" font-size="14">Time</text>
+  
+  ${(() => {
+    // Add VWAP legend if VWAP line is present
+    if (marketData.vwap) {
+      const legendX = marginLeft + chartWidth - 120;
+      const legendY = marginTop + 30;
+      return `
+        <g>
+          <rect x="${legendX - 5}" y="${legendY - 15}" width="110" height="25" fill="white" stroke="#ccc" stroke-width="1" opacity="0.9" rx="3"/>
+          <line x1="${legendX}" y1="${legendY}" x2="${legendX + 20}" y2="${legendY}" stroke="#ff6b35" stroke-width="3" opacity="0.8"/>
+          <text x="${legendX + 25}" y="${legendY + 4}" font-size="11" fill="#333">VWAP</text>
+        </g>`;
+    }
+    return '';
+  })()}
 </svg>
   `.trim();
 };
