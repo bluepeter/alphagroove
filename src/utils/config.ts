@@ -860,14 +860,16 @@ export const mergeConfigWithCliOptions = (
   if (mergedConfig.from && mergedConfig.to) {
     const originalFromDate = new Date(mergedConfig.from);
     const smaAdjustedFromDate = new Date(originalFromDate);
-    
+
     // Add approximately 30 calendar days to account for ~20 trading days + weekends/holidays
     smaAdjustedFromDate.setDate(smaAdjustedFromDate.getDate() + 30);
-    
+
     // Only adjust if the adjusted date is still before the 'to' date
     if (smaAdjustedFromDate < new Date(mergedConfig.to)) {
       const adjustedFromDateStr = smaAdjustedFromDate.toISOString().split('T')[0];
-      console.log(`📊 SMA Analysis: Adjusting start date from ${mergedConfig.from} to ${adjustedFromDateStr} to allow for 20-day SMA calculation`);
+      console.log(
+        `📊 SMA Analysis: Adjusting start date from ${mergedConfig.from} to ${adjustedFromDateStr} to allow for 20-day SMA calculation`
+      );
       mergedConfig.from = adjustedFromDateStr;
     }
   }

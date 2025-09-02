@@ -537,7 +537,7 @@ describe('Chart Generator', () => {
       // Should contain VWAP information in header
       expect(svgContent).toContain('VWAP:');
       expect(svgContent).toMatch(/VWAP: \$\d+\.\d{2}/); // Format: VWAP: $104.XX
-      expect(svgContent).toMatch(/\$\d+\.\d{2} (ABOVE|BELOW|AT)\)/); // Position relative to VWAP
+      expect(svgContent).toMatch(/\$\d+\.\d{2} (ABOVE|BELOW|AT) current price\)/); // Position relative to current price
 
       // Should contain VWAP line visualization (SVG path element)
       expect(svgContent).toContain('stroke="#ff6b35"'); // VWAP line color
@@ -709,7 +709,7 @@ describe('Chart Generator', () => {
       // Should contain SMA information in header
       expect(svgContent).toContain('20-Day SMA:');
       expect(svgContent).toMatch(/20-Day SMA: \$\d+\.\d{2}/);
-      expect(svgContent).toMatch(/\$\d+\.\d{2} (ABOVE|BELOW|AT)\)/);
+      expect(svgContent).toMatch(/\$\d+\.\d{2} (ABOVE|BELOW|AT) current price\)/);
 
       // Should contain SMA line visualization (horizontal dashed line)
       expect(svgContent).toContain('stroke="#2196F3"'); // SMA line color

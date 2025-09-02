@@ -537,7 +537,7 @@ describe('Configuration System', () => {
 
       expect(merged.ticker).toBe('QQQ');
 
-      expect(merged.from).toBe('2022-01-01');
+      expect(merged.from).toBe('2022-01-31'); // Adjusted for SMA calculation
       expect(merged.to).toBe('2022-12-31');
       expect(merged.llmConfirmationScreen).toBeDefined();
       expect(merged.llmConfirmationScreen!.llmProvider).toBe('openai');
@@ -591,7 +591,7 @@ describe('Configuration System', () => {
       // New structure should take priority
       expect(merged.ticker).toBe('NEW_TICKER');
 
-      expect(merged.from).toBe('2024-01-01');
+      expect(merged.from).toBe('2024-01-31'); // Adjusted for SMA calculation
       expect(merged.llmConfirmationScreen).toBeDefined();
       expect(merged.llmConfirmationScreen!.llmProvider).toBe('anthropic');
     });

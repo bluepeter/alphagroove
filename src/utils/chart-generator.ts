@@ -373,7 +373,7 @@ export const generateSvgChart = (
 
   const width = 1200;
   const height = 800;
-  const marginTop = 105; // Increased to accommodate VWAP line
+  const marginTop = 120; // Increased to accommodate VWAP/SMA lines and comparison
   const marginRight = 50;
   const marginBottom = 150;
   const marginLeft = 70;
@@ -674,7 +674,7 @@ export const generateSvgChart = (
     const sign = vwapDiff >= 0 ? '+' : '';
     const position =
       marketData.vwapPosition === 'at' ? 'AT' : marketData.vwapPosition?.toUpperCase();
-    vwapInfo = `VWAP: $${marketData.vwap.toFixed(2)} (${sign}$${vwapDiff.toFixed(2)} ${position})`;
+    vwapInfo = `VWAP: $${marketData.vwap.toFixed(2)} (${sign}$${vwapDiff.toFixed(2)} ${position} current price)`;
   } else {
     vwapInfo = 'VWAP: N/A';
   }
@@ -687,12 +687,21 @@ export const generateSvgChart = (
     const smaDiff = marketData.smaDifference || 0;
     const sign = smaDiff >= 0 ? '+' : '';
     const position = marketData.smaPosition === 'at' ? 'AT' : marketData.smaPosition?.toUpperCase();
-    smaInfo = `20-Day SMA: $${marketData.sma20.toFixed(2)} (${sign}$${smaDiff.toFixed(2)} ${position})`;
+    smaInfo = `20-Day SMA: $${marketData.sma20.toFixed(2)} (${sign}$${smaDiff.toFixed(2)} ${position} current price)`;
   } else {
     smaInfo = '20-Day SMA: N/A';
   }
 
   const marketDataLine3 = `${vwapInfo} | ${smaInfo}`;
+
+  // Format VWAP vs SMA comparison for clear LLM interpretation
+  let marketDataLine4 = '';
+  if (marketData.vwap && marketData.sma20) {
+    const vwapVsSmaDiff = marketData.vwap - marketData.sma20;
+    const sign = vwapVsSmaDiff >= 0 ? '+' : '';
+    const position = vwapVsSmaDiff > 0 ? 'ABOVE' : vwapVsSmaDiff < 0 ? 'BELOW' : 'AT';
+    marketDataLine4 = `VWAP ${sign}$${Math.abs(vwapVsSmaDiff).toFixed(2)} ${position} SMA`;
+  }
 
   return `
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
@@ -709,6 +718,13 @@ export const generateSvgChart = (
   <text x="${width / 2}" y="85" text-anchor="middle" font-size="11">
     ${marketDataLine3}
   </text>
+  ${
+    marketDataLine4
+      ? `<text x="${width / 2}" y="100" text-anchor="middle" font-size="11" font-weight="bold" fill="#2196F3">
+    ${marketDataLine4}
+  </text>`
+      : ''
+  }
   
   <rect x="${marginLeft}" y="${marginTop}" width="${chartWidth}" height="${chartHeight}" fill="none" stroke="none" />
   
