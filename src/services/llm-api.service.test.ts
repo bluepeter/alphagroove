@@ -150,11 +150,11 @@ describe('LlmApiService', () => {
 
       mockAnthropicCreate
         .mockResolvedValueOnce({
-          content: [{ text: '{"action": "long", "confidence": 7.5}' }],
+          content: [{ text: '{"action": "long"}' }],
           usage: { input_tokens: 10, output_tokens: 5 },
         })
         .mockResolvedValueOnce({
-          content: [{ text: '{"action": "short", "confidence": "8"}' }],
+          content: [{ text: '{"action": "short"}' }],
           usage: { input_tokens: 10, output_tokens: 5 },
         })
         .mockResolvedValueOnce({
@@ -168,29 +168,27 @@ describe('LlmApiService', () => {
         {
           action: 'long',
           rationalization: undefined,
-          confidence: 7.5,
           cost: expectedCost,
-          debugRawText: '{"action": "long", "confidence": 7.5}',
+          debugRawText: '{"action": "long"}',
           rawResponse: {
-            content: [{ text: '{"action": "long", "confidence": 7.5}' }],
+            content: [{ text: '{"action": "long"}' }],
             usage: { input_tokens: 10, output_tokens: 5 },
           },
         },
         {
           action: 'short',
           rationalization: undefined,
-          confidence: 8,
           cost: expectedCost,
-          debugRawText: '{"action": "short", "confidence": "8"}',
+          debugRawText: '{"action": "short"}',
           rawResponse: {
-            content: [{ text: '{"action": "short", "confidence": "8"}' }],
+            content: [{ text: '{"action": "short"}' }],
             usage: { input_tokens: 10, output_tokens: 5 },
           },
         },
         {
           action: 'do_nothing',
           rationalization: undefined,
-          confidence: undefined,
+
           cost: expectedCost,
           debugRawText: '{"action": "do_nothing"}',
           rawResponse: {

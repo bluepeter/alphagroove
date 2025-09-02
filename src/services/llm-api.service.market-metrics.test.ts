@@ -36,7 +36,7 @@ describe('LlmApiService Market Metrics Integration', () => {
 
     // Mock successful LLM response
     mockAnthropicCreate.mockResolvedValue({
-      content: [{ text: '{"action": "long", "rationalization": "Test reason", "confidence": 8}' }],
+      content: [{ text: '{"action": "long", "rationalization": "Test reason"}' }],
       usage: { input_tokens: 100, output_tokens: 50 },
     });
 

@@ -60,8 +60,7 @@ const _mockLLMResponse = (
   inputTokens = 100,
   outputTokens = 50,
   stopLoss?: number,
-  profitTarget?: number,
-  confidence?: number
+  profitTarget?: number
 ): LLMResponse => {
   const INPUT_COST_PER_MILLION_TOKENS = 3;
   const OUTPUT_COST_PER_MILLION_TOKENS = 15;
@@ -75,7 +74,7 @@ const _mockLLMResponse = (
     cost,
     stopLoss,
     profitTarget,
-    confidence,
+
     rawResponse: { usage: { input_tokens: inputTokens, output_tokens: outputTokens } },
   };
 };
@@ -165,7 +164,7 @@ describe('LlmConfirmationScreen', () => {
     expect(mockGetTradeDecisionsFn).toHaveBeenCalled();
     expect(result.proceed).toBe(true);
     expect(result.direction).toBe('long');
-    expect(result.confidence).toBeCloseTo(8);
+
     expect(result.averagedProposedStopLoss).toBeCloseTo(100.5);
     expect(result.averagedProposedProfitTarget).toBeCloseTo(110.5);
   });
@@ -193,7 +192,7 @@ describe('LlmConfirmationScreen', () => {
     expect(mockGetTradeDecisionsFn).toHaveBeenCalled();
     expect(result.proceed).toBe(true);
     expect(result.direction).toBe('long');
-    expect(result.confidence).toBeCloseTo(8.5);
+
     expect(result.averagedProposedStopLoss).toBeCloseTo(101);
     expect(result.averagedProposedProfitTarget).toBeCloseTo(111);
   });
@@ -226,29 +225,27 @@ describe('LlmConfirmationScreen', () => {
 });
 
 describe('calculateAverageProposedPrices', () => {
-  it('should correctly average valid stopLoss, profitTarget, and confidence for consensus action', () => {
+  it('should correctly average valid stopLoss and profitTarget for consensus action', () => {
     const responses: LLMResponse[] = [
-      _mockLLMResponse('long', 'r1', undefined, 10, 5, 100, 110, 7),
-      _mockLLMResponse('long', 'r2', undefined, 10, 5, 98, 112, 9),
-      _mockLLMResponse('short', 'r3', undefined, 10, 5, 90, 120, 5),
-      _mockLLMResponse('long', 'r4', undefined, 10, 5, undefined, 114, 8),
-      _mockLLMResponse('long', 'r5', undefined, 10, 5, 102, undefined, 6),
-      _mockLLMResponse('long', 'r6', undefined, 10, 5, 101, 111, undefined),
+      _mockLLMResponse('long', 'r1', undefined, 10, 5, 100, 110),
+      _mockLLMResponse('long', 'r2', undefined, 10, 5, 98, 112),
+      _mockLLMResponse('short', 'r3', undefined, 10, 5, 90, 120),
+      _mockLLMResponse('long', 'r4', undefined, 10, 5, undefined, 114),
+      _mockLLMResponse('long', 'r5', undefined, 10, 5, 102, undefined),
+      _mockLLMResponse('long', 'r6', undefined, 10, 5, 101, 111),
     ];
     const result = calculateAverageProposedPrices(responses, 'long');
     expect(result.averagedProposedStopLoss).toBeCloseTo((100 + 98 + 102 + 101) / 4);
     expect(result.averagedProposedProfitTarget).toBeCloseTo((110 + 112 + 114 + 111) / 4);
-    expect(result.averagedConfidence).toBeCloseTo((7 + 9 + 8 + 6) / 4);
   });
 
   it('should return undefined for averages if no valid data for consensus action', () => {
     const responses: LLMResponse[] = [
-      _mockLLMResponse('short', 'r1', undefined, 10, 5, 90, 120, 5),
-      _mockLLMResponse('long', 'r2', undefined, 10, 5, undefined, undefined, undefined),
+      _mockLLMResponse('short', 'r1', undefined, 10, 5, 90, 120),
+      _mockLLMResponse('long', 'r2', undefined, 10, 5, undefined, undefined),
     ];
     const result = calculateAverageProposedPrices(responses, 'long');
     expect(result.averagedProposedStopLoss).toBeUndefined();
     expect(result.averagedProposedProfitTarget).toBeUndefined();
-    expect(result.averagedConfidence).toBeUndefined();
   });
 });

@@ -15,14 +15,11 @@ export const calculateAverageProposedPrices = (
 ): {
   averagedProposedStopLoss?: number;
   averagedProposedProfitTarget?: number;
-  averagedConfidence?: number;
 } => {
   let slSum = 0;
   let slCount = 0;
   let ptSum = 0;
   let ptCount = 0;
-  let confSum = 0;
-  let confCount = 0;
 
   responses.forEach(response => {
     // Only consider prices from responses that align with the consensus action
@@ -35,17 +32,12 @@ export const calculateAverageProposedPrices = (
         ptSum += response.profitTarget;
         ptCount++;
       }
-      if (typeof response.confidence === 'number' && !isNaN(response.confidence)) {
-        confSum += response.confidence;
-        confCount++;
-      }
     }
   });
 
   return {
     averagedProposedStopLoss: slCount > 0 ? slSum / slCount : undefined,
     averagedProposedProfitTarget: ptCount > 0 ? ptSum / ptCount : undefined,
-    averagedConfidence: confCount > 0 ? confSum / confCount : undefined,
   };
 };
 
@@ -157,7 +149,6 @@ export class LlmConfirmationScreen implements EntryScreen {
       let averagedPrices: {
         averagedProposedStopLoss?: number;
         averagedProposedProfitTarget?: number;
-        averagedConfidence?: number;
       } = {};
 
       if (configuredDirection === 'llm_decides') {
@@ -172,7 +163,7 @@ export class LlmConfirmationScreen implements EntryScreen {
             cost: totalCost,
             averagedProposedStopLoss: averagedPrices.averagedProposedStopLoss,
             averagedProposedProfitTarget: averagedPrices.averagedProposedProfitTarget,
-            confidence: averagedPrices.averagedConfidence,
+
             _debug: { responses },
           };
           rationale = `LLM consensus to GO LONG (${longVotes} long vs ${shortVotes} short)`;
@@ -184,7 +175,7 @@ export class LlmConfirmationScreen implements EntryScreen {
             cost: totalCost,
             averagedProposedStopLoss: averagedPrices.averagedProposedStopLoss,
             averagedProposedProfitTarget: averagedPrices.averagedProposedProfitTarget,
-            confidence: averagedPrices.averagedConfidence,
+
             _debug: { responses },
           };
           rationale = `LLM consensus to GO SHORT (${shortVotes} short vs ${longVotes} long)`;
@@ -217,7 +208,7 @@ export class LlmConfirmationScreen implements EntryScreen {
             rationale: `LLM consensus to GO LONG, matching configured direction.`,
             averagedProposedStopLoss: averagedPrices.averagedProposedStopLoss,
             averagedProposedProfitTarget: averagedPrices.averagedProposedProfitTarget,
-            confidence: averagedPrices.averagedConfidence,
+
             _debug: { responses },
           };
           logMessage = `  LLM consensus to GO LONG, matching configured direction. Signal proceeds.`;
@@ -233,7 +224,7 @@ export class LlmConfirmationScreen implements EntryScreen {
             rationale: `LLM consensus to GO SHORT, matching configured direction.`,
             averagedProposedStopLoss: averagedPrices.averagedProposedStopLoss,
             averagedProposedProfitTarget: averagedPrices.averagedProposedProfitTarget,
-            confidence: averagedPrices.averagedConfidence,
+
             _debug: { responses },
           };
           logMessage = `  LLM consensus to GO SHORT, matching configured direction. Signal proceeds.`;

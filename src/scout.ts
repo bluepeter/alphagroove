@@ -481,10 +481,6 @@ const displayIndividualLLMResponses = (responses: any[]): void => {
       console.log(`   ${chalk.dim('Reasoning:')} ${response.rationalization}`);
     }
 
-    if (response.confidence) {
-      console.log(`   ${chalk.dim('Confidence:')} ${response.confidence}/10`);
-    }
-
     if (response.proposedStopLoss) {
       console.log(`   ${chalk.dim('Proposed Stop:')} $${response.proposedStopLoss}`);
     }
