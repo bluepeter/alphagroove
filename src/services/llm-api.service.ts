@@ -68,7 +68,11 @@ export class LlmApiService {
     }
   }
 
-  public async getTradeDecisions(chartPath: string): Promise<LLMResponse[]> {
+  public async getTradeDecisions(
+    chartPath: string,
+    marketMetrics?: string,
+    debug?: boolean
+  ): Promise<LLMResponse[]> {
     if (!this.isEnabled() || !this.anthropic) {
       console.warn('LLM API service is not enabled or not configured correctly.');
       return Array.from({ length: this.config.numCalls || 1 }, () => ({
@@ -104,8 +108,17 @@ export class LlmApiService {
 
     for (let i = 0; i < numCalls; i++) {
       const currentPrompt = promptsToUse[i];
-      const fullPrompt = `${currentPrompt}${this.config.commonPromptSuffixForJson || ''}`;
+      const metricsAddendum = marketMetrics ? `\n\nMarket Context:\n${marketMetrics}\n` : '';
+      const fullPrompt = `${currentPrompt}${metricsAddendum}${this.config.commonPromptSuffixForJson || ''}`;
       const temperature = this.config.temperatures?.[i] || this.config.temperatures?.[0] || 0.5;
+
+      // Debug: Output the full prompt if debug is enabled
+      if (debug) {
+        console.log(`\n[DEBUG] LLM Prompt ${i + 1}:`);
+        console.log('='.repeat(80));
+        console.log(fullPrompt);
+        console.log('='.repeat(80));
+      }
 
       const call = async (): Promise<LLMResponse> => {
         let callCost = 0;

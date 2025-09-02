@@ -59,7 +59,8 @@ export class LlmConfirmationScreen implements EntryScreen {
     screenConfig: LLMScreenConfig,
     appConfig: AppConfig,
     _context?: EntryScreenContext,
-    debug?: boolean
+    debug?: boolean,
+    marketMetrics?: string
   ): Promise<ScreenDecision> {
     const llmConfig = appConfig.llmConfirmationScreen || appConfig.shared?.llmConfirmationScreen;
     // 1. Check if LLM config exists
@@ -94,7 +95,11 @@ export class LlmConfirmationScreen implements EntryScreen {
 
       await fs.copyFile(originalChartPath, tempChartPath);
 
-      const responses: LLMResponse[] = await llmService.getTradeDecisions(tempChartPath);
+      const responses: LLMResponse[] = await llmService.getTradeDecisions(
+        tempChartPath,
+        marketMetrics,
+        debug
+      );
 
       let longVotes = 0;
       let shortVotes = 0;

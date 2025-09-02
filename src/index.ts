@@ -135,13 +135,43 @@ export const handleLlmTradeScreeningInternal = async (
     mergedConfig,
     chartEntryPatternName
   );
+
+  // Generate market metrics for backtest LLM prompts
+  // Fetch the same multi-day data that the chart generator uses
+  const { fetchMultiDayData } = await import('./utils/chart-generator');
+  const { generateMarketMetricsForPrompt } = await import('./utils/market-metrics');
+
+  let marketMetrics: string | undefined = undefined;
+  try {
+    // Fetch multi-day data for market metrics calculation (same as chart generation)
+    const allBars = await fetchMultiDayData(
+      currentSignal.ticker,
+      mergedConfig.timeframe,
+      currentSignal.trade_date,
+      25
+    );
+
+    // Create entry signal for market metrics
+    const entrySignal = {
+      timestamp: currentSignal.timestamp,
+      price: currentSignal.price,
+      type: 'entry' as const,
+    };
+
+    // Generate market metrics (no daily bars for backtest - will aggregate from intraday)
+    marketMetrics = generateMarketMetricsForPrompt(allBars, entrySignal, undefined);
+  } catch (error) {
+    console.warn('[LLM Prep] Failed to generate market metrics for backtest:', error);
+  }
+
   const screenDecision = await llmScreenInstance.shouldSignalProceed(
     currentSignal,
     chartPathForLLM,
     screenSpecificLLMConfig,
     rawConfig, // Pass the rawConfig which LlmConfirmationScreen expects as AppConfig
     undefined, // context
-    debug // Pass debug flag
+    debug, // Pass debug flag
+    marketMetrics // market metrics
   );
 
   // screenDecision already includes proceed, cost, and LLM analysis

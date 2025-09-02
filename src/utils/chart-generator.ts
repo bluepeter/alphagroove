@@ -62,7 +62,7 @@ const isDaylightSavingTime = (date: Date): boolean => {
   return date >= dstStart && date < dstEnd;
 };
 
-interface MarketDataContext {
+export interface MarketDataContext {
   previousClose?: number;
   currentOpen?: number;
   currentHigh?: number;
@@ -81,7 +81,10 @@ interface MarketDataContext {
 /**
  * Calculate market data context for chart headers
  */
-const calculateMarketDataContext = (allData: Bar[], entryDate: string): MarketDataContext => {
+export const calculateMarketDataContext = (
+  allData: Bar[],
+  entryDate: string
+): MarketDataContext => {
   // Get current day data (trading hours only)
   const currentDayBars = allData.filter(bar => {
     const barTimestamp = parseTimestampForChart(bar.timestamp);
@@ -245,7 +248,7 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
  *                            The signalDate itself is always included if it has data.
  * @returns A promise that resolves to an array of Bar objects, or an empty array if an error occurs.
  */
-const fetchMultiDayData = async (
+export const fetchMultiDayData = async (
   ticker: string,
   timeframe: string,
   signalDate: string, // YYYY-MM-DD format

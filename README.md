@@ -11,6 +11,8 @@ intelligent analysis over curve-fitting.
 
 - Historical analysis of intraday trading patterns using high-resolution datasets
 - LLM-powered trade analysis with automated chart generation for pattern recognition
+- **Enhanced Market Context**: LLM receives comprehensive market metrics including gaps, VWAP, SMA,
+  and price relationships
 - Statistical analysis with comprehensive metrics (mean/median returns, win rates, distribution
   analysis)
 - Modular pattern architecture for entry/exit strategies
@@ -19,6 +21,8 @@ intelligent analysis over curve-fitting.
 
 - Real-time market analysis using Polygon.io API
 - Same LLM configuration and analysis methods validated through backtesting
+- **Rich Market Context**: LLM receives detailed market metrics including previous close, gaps, VWAP
+  vs price, SMA vs price
 - Generates actionable trade signals with specific entry/exit levels for manual execution
 - On-demand analysis for any date/time, not just current market conditions
 
@@ -305,17 +309,17 @@ backtest:
 
 ## Command Line Options
 
-| Option                         | Description                  | Default     |
-| ------------------------------ | ---------------------------- | ----------- |
-| `--from <YYYY-MM-DD>`          | Start date (inclusive)       | From config |
-| `--to <YYYY-MM-DD>`            | End date (inclusive)         | From config |
-| `--entry-pattern <pattern>`    | Entry pattern to use         | From config |
-| `--ticker <symbol>`            | Ticker to analyze            | SPY         |
-| `--timeframe <period>`         | Data resolution              | 1min        |
-| `--maxConcurrentDays <number>` | Max concurrent days (1-20)   | 3           |
-| `--debug`                      | Show debug information       | false       |
-| `--verbose`                    | Show detailed LLM responses  | false       |
-| `--dry-run`                    | Show query without executing | false       |
+| Option                         | Description                                                      | Default     |
+| ------------------------------ | ---------------------------------------------------------------- | ----------- |
+| `--from <YYYY-MM-DD>`          | Start date (inclusive)                                           | From config |
+| `--to <YYYY-MM-DD>`            | End date (inclusive)                                             | From config |
+| `--entry-pattern <pattern>`    | Entry pattern to use                                             | From config |
+| `--ticker <symbol>`            | Ticker to analyze                                                | SPY         |
+| `--timeframe <period>`         | Data resolution                                                  | 1min        |
+| `--maxConcurrentDays <number>` | Max concurrent days (1-20)                                       | 3           |
+| `--debug`                      | Show debug information                                           | false       |
+| `--verbose`                    | Show detailed LLM responses and full prompts with market context | false       |
+| `--dry-run`                    | Show query without executing                                     | false       |
 
 ### Pattern-Specific Options
 
@@ -364,18 +368,54 @@ pnpm scout --ticker SPY --date 2025-05-28 --time 14:30 --verbose
 
 - **Real-Time Data**: Uses Polygon.io API for current and historical market data
 - **Identical Analysis**: Same LLM configuration and chart generation as backtesting
+- **Enhanced Market Context**: LLM receives comprehensive market metrics (see below)
 - **Trade Recommendations**: Provides entry/exit levels, stop loss, and profit targets
 - **Risk/Reward Analysis**: Calculates risk-reward ratios and percentage moves
 - **Flexible Timing**: Analyze any date/time, not just current market conditions
 
+## Market Context for LLM Analysis
+
+Both the backtesting engine and scout provide rich market context to the LLM for more informed
+decision-making. When using the `--verbose` flag, you can see the full prompts including this market
+context.
+
+### Market Metrics Included
+
+The LLM receives a **Market Context** section with each prompt containing:
+
+- **Previous Close & Today's Open**: Gap analysis with percentage and direction
+- **Today's High/Low Range**: Current trading range context
+- **Current Price & Time**: Real-time price action
+- **VWAP Analysis**: Current price relative to Volume Weighted Average Price
+- **SMA Analysis**: Current price relative to 20-day Simple Moving Average
+- **VWAP vs SMA**: Relationship between technical indicators
+
+### Example Market Context
+
+```
+Market Context:
+Prev Close: $644.84 | Today Open: $637.50 | GAP DOWN: $-7.34 (-1.14%)
+Today H/L: $640.14/$634.92 | Current: $638.53 @ 03:10 PM
+Current price of $638.53 is $1.08 ABOVE VWAP of $637.45.
+Current price of $638.53 is $2.02 BELOW SMA of $640.55.
+VWAP of $637.45 is $3.10 BELOW SMA of $640.55.
+```
+
+This context helps the LLM understand:
+
+- **Gap conditions** (up/down from previous close)
+- **Intraday momentum** (relative to VWAP)
+- **Trend context** (relative to 20-day SMA)
+- **Technical alignment** (VWAP vs SMA positioning)
+
 ## Command Line Options
 
-| Option                | Description                      | Default      |
-| --------------------- | -------------------------------- | ------------ |
-| `--ticker <symbol>`   | Ticker symbol (overrides config) | From config  |
-| `--date <YYYY-MM-DD>` | Trade date                       | Today        |
-| `--time <HH:MM>`      | Entry time in Eastern Time       | Current time |
-| `-v, --verbose`       | Show detailed LLM responses      | false        |
+| Option                | Description                                                      | Default      |
+| --------------------- | ---------------------------------------------------------------- | ------------ |
+| `--ticker <symbol>`   | Ticker symbol (overrides config)                                 | From config  |
+| `--date <YYYY-MM-DD>` | Trade date                                                       | Today        |
+| `--time <HH:MM>`      | Entry time in Eastern Time                                       | Current time |
+| `-v, --verbose`       | Show detailed LLM responses and full prompts with market context | false        |
 
 ## Requirements
 

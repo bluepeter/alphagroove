@@ -8,6 +8,7 @@ import { Bar, Signal } from './patterns/types';
 import { LlmConfirmationScreen } from './screens/llm-confirmation.screen';
 import type { EnrichedSignal } from './screens/types';
 import { PolygonApiService } from './services/polygon-api.service';
+import { generateMarketMetricsForPrompt } from './utils/market-metrics';
 
 import {
   convertPolygonData,
@@ -218,7 +219,9 @@ const performLLMAnalysis = async (
   tradeDate: string,
   entrySignal: Signal,
   rawConfig: any,
-  options: any
+  options: any,
+  allBars: Bar[],
+  dailyBars?: DailyBar[]
 ): Promise<void> => {
   console.log(chalk.green(`\n✅ Chart generated successfully!`));
   console.log(chalk.bold(`Masked chart (for LLM): ${chartPath}`));
@@ -244,6 +247,9 @@ const performLLMAnalysis = async (
       return;
     }
 
+    // Generate market metrics for LLM prompt
+    const marketMetrics = generateMarketMetricsForPrompt(allBars, entrySignal, dailyBars);
+
     const llmScreen = new LlmConfirmationScreen();
     const llmDecision = await llmScreen.shouldSignalProceed(
       enrichedSignal,
@@ -251,7 +257,8 @@ const performLLMAnalysis = async (
       llmScreenConfig,
       rawConfig,
       undefined, // context
-      options.verbose // debug
+      options.verbose, // debug
+      marketMetrics // market metrics
     );
 
     // Display LLM Decision
@@ -587,7 +594,16 @@ export const main = async (cmdOptions?: any): Promise<void> => {
 
     if (chartPath) {
       // Perform LLM analysis and display results
-      await performLLMAnalysis(chartPath, ticker, tradeDate, entrySignal, rawConfig, options);
+      await performLLMAnalysis(
+        chartPath,
+        ticker,
+        tradeDate,
+        entrySignal,
+        rawConfig,
+        options,
+        allBars,
+        dailyBars
+      );
     } else {
       console.error(chalk.red('Failed to generate chart'));
       process.exit(1);

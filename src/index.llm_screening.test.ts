@@ -80,6 +80,11 @@ vi.mock('./utils/mappers.js', () => ({
 vi.mock('./utils/chart-generator.js', () => ({
   generateEntryChart: vi.fn(() => Promise.resolve('path/to/chart.png')),
   generateEntryCharts: vi.fn(() => Promise.resolve([])),
+  fetchMultiDayData: vi.fn(() => Promise.resolve([])),
+}));
+
+vi.mock('./utils/market-metrics.js', () => ({
+  generateMarketMetricsForPrompt: vi.fn(() => 'Test market metrics'),
 }));
 
 vi.mock('./utils/calculations.js', async () => {
@@ -199,7 +204,8 @@ describe('LLM Trade Screening Tests', () => {
         screenConfigEnabled,
         currentAppConfig,
         undefined, // context
-        undefined // debug
+        undefined, // debug
+        'Test market metrics' // market metrics
       );
       expect(resultFalse).toEqual({
         proceed: false,
