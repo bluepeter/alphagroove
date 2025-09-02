@@ -31,18 +31,14 @@ program
 program.parse(process.argv);
 
 /**
- * Calculate the previous trading day (skip weekends)
- * Simple approach for live trading scout
+ * Calculate the start date for fetching trading data (account for holidays)
+ * Goes back enough days to ensure we capture the previous trading day
  */
 const calculatePreviousTradingDay = (date: Date): string => {
+  // For live trading scout, go back 5 calendar days to ensure we capture
+  // the previous trading day even with holidays like Labor Day
   const prevDate = new Date(date);
-  prevDate.setDate(prevDate.getDate() - 1);
-
-  // Skip weekends - if it's Sunday (0) or Saturday (6), go back further
-  while (prevDate.getDay() === 0 || prevDate.getDay() === 6) {
-    prevDate.setDate(prevDate.getDate() - 1);
-  }
-
+  prevDate.setDate(prevDate.getDate() - 5);
   return prevDate.toISOString().split('T')[0];
 };
 
