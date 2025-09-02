@@ -8,7 +8,7 @@ import { Bar, Signal } from './patterns/types';
 import { LlmConfirmationScreen } from './screens/llm-confirmation.screen';
 import type { EnrichedSignal } from './screens/types';
 import { PolygonApiService } from './services/polygon-api.service';
-import { getPreviousTradingDay } from './utils/date-helpers';
+
 import {
   convertPolygonData,
   filterTradingData,
@@ -29,6 +29,22 @@ program
   .option('-v, --verbose', 'Show detailed information');
 
 program.parse(process.argv);
+
+/**
+ * Calculate the previous trading day (skip weekends)
+ * Simple approach for live trading scout
+ */
+const calculatePreviousTradingDay = (date: Date): string => {
+  const prevDate = new Date(date);
+  prevDate.setDate(prevDate.getDate() - 1);
+
+  // Skip weekends - if it's Sunday (0) or Saturday (6), go back further
+  while (prevDate.getDay() === 0 || prevDate.getDay() === 6) {
+    prevDate.setDate(prevDate.getDate() - 1);
+  }
+
+  return prevDate.toISOString().split('T')[0];
+};
 
 /**
  * Load and validate configuration
@@ -59,7 +75,25 @@ const loadScoutConfig = async () => {
  */
 const validateTradingDate = (bars: Bar[], requestedDate: string): boolean => {
   // Check if any bars exist for the exact requested date
-  const requestedDateBars = bars.filter(bar => bar.timestamp.startsWith(requestedDate));
+  // Handle different timestamp formats from Polygon API
+  const requestedDateBars = bars.filter(bar => {
+    const barDate = new Date(parseTimestampAsET(bar.timestamp)).toISOString().split('T')[0];
+    return barDate === requestedDate;
+  });
+
+  if (requestedDateBars.length === 0) {
+    console.log(
+      `No bars found for requested date ${requestedDate}. Available dates:`,
+      [
+        ...new Set(
+          bars
+            .slice(0, 10)
+            .map(bar => new Date(parseTimestampAsET(bar.timestamp)).toISOString().split('T')[0])
+        ),
+      ].join(', ')
+    );
+  }
+
   return requestedDateBars.length > 0;
 };
 
@@ -194,7 +228,7 @@ const performLLMAnalysis = async (
     }
 
     if (llmDecision.proceed && llmDecision.direction) {
-      displayTradingInstructions(entrySignal, llmDecision);
+      displayTradingInstructions(entrySignal, llmDecision, rawConfig);
     }
 
     if (llmDecision.rationale) {
@@ -217,24 +251,70 @@ const performLLMAnalysis = async (
 /**
  * Display manual trading instructions
  */
-const displayTradingInstructions = (entrySignal: Signal, llmDecision: any): void => {
+const displayTradingInstructions = (
+  entrySignal: Signal,
+  llmDecision: any,
+  rawConfig: any
+): void => {
   console.log(chalk.bold('\n📋 Manual Trading Instructions:'));
   console.log(`${chalk.bold('Entry Price:')} $${entrySignal.price.toFixed(2)}`);
 
   if (llmDecision.averagedProposedStopLoss) {
     const stopLossDistance = Math.abs(entrySignal.price - llmDecision.averagedProposedStopLoss);
     const stopLossPercent = ((stopLossDistance / entrySignal.price) * 100).toFixed(2);
+    const stopLossDollarChangeRaw = llmDecision.averagedProposedStopLoss - entrySignal.price;
+    const stopLossDollarChange = stopLossDollarChangeRaw.toFixed(2);
+    const changeSign = stopLossDollarChangeRaw >= 0 ? '+' : '';
     console.log(
-      `${chalk.bold('Stop Loss:')} $${llmDecision.averagedProposedStopLoss.toFixed(2)} (${stopLossPercent}% risk)`
+      `${chalk.bold('Stop Loss:')} $${llmDecision.averagedProposedStopLoss.toFixed(2)} (${changeSign}$${stopLossDollarChange}, ${stopLossPercent}% risk)`
     );
   }
 
   if (llmDecision.averagedProposedProfitTarget) {
     const profitDistance = Math.abs(llmDecision.averagedProposedProfitTarget - entrySignal.price);
     const profitPercent = ((profitDistance / entrySignal.price) * 100).toFixed(2);
+    const profitDollarChangeRaw = llmDecision.averagedProposedProfitTarget - entrySignal.price;
+    const profitDollarChange = profitDollarChangeRaw.toFixed(2);
+    const changeSign = profitDollarChangeRaw >= 0 ? '+' : '';
     console.log(
-      `${chalk.bold('Profit Target:')} $${llmDecision.averagedProposedProfitTarget.toFixed(2)} (${profitPercent}% gain)`
+      `${chalk.bold('Profit Target:')} $${llmDecision.averagedProposedProfitTarget.toFixed(2)} (${changeSign}$${profitDollarChange}, ${profitPercent}% gain)`
     );
+  }
+
+  // Display trailing stop information if configured
+  // Check both backtest and shared config locations for trailing stop
+  const backtestExitConfig = rawConfig?.backtest?.exit;
+  const trailingStopConfig = backtestExitConfig?.strategyOptions?.trailingStop;
+  const isTrailingStopEnabled = backtestExitConfig?.enabled?.includes('trailingStop');
+
+  if (trailingStopConfig && isTrailingStopEnabled) {
+    console.log(chalk.bold('Trailing Stop:'));
+
+    // Activation level
+    if (trailingStopConfig.activationAtrMultiplier !== undefined) {
+      if (trailingStopConfig.activationAtrMultiplier === 0) {
+        console.log(`  ${chalk.bold('Activation:')} Immediate (0x ATR)`);
+      } else {
+        console.log(
+          `  ${chalk.bold('Activation:')} ${trailingStopConfig.activationAtrMultiplier}x ATR from entry`
+        );
+      }
+    } else if (trailingStopConfig.activationPercent !== undefined) {
+      if (trailingStopConfig.activationPercent === 0) {
+        console.log(`  ${chalk.bold('Activation:')} Immediate (0% from entry)`);
+      } else {
+        console.log(
+          `  ${chalk.bold('Activation:')} ${trailingStopConfig.activationPercent}% from entry`
+        );
+      }
+    }
+
+    // Trail amount
+    if (trailingStopConfig.trailAtrMultiplier !== undefined) {
+      console.log(`  ${chalk.bold('Trail Amount:')} ${trailingStopConfig.trailAtrMultiplier}x ATR`);
+    } else if (trailingStopConfig.trailPercent !== undefined) {
+      console.log(`  ${chalk.bold('Trail Amount:')} ${trailingStopConfig.trailPercent}% of price`);
+    }
   }
 
   if (llmDecision.averagedProposedStopLoss && llmDecision.averagedProposedProfitTarget) {
@@ -321,12 +401,8 @@ export const main = async (cmdOptions?: any): Promise<void> => {
       currentTime = new Date();
     }
 
-    // Calculate date range - use actual trading data to find prior day
-    const previousDate = await getPreviousTradingDay(
-      new Date(tradeDate),
-      ticker,
-      rawConfig.shared?.timeframe || '1min'
-    );
+    // Calculate previous trading day (simple approach for live data)
+    const previousDate = calculatePreviousTradingDay(new Date(tradeDate));
 
     console.log(chalk.bold(`\n🔍 AlphaGroove Entry Scout`));
     console.log(chalk.dim(`Ticker: ${ticker}`));
