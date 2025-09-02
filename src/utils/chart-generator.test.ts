@@ -651,4 +651,224 @@ describe('Chart Generator', () => {
       expect(svgContent).toContain('VWAP</text>'); // Legend should be present
     });
   });
+
+  describe('SMA Integration', () => {
+    it('should include SMA in chart headers and visualization with daily bars', () => {
+      const intradayBars = [
+        // Previous day data
+        {
+          timestamp: '2023-05-01 15:30:00',
+          open: 100.5,
+          high: 102,
+          low: 100,
+          close: 101.5,
+          volume: 1200,
+          trade_date: '2023-05-01',
+        },
+        // Current day data
+        {
+          timestamp: '2023-05-02 09:30:00',
+          open: 103,
+          high: 105,
+          low: 102,
+          close: 104,
+          volume: 10000,
+          trade_date: '2023-05-02',
+        },
+        {
+          timestamp: '2023-05-02 10:30:00',
+          open: 104,
+          high: 106,
+          low: 103,
+          close: 105,
+          volume: 8000,
+          trade_date: '2023-05-02',
+        },
+      ];
+
+      // Create 20 days of daily bars for SMA calculation
+      const dailyBars = Array.from({ length: 20 }, (_, i) => ({
+        date: `2023-04-${String(i + 10).padStart(2, '0')}`,
+        open: 100 + i * 0.5,
+        high: 102 + i * 0.5,
+        low: 98 + i * 0.5,
+        close: 100 + i * 0.5,
+        volume: 1000000,
+      }));
+
+      const svgContent = generateSvgChart(
+        'SPY',
+        'sma-test-pattern',
+        intradayBars,
+        { timestamp: '2023-05-02 10:30:00', price: 105, type: 'entry' },
+        false,
+        false,
+        dailyBars
+      );
+
+      // Should contain SMA information in header
+      expect(svgContent).toContain('20-Day SMA:');
+      expect(svgContent).toMatch(/20-Day SMA: \$\d+\.\d{2}/);
+      expect(svgContent).toMatch(/\$\d+\.\d{2} (ABOVE|BELOW|AT)\)/);
+
+      // Should contain SMA line visualization (horizontal dashed line)
+      expect(svgContent).toContain('stroke="#2196F3"'); // SMA line color
+      expect(svgContent).toContain('stroke-dasharray="5,5"'); // SMA dashed line
+
+      // Should contain SMA legend
+      expect(svgContent).toContain('20-Day SMA</text>');
+    });
+
+    it('should aggregate intraday to daily bars when no daily bars provided', () => {
+      // Multi-day intraday data that will be aggregated to daily
+      const intradayBars = [
+        // Day 1
+        {
+          timestamp: '2023-04-28 09:30:00',
+          open: 98,
+          high: 100,
+          low: 97,
+          close: 99,
+          volume: 5000,
+          trade_date: '2023-04-28',
+        },
+        {
+          timestamp: '2023-04-28 15:30:00',
+          open: 99,
+          high: 101,
+          low: 98,
+          close: 100,
+          volume: 3000,
+          trade_date: '2023-04-28',
+        },
+        // Day 2 (current day)
+        {
+          timestamp: '2023-05-01 09:30:00',
+          open: 100,
+          high: 102,
+          low: 99,
+          close: 101,
+          volume: 8000,
+          trade_date: '2023-05-01',
+        },
+      ];
+
+      const svgContent = generateSvgChart(
+        'SPY',
+        'sma-aggregate-test',
+        intradayBars,
+        { timestamp: '2023-05-01 09:30:00', price: 101, type: 'entry' },
+        false,
+        false
+        // No dailyBars provided - should aggregate from intraday
+      );
+
+      // Should show SMA as N/A (insufficient data for 20-day SMA)
+      expect(svgContent).toContain('20-Day SMA: N/A');
+
+      // Should not contain SMA line or legend when N/A
+      expect(svgContent).not.toContain('stroke="#2196F3"');
+      expect(svgContent).not.toContain('20-Day SMA</text>');
+    });
+
+    it('should display both VWAP and SMA in legend when both available', () => {
+      const intradayBars = [
+        {
+          timestamp: '2023-05-02 09:30:00',
+          open: 103,
+          high: 105,
+          low: 102,
+          close: 104,
+          volume: 10000,
+          trade_date: '2023-05-02',
+        },
+        {
+          timestamp: '2023-05-02 10:30:00',
+          open: 104,
+          high: 106,
+          low: 103,
+          close: 105,
+          volume: 8000,
+          trade_date: '2023-05-02',
+        },
+      ];
+
+      // 20 days of daily bars for SMA
+      const dailyBars = Array.from({ length: 20 }, (_, i) => ({
+        date: `2023-04-${String(i + 10).padStart(2, '0')}`,
+        open: 100 + i * 0.5,
+        high: 102 + i * 0.5,
+        low: 98 + i * 0.5,
+        close: 100 + i * 0.5,
+        volume: 1000000,
+      }));
+
+      const svgContent = generateSvgChart(
+        'SPY',
+        'vwap-sma-test',
+        intradayBars,
+        { timestamp: '2023-05-02 10:30:00', price: 105, type: 'entry' },
+        false,
+        false,
+        dailyBars
+      );
+
+      // Should contain both VWAP and SMA in headers
+      expect(svgContent).toContain('VWAP:');
+      expect(svgContent).toContain('20-Day SMA:');
+
+      // Should contain both lines
+      expect(svgContent).toContain('stroke="#ff6b35"'); // VWAP line
+      expect(svgContent).toContain('stroke="#2196F3"'); // SMA line
+
+      // Should contain both in legend
+      expect(svgContent).toContain('VWAP</text>');
+      expect(svgContent).toContain('20-Day SMA</text>');
+    });
+
+    it('should handle SMA calculation with realistic stock data', () => {
+      const currentDayBars = [
+        {
+          timestamp: '2023-05-02 09:30:00',
+          open: 420.5,
+          high: 422.0,
+          low: 419.5,
+          close: 421.2,
+          volume: 250000,
+          trade_date: '2023-05-02',
+        },
+      ];
+
+      // 20 days of realistic daily bars
+      const dailyBars = Array.from({ length: 20 }, (_, i) => ({
+        date: `2023-04-${String(i + 10).padStart(2, '0')}`,
+        open: 415 + i * 0.3,
+        high: 417 + i * 0.3,
+        low: 413 + i * 0.3,
+        close: 415.5 + i * 0.3,
+        volume: 2000000 + i * 10000,
+      }));
+
+      const svgContent = generateSvgChart(
+        'SPY',
+        'realistic-sma-test',
+        currentDayBars,
+        { timestamp: '2023-05-02 09:30:00', price: 421.2, type: 'entry' },
+        false,
+        false,
+        dailyBars
+      );
+
+      // Should calculate and display SMA
+      expect(svgContent).toContain('20-Day SMA:');
+      expect(svgContent).toMatch(/20-Day SMA: \$41\d\.\d{2}/); // Should be in 410s range
+
+      // Should show position relative to SMA
+      expect(svgContent).toMatch(/(ABOVE|BELOW|AT)/);
+
+      // Should include SMA line visualization
+      expect(svgContent).toContain('stroke="#2196F3"');
+      expect(svgContent).toContain('stroke-dasharray="5,5"');
+    });
+  });
 });

@@ -3,6 +3,7 @@ import path from 'path';
 import sharp from 'sharp';
 import { Bar, Signal } from '../patterns/types';
 import { generateSvgChart } from './chart-generator';
+import type { DailyBar } from './sma-calculator';
 
 export interface ScoutChartOptions {
   ticker: string;
@@ -11,6 +12,7 @@ export interface ScoutChartOptions {
   entrySignal: Signal;
   data: Bar[];
   allData: Bar[];
+  dailyBars?: DailyBar[];
 }
 
 /**
@@ -18,7 +20,7 @@ export interface ScoutChartOptions {
  * This reuses the existing chart generation from utils/chart-generator.ts
  */
 export const generateScoutChart = async (options: ScoutChartOptions): Promise<string> => {
-  const { ticker, entryPatternName, tradeDate, entrySignal, data, allData } = options;
+  const { ticker, entryPatternName, tradeDate, entrySignal, data, allData, dailyBars } = options;
 
   // Create timestamp-based filename for scout charts
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -38,11 +40,27 @@ export const generateScoutChart = async (options: ScoutChartOptions): Promise<st
 
   // Use the existing chart generation logic from backtest
   // For LLM chart: use filtered data (up to entry time) with anonymization
-  const svgLlm = generateSvgChart(ticker, entryPatternName, data, entrySignal, false, true);
+  const svgLlm = generateSvgChart(
+    ticker,
+    entryPatternName,
+    data,
+    entrySignal,
+    false,
+    true,
+    dailyBars
+  );
   fs.writeFileSync(svgOutputPathLlm, svgLlm, 'utf-8');
 
   // For complete chart: use all trading hours data without anonymization
-  const svgComplete = generateSvgChart(ticker, entryPatternName, allData, entrySignal, true, false);
+  const svgComplete = generateSvgChart(
+    ticker,
+    entryPatternName,
+    allData,
+    entrySignal,
+    true,
+    false,
+    dailyBars
+  );
   fs.writeFileSync(svgOutputPathComplete, svgComplete, 'utf-8');
 
   try {

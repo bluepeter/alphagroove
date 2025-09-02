@@ -107,7 +107,8 @@ describe('Scout Chart Generator', () => {
         mockBars, // filtered data
         mockSignal,
         false, // showFullDayData = false
-        true // anonymize = true
+        true, // anonymize = true
+        undefined // dailyBars = undefined (not provided in test)
       );
 
       // Complete chart: all data, not anonymized
@@ -117,7 +118,8 @@ describe('Scout Chart Generator', () => {
         mockBars, // all data
         mockSignal,
         true, // showFullDayData = true
-        false // anonymize = false
+        false, // anonymize = false
+        undefined // dailyBars = undefined (not provided in test)
       );
 
       expect(mockedFs.writeFileSync).toHaveBeenCalledTimes(2);

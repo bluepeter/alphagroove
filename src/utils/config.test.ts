@@ -470,7 +470,7 @@ describe('Configuration System', () => {
       expect(merged.ticker).toBe('SPY');
       expect(merged.timeframe).toBe('1min');
 
-      expect(merged.from).toBe('2023-01-01');
+      expect(merged.from).toBe('2023-01-31'); // Adjusted for SMA calculation
       expect(merged.to).toBe('2023-12-31');
       expect(merged.maxConcurrentDays).toBe(2);
 

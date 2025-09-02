@@ -8,6 +8,12 @@ import { Bar, Signal } from '../patterns/types';
 import { parseTimestampAsET } from './polygon-data-converter';
 import { isTradingHours } from './date-helpers';
 import { calculateVWAPResult, calculateVWAPLine, filterCurrentDayBars } from './vwap-calculator';
+import {
+  calculateSMAResult,
+  aggregateIntradayToDaily,
+  type DailyBar,
+  SMA_PERIODS,
+} from './sma-calculator';
 
 /**
  * Parse timestamp correctly for both CSV (already in ET) and Polygon (UTC) data
@@ -66,6 +72,10 @@ interface MarketDataContext {
   vwapPosition?: 'above' | 'below' | 'at';
   vwapDifference?: number;
   vwapDifferencePercent?: number;
+  sma20?: number;
+  smaPosition?: 'above' | 'below' | 'at';
+  smaDifference?: number;
+  smaDifferencePercent?: number;
 }
 
 /**
@@ -147,8 +157,9 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
   const pngOutputPath = path.join(patternDir, `${baseFileName}_masked.png`);
   const completePngOutputPath = path.join(patternDir, `${baseFileName}_complete.png`);
 
-  // Fetch data for the tradeDate and 1 prior actual trading day
-  const data = await fetchMultiDayData(ticker, timeframe, tradeDate, 1);
+  // Fetch data for the tradeDate and enough prior trading days for SMA calculation
+  // Need at least 20 days for 20-day SMA, fetch 25 to be safe
+  const data = await fetchMultiDayData(ticker, timeframe, tradeDate, 25);
 
   if (!data || data.length === 0) {
     console.warn(
@@ -157,13 +168,33 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
     return ''; // Or throw an error
   }
 
+  // For backtest, we need to aggregate intraday data to daily bars for SMA calculation
+  // This will be undefined for scout (which provides dailyBars directly)
+  const dailyBars = undefined; // Let generateSvgChart aggregate from intraday data
+
   // Generate SVG for the LLM chart (filtered up to entry)
-  const svgLlm = generateSvgChart(ticker, entryPatternName, data, entrySignal, false, true);
+  const svgLlm = generateSvgChart(
+    ticker,
+    entryPatternName,
+    data,
+    entrySignal,
+    false,
+    true,
+    dailyBars
+  );
   // console.log(`[generateEntryChart DEBUG] Length of svgLlm (LLM chart): ${svgLlm.length}`);
   fs.writeFileSync(svgOutputPathLlm, svgLlm, 'utf-8');
 
   // Generate SVG for the "complete" 2-day chart (full days)
-  const svgComplete = generateSvgChart(ticker, entryPatternName, data, entrySignal, true, false);
+  const svgComplete = generateSvgChart(
+    ticker,
+    entryPatternName,
+    data,
+    entrySignal,
+    true,
+    false,
+    dailyBars
+  );
   // console.log(
   //   `[generateEntryChart DEBUG] Length of svgComplete (Complete chart): ${svgComplete.length}`
   // );
@@ -309,7 +340,8 @@ export const generateSvgChart = (
   allDataInput: Bar[],
   entrySignal: Signal,
   showFullDayData?: boolean,
-  anonymize?: boolean
+  anonymize?: boolean,
+  dailyBars?: DailyBar[]
 ): string => {
   // Explicit console logs for debugging timestamp matching - REMOVE/COMMENT OUT
   if (!showFullDayData) {
@@ -410,8 +442,8 @@ export const generateSvgChart = (
     {} as Record<string, Bar[]>
   );
 
-  const minPrice = Math.min(...finalDataForChart.map(d => d.low)) * 0.995;
-  const maxPrice = Math.max(...finalDataForChart.map(d => d.high)) * 1.005;
+  let minPrice = Math.min(...finalDataForChart.map(d => d.low)) * 0.995;
+  let maxPrice = Math.max(...finalDataForChart.map(d => d.high)) * 1.005;
   const priceRange = maxPrice - minPrice;
   const maxVolume = Math.max(...finalDataForChart.map(d => d.volume));
 
@@ -595,6 +627,24 @@ export const generateSvgChart = (
     marketData.vwapDifferencePercent = vwapResult.priceVsVwapPercent;
   }
 
+  // Calculate 20-day SMA
+  let smaData: DailyBar[] = [];
+  if (dailyBars && dailyBars.length > 0) {
+    // Use provided daily bars (from Polygon for scout)
+    smaData = dailyBars;
+  } else {
+    // Aggregate intraday data to daily bars (for backtest with CSV data)
+    smaData = aggregateIntradayToDaily(allDataInput);
+  }
+
+  const smaResult = calculateSMAResult(smaData, SMA_PERIODS.MEDIUM, marketData.currentPrice);
+  if (smaResult) {
+    marketData.sma20 = smaResult.sma;
+    marketData.smaPosition = smaResult.position;
+    marketData.smaDifference = smaResult.priceVsSma;
+    marketData.smaDifferencePercent = smaResult.priceVsSmaPercent;
+  }
+
   // Enhanced gap information with clear directional language
   let gapInfo = '';
   let gapDirection = '';
@@ -631,7 +681,18 @@ export const generateSvgChart = (
 
   const marketDataLine2 = `Today H/L: ${marketData.currentHigh ? '$' + marketData.currentHigh.toFixed(2) : 'N/A'}/${marketData.currentLow ? '$' + marketData.currentLow.toFixed(2) : 'N/A'} | Current: $${marketData.currentPrice.toFixed(2)} @ ${entryTime}`;
 
-  const marketDataLine3 = vwapInfo;
+  // Format SMA information
+  let smaInfo = '';
+  if (marketData.sma20) {
+    const smaDiff = marketData.smaDifference || 0;
+    const sign = smaDiff >= 0 ? '+' : '';
+    const position = marketData.smaPosition === 'at' ? 'AT' : marketData.smaPosition?.toUpperCase();
+    smaInfo = `20-Day SMA: $${marketData.sma20.toFixed(2)} (${sign}$${smaDiff.toFixed(2)} ${position})`;
+  } else {
+    smaInfo = '20-Day SMA: N/A';
+  }
+
+  const marketDataLine3 = `${vwapInfo} | ${smaInfo}`;
 
   return `
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
@@ -763,6 +824,20 @@ export const generateSvgChart = (
     return '';
   })()}
   
+  ${(() => {
+    // Generate 20-day SMA line if available (only on Signal Day)
+    if (marketData.sma20) {
+      // Use the same priceToY function that other chart elements use
+      const smaY = priceToY(marketData.sma20);
+
+      // Only show SMA on Signal Day (from first day boundary line to right edge)
+      const signalDayStartX = dayBoundaryLines.length > 0 ? dayBoundaryLines[0].x : marginLeft;
+
+      return `<line x1="${signalDayStartX}" y1="${smaY}" x2="${marginLeft + chartWidth}" y2="${smaY}" stroke="#2196F3" stroke-width="2" fill="none" opacity="0.8" stroke-dasharray="5,5" />`;
+    }
+    return '';
+  })()}
+  
   ${uniqueXTicksAndLabels
     .map(label => {
       if (label.isTick && !label.isTime) {
@@ -780,16 +855,46 @@ export const generateSvgChart = (
   <text x="${marginLeft + chartWidth / 2}" y="${height - 25}" text-anchor="middle" font-size="14">Time</text>
   
   ${(() => {
-    // Add VWAP legend if VWAP line is present
-    if (marketData.vwap) {
-      const legendX = marginLeft + chartWidth - 120;
+    // Add legend for VWAP and/or SMA if present
+    const hasVwap = !!marketData.vwap;
+    const hasSma = !!marketData.sma20;
+
+    if (hasVwap || hasSma) {
+      const legendItems = [];
+      let legendWidth = 10; // Base padding
+
+      if (hasVwap) {
+        legendItems.push({ label: 'VWAP', color: '#ff6b35', strokeWidth: 3, dashArray: '' });
+        legendWidth += 70; // VWAP item width
+      }
+
+      if (hasSma) {
+        legendItems.push({
+          label: '20-Day SMA',
+          color: '#2196F3',
+          strokeWidth: 2,
+          dashArray: '5,5',
+        });
+        legendWidth += 90; // SMA item width
+      }
+
+      const legendX = marginLeft + chartWidth - legendWidth;
       const legendY = marginTop + 30;
-      return `
-        <g>
-          <rect x="${legendX - 5}" y="${legendY - 15}" width="110" height="25" fill="white" stroke="#ccc" stroke-width="1" opacity="0.9" rx="3"/>
-          <line x1="${legendX}" y1="${legendY}" x2="${legendX + 20}" y2="${legendY}" stroke="#ff6b35" stroke-width="3" opacity="0.8"/>
-          <text x="${legendX + 25}" y="${legendY + 4}" font-size="11" fill="#333">VWAP</text>
-        </g>`;
+
+      let legendSvg = `<g>
+        <rect x="${legendX - 5}" y="${legendY - 15}" width="${legendWidth}" height="25" fill="white" stroke="#ccc" stroke-width="1" opacity="0.9" rx="3"/>`;
+
+      let currentX = legendX;
+      legendItems.forEach((item, _i) => {
+        const dashAttr = item.dashArray ? ` stroke-dasharray="${item.dashArray}"` : '';
+        legendSvg += `
+          <line x1="${currentX}" y1="${legendY}" x2="${currentX + 20}" y2="${legendY}" stroke="${item.color}" stroke-width="${item.strokeWidth}" opacity="0.8"${dashAttr}/>
+          <text x="${currentX + 25}" y="${legendY + 4}" font-size="11" fill="#333">${item.label}</text>`;
+        currentX += item.label === 'VWAP' ? 70 : 90;
+      });
+
+      legendSvg += '</g>';
+      return legendSvg;
     }
     return '';
   })()}

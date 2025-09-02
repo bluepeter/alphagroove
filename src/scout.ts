@@ -18,6 +18,11 @@ import {
 import { calculateEntryAtr } from './utils/trade-processing';
 import { calculateExitPrices } from './utils/exit-price-calculator';
 import { generateScoutChart, type ScoutChartOptions } from './utils/scout-chart-generator';
+import {
+  convertPolygonToDailyBars,
+  calculateTradingDaysAgo,
+  type DailyBar,
+} from './utils/sma-calculator';
 
 // Initialize command line interface
 const program = new Command();
@@ -96,6 +101,42 @@ const validateTradingDate = (bars: Bar[], requestedDate: string): boolean => {
 };
 
 /**
+ * Fetch daily bars for SMA calculation
+ */
+const fetchDailyBarsForSMA = async (
+  polygonService: PolygonApiService,
+  ticker: string,
+  tradeDate: string
+): Promise<DailyBar[]> => {
+  try {
+    // Calculate date 20 trading days ago (with buffer for weekends/holidays)
+    const fromDate = calculateTradingDaysAgo(20, new Date(tradeDate));
+
+    console.log(chalk.dim(`Fetching daily bars for SMA from ${fromDate} to ${tradeDate}`));
+
+    // Fetch daily bars from Polygon
+    const polygonDailyBars = await polygonService.fetchPolygonData(
+      ticker,
+      fromDate,
+      tradeDate,
+      1,
+      'day'
+    );
+
+    // Convert to our DailyBar format
+    const dailyBars = convertPolygonToDailyBars(polygonDailyBars);
+
+    console.log(chalk.dim(`Retrieved ${dailyBars.length} daily bars for SMA calculation`));
+
+    return dailyBars;
+  } catch (error) {
+    console.log(chalk.yellow(`⚠️  Could not fetch daily bars for SMA: ${error}`));
+    console.log(chalk.dim('SMA will not be displayed on chart'));
+    return [];
+  }
+};
+
+/**
  * Fetch and process market data from Polygon API
  */
 const fetchMarketData = async (
@@ -152,7 +193,8 @@ const generateAnalysisChart = async (
   tradeDate: string,
   entrySignal: Signal,
   filteredBars: Bar[],
-  allBars: Bar[]
+  allBars: Bar[],
+  dailyBars?: DailyBar[]
 ): Promise<string> => {
   const chartOptions: ScoutChartOptions = {
     ticker,
@@ -161,6 +203,7 @@ const generateAnalysisChart = async (
     entrySignal,
     data: filteredBars,
     allData: allBars,
+    dailyBars,
   };
 
   return await generateScoutChart(chartOptions);
@@ -513,6 +556,9 @@ export const main = async (cmdOptions?: any): Promise<void> => {
     // Fetch and process market data
     const allBars = await fetchMarketData(polygonService, ticker, tradeDate, previousDate);
 
+    // Fetch daily bars for SMA calculation
+    const dailyBars = await fetchDailyBarsForSMA(polygonService, ticker, tradeDate);
+
     // Create entry signal based on current market conditions
     const entrySignal = createEntrySignal(allBars, tradeDate, currentTime);
 
@@ -535,7 +581,8 @@ export const main = async (cmdOptions?: any): Promise<void> => {
       tradeDate,
       entrySignal,
       filteredBars,
-      tradingHoursBars
+      tradingHoursBars,
+      dailyBars
     );
 
     if (chartPath) {
