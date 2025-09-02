@@ -5,6 +5,55 @@ import path from 'path';
 import sharp from 'sharp';
 
 import { Bar, Signal } from '../patterns/types';
+import { parseTimestampAsET } from './polygon-data-converter';
+
+interface MarketDataContext {
+  previousClose?: number;
+  currentOpen?: number;
+  currentHigh?: number;
+  currentLow?: number;
+  currentPrice: number;
+}
+
+/**
+ * Calculate market data context for chart headers
+ */
+const calculateMarketDataContext = (allData: Bar[], entryDate: string): MarketDataContext => {
+  // Get current day data
+  const currentDayBars = allData.filter(bar => {
+    const barDate = new Date(parseTimestampAsET(bar.timestamp)).toISOString().split('T')[0];
+    return barDate === entryDate;
+  });
+
+  // Get previous day data
+  const previousDayBars = allData.filter(bar => {
+    const barDate = new Date(parseTimestampAsET(bar.timestamp)).toISOString().split('T')[0];
+    return barDate < entryDate;
+  });
+
+  // Calculate previous day close (last bar of previous day)
+  const previousClose =
+    previousDayBars.length > 0 ? previousDayBars[previousDayBars.length - 1].close : undefined;
+
+  // Calculate current day OHLC
+  let currentOpen: number | undefined;
+  let currentHigh: number | undefined;
+  let currentLow: number | undefined;
+
+  if (currentDayBars.length > 0) {
+    currentOpen = currentDayBars[0].open;
+    currentHigh = Math.max(...currentDayBars.map(bar => bar.high));
+    currentLow = Math.min(...currentDayBars.map(bar => bar.low));
+  }
+
+  return {
+    previousClose,
+    currentOpen,
+    currentHigh,
+    currentLow,
+    currentPrice: 0, // Will be set from entrySignal.price
+  };
+};
 
 // Choose lightweight-charts from Trading View as the charting library
 // This provides professional-grade charts with candlesticks and volume support
@@ -228,7 +277,7 @@ export const generateSvgChart = (
 
   const width = 1200;
   const height = 800;
-  const marginTop = 70;
+  const marginTop = 90;
   const marginRight = 50;
   const marginBottom = 150;
   const marginLeft = 70;
@@ -462,14 +511,36 @@ export const generateSvgChart = (
     minute: '2-digit',
   });
 
+  // Calculate market data context for LLM
+  const entryDate = new Date(entrySignal.timestamp).toISOString().split('T')[0];
+  const marketData = calculateMarketDataContext(allDataInput, entryDate);
+
   const chartTitle = anonymize ? `XXX - ${patternName}` : `${ticker} - ${patternName}`;
   const headerDateText = anonymize ? 'XXX' : entryDateFormatted;
 
+  // Format market data for display
+  marketData.currentPrice = entrySignal.price;
+  const gapInfo =
+    marketData.previousClose && marketData.currentOpen
+      ? `Gap: ${marketData.currentOpen > marketData.previousClose ? '+' : ''}$${(marketData.currentOpen - marketData.previousClose).toFixed(2)}`
+      : '';
+
+  // Market data should always be shown - only ticker and date are anonymized
+  const marketDataLine1 = `Prev Close: ${marketData.previousClose ? '$' + marketData.previousClose.toFixed(2) : 'N/A'} | Today Open: ${marketData.currentOpen ? '$' + marketData.currentOpen.toFixed(2) : 'N/A'} ${gapInfo ? '(' + gapInfo + ')' : ''}`;
+
+  const marketDataLine2 = `Today H/L: ${marketData.currentHigh ? '$' + marketData.currentHigh.toFixed(2) : 'N/A'}/${marketData.currentLow ? '$' + marketData.currentLow.toFixed(2) : 'N/A'} | Current: $${marketData.currentPrice.toFixed(2)} @ ${entryTime}`;
+
   return `
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-  <text x="${width / 2}" y="25" text-anchor="middle" font-size="18" font-weight="bold">${chartTitle}</text>
-  <text x="${width / 2}" y="50" text-anchor="middle" font-size="14">
-    Date: ${headerDateText}, Time: ${entryTime}, Current Price: $${entrySignal.price.toFixed(2)}
+  <text x="${width / 2}" y="20" text-anchor="middle" font-size="18" font-weight="bold">${chartTitle}</text>
+  <text x="${width / 2}" y="40" text-anchor="middle" font-size="12">
+    Date: ${headerDateText}
+  </text>
+  <text x="${width / 2}" y="55" text-anchor="middle" font-size="11">
+    ${marketDataLine1}
+  </text>
+  <text x="${width / 2}" y="70" text-anchor="middle" font-size="11">
+    ${marketDataLine2}
   </text>
   
   <rect x="${marginLeft}" y="${marginTop}" width="${chartWidth}" height="${chartHeight}" fill="none" stroke="none" />

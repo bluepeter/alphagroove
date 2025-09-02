@@ -4,9 +4,9 @@ import path from 'path';
 
 import { describe, it, expect, beforeEach, afterAll, vi } from 'vitest';
 
-import { Signal } from '../patterns/types';
+import { Bar, Signal } from '../patterns/types';
 
-import { generateEntryChart, generateEntryCharts } from './chart-generator';
+import { generateEntryChart, generateEntryCharts, generateSvgChart } from './chart-generator';
 
 // Mock fs and execSync
 vi.mock('fs', async () => {
@@ -205,5 +205,181 @@ describe('Chart Generator', () => {
       expect.stringContaining('No data to display after filtering for entry signal')
     );
     consoleWarnSpy.mockRestore();
+  });
+
+  describe('Market Data Context in Chart Headers', () => {
+    const createMockBars = (
+      date: string,
+      ohlc: { open: number; high: number; low: number; close: number }[]
+    ): Bar[] => {
+      return ohlc.map((bar, index) => ({
+        timestamp: `${date} ${9 + index}:30:00`,
+        open: bar.open,
+        high: bar.high,
+        low: bar.low,
+        close: bar.close,
+        volume: 1000,
+        trade_date: date,
+      }));
+    };
+
+    it('should include market data context in SVG chart headers', () => {
+      const previousDayBars = createMockBars('2023-05-01', [
+        { open: 100, high: 101, low: 99, close: 100.5 },
+        { open: 100.5, high: 102, low: 100, close: 101.5 },
+      ]);
+
+      const currentDayBars = createMockBars('2023-05-02', [
+        { open: 103, high: 105, low: 102, close: 104 },
+        { open: 104, high: 106, low: 103.5, close: 105.5 },
+      ]);
+
+      const allBars = [...previousDayBars, ...currentDayBars];
+      const entrySignal: Signal = {
+        timestamp: '2023-05-02 10:30:00',
+        price: 104.5,
+        type: 'entry',
+        direction: 'long',
+      };
+
+      const svgContent = generateSvgChart(
+        'SPY',
+        'test-pattern',
+        allBars,
+        entrySignal,
+        false, // showFullDayData
+        false // not anonymized
+      );
+
+      // Check that market data is included
+      expect(svgContent).toContain('Prev Close: $101.50'); // Previous day close
+      expect(svgContent).toContain('Today Open: $103.00'); // Current day open
+      expect(svgContent).toContain('Gap: +$1.50'); // Gap calculation
+      expect(svgContent).toContain('Today H/L: $106.00/$102.00'); // Current day high/low
+      expect(svgContent).toContain('Current: $104.50'); // Current price from signal
+    });
+
+    it('should show gap down correctly', () => {
+      const previousDayBars = createMockBars('2023-05-01', [
+        { open: 100, high: 101, low: 99, close: 102 },
+      ]);
+
+      const currentDayBars = createMockBars('2023-05-02', [
+        { open: 98, high: 99, low: 97, close: 98.5 },
+      ]);
+
+      const allBars = [...previousDayBars, ...currentDayBars];
+      const entrySignal: Signal = {
+        timestamp: '2023-05-02 10:30:00',
+        price: 98.5,
+        type: 'entry',
+        direction: 'long',
+      };
+
+      const svgContent = generateSvgChart(
+        'SPY',
+        'test-pattern',
+        allBars,
+        entrySignal,
+        false, // showFullDayData
+        false // not anonymized
+      );
+
+      expect(svgContent).toContain('Prev Close: $102.00');
+      expect(svgContent).toContain('Today Open: $98.00');
+      expect(svgContent).toContain('Gap: $-4.00'); // Gap down
+    });
+
+    it('should anonymize only ticker and date, not market data', () => {
+      const previousDayBars = createMockBars('2023-05-01', [
+        { open: 100, high: 101, low: 99, close: 100.5 },
+      ]);
+
+      const currentDayBars = createMockBars('2023-05-02', [
+        { open: 103, high: 105, low: 102, close: 104 },
+      ]);
+
+      const allBars = [...previousDayBars, ...currentDayBars];
+      const entrySignal: Signal = {
+        timestamp: '2023-05-02 10:30:00',
+        price: 104.5,
+        type: 'entry',
+        direction: 'long',
+      };
+
+      const svgContent = generateSvgChart(
+        'SPY',
+        'test-pattern',
+        allBars,
+        entrySignal,
+        false, // showFullDayData
+        true // anonymized
+      );
+
+      // Should anonymize ticker and date
+      expect(svgContent).toContain('XXX - test-pattern');
+      expect(svgContent).toContain('Date: XXX');
+
+      // Should NOT anonymize market data
+      expect(svgContent).toContain('Prev Close: $100.50');
+      expect(svgContent).toContain('Today Open: $103.00');
+      expect(svgContent).toContain('Gap: +$2.50');
+      expect(svgContent).toContain('Current: $104.50');
+    });
+
+    it('should handle missing previous day data gracefully', () => {
+      const currentDayBars = createMockBars('2023-05-02', [
+        { open: 103, high: 105, low: 102, close: 104 },
+      ]);
+
+      const entrySignal: Signal = {
+        timestamp: '2023-05-02 10:30:00',
+        price: 104.5,
+        type: 'entry',
+        direction: 'long',
+      };
+
+      const svgContent = generateSvgChart(
+        'SPY',
+        'test-pattern',
+        currentDayBars,
+        entrySignal,
+        false, // showFullDayData
+        false // not anonymized
+      );
+
+      // Should show N/A for missing previous close
+      expect(svgContent).toContain('Prev Close: N/A');
+      expect(svgContent).toContain('Today Open: $103.00');
+      expect(svgContent).not.toContain('Gap:'); // No gap info when prev close missing
+    });
+
+    it('should handle empty current day data gracefully', () => {
+      const previousDayBars = createMockBars('2023-05-01', [
+        { open: 100, high: 101, low: 99, close: 100.5 },
+      ]);
+
+      const entrySignal: Signal = {
+        timestamp: '2023-05-02 10:30:00',
+        price: 104.5,
+        type: 'entry',
+        direction: 'long',
+      };
+
+      const svgContent = generateSvgChart(
+        'SPY',
+        'test-pattern',
+        previousDayBars,
+        entrySignal,
+        false, // showFullDayData
+        false // not anonymized
+      );
+
+      // Should show previous close but N/A for current day OHLC
+      expect(svgContent).toContain('Prev Close: $100.50');
+      expect(svgContent).toContain('Today Open: N/A');
+      expect(svgContent).toContain('Today H/L: N/A/N/A');
+      expect(svgContent).toContain('Current: $104.50'); // From signal
+    });
   });
 });
