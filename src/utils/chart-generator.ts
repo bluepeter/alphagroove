@@ -394,7 +394,7 @@ export const generateSvgChart = (
   const width = 1200;
   const height = 800;
   const marginTop = 135; // Increased to accommodate separate VWAP and SMA lines
-  const marginRight = 50;
+  const marginRight = 120; // Increased for volume-by-price histogram
   const marginBottom = 150;
   const marginLeft = 70;
   const chartWidth = width - marginLeft - marginRight;
@@ -471,6 +471,50 @@ export const generateSvgChart = (
     marginTop + chartHeight - ((price - minPrice) / priceRange) * chartHeight;
   const volumeToHeight = (volume: number) => (volume / maxVolume) * volumeHeight;
 
+  // Calculate 20-period volume moving average for current day only
+  const calculateVolumeMA = (bars: Bar[], period: number = 20) => {
+    const volumeMA: { index: number; ma: number }[] = [];
+
+    for (let i = 0; i < bars.length; i++) {
+      if (i >= period - 1) {
+        const sum = bars.slice(i - period + 1, i + 1).reduce((acc, bar) => acc + bar.volume, 0);
+        volumeMA.push({ index: i, ma: sum / period });
+      }
+    }
+
+    return volumeMA;
+  };
+
+  // Calculate volume-by-price histogram
+  const calculateVolumeByPrice = (bars: Bar[], priceBins: number = 20) => {
+    if (bars.length === 0) return [];
+
+    const minPrice = Math.min(...bars.map(b => b.low));
+    const maxPrice = Math.max(...bars.map(b => b.high));
+    const priceStep = (maxPrice - minPrice) / priceBins;
+
+    const volumeByPrice: { price: number; volume: number }[] = [];
+
+    // Initialize bins
+    for (let i = 0; i < priceBins; i++) {
+      volumeByPrice.push({
+        price: minPrice + (i + 0.5) * priceStep,
+        volume: 0,
+      });
+    }
+
+    // Accumulate volume in each price bin
+    bars.forEach(bar => {
+      const typicalPrice = (bar.high + bar.low + bar.close) / 3;
+      const binIndex = Math.min(Math.floor((typicalPrice - minPrice) / priceStep), priceBins - 1);
+      if (binIndex >= 0 && binIndex < priceBins) {
+        volumeByPrice[binIndex].volume += bar.volume;
+      }
+    });
+
+    return volumeByPrice.filter(bin => bin.volume > 0);
+  };
+
   const getXPosition = (index: number) => {
     if (finalDataForChart.length <= 1) return marginLeft + chartWidth / 2;
     return marginLeft + (index / (finalDataForChart.length - 1)) * chartWidth;
@@ -533,7 +577,6 @@ export const generateSvgChart = (
   const RTH_START_MINUTE = 30;
   const RTH_END_HOUR = 16;
   const RTH_END_MINUTE = 0;
-  const FULL_LABEL_HOURS = [9, 12, 16];
 
   displayDayStrings.forEach(dateStr => {
     const dayData = tradingDaysForLabels[dateStr];
@@ -572,14 +615,6 @@ export const generateSvgChart = (
           const xPos = getXPosition(barIndex);
 
           xTicksAndLabels.push({ text: '', x: xPos, isTick: true });
-
-          const isFullLabelHour = FULL_LABEL_HOURS.includes(hour);
-          const isMarketOpen = hour === RTH_START_HOUR && minute === RTH_START_MINUTE;
-          const isMarketClose =
-            hour === RTH_END_HOUR &&
-            minute === RTH_END_MINUTE &&
-            actualTime.getHours() === RTH_END_HOUR &&
-            actualTime.getMinutes() === RTH_END_MINUTE;
 
           // Standard hourly markers: 10 AM, 11 AM, 12 PM, 1 PM, 2 PM, 3 PM
           const isStandardTime = hour >= 10 && hour <= 15 && minute === 0;
@@ -873,6 +908,27 @@ export const generateSvgChart = (
   }).join('\n  ')}
   <line x1="${marginLeft}" y1="${volumeTop + volumeHeight}" x2="${marginLeft + chartWidth}" y2="${volumeTop + volumeHeight}" stroke="#333" stroke-width="1" />
   
+    ${(() => {
+      // Generate volume moving average line for both days
+      if (finalDataForChart.length < 20) return ''; // Need at least 20 bars for MA
+
+      const volumeMA = calculateVolumeMA(finalDataForChart, 20);
+      if (volumeMA.length === 0) return '';
+
+      // Create path for volume MA line
+      const pathPoints = volumeMA.map(point => {
+        const x = getXPosition(point.index);
+        const volumeMAHeight = volumeToHeight(point.ma);
+        const y = volumeTop + volumeHeight - volumeMAHeight;
+        return `${x},${y}`;
+      });
+
+      if (pathPoints.length < 2) return '';
+
+      const pathString = `M ${pathPoints.join(' L ')}`;
+      return `<path d="${pathString}" stroke="#ff9500" stroke-width="2" fill="none" opacity="0.8" />`;
+    })()}
+  
   ${(() => {
     // Generate VWAP line if available and not suppressed
     if (!suppressVwap && marketData.vwap) {
@@ -981,6 +1037,30 @@ export const generateSvgChart = (
       return legendSvg;
     }
     return '';
+  })()}
+  
+  ${(() => {
+    // Generate volume-by-price histogram on the right side (current day only)
+    const currentDayBarsForHistogram = filterCurrentDayBars(finalDataForChart, entryDate);
+    const volumeByPrice = calculateVolumeByPrice(currentDayBarsForHistogram, 15);
+    if (volumeByPrice.length === 0) return '';
+
+    const maxVolumeByPrice = Math.max(...volumeByPrice.map(vbp => vbp.volume));
+    const histogramWidth = 60; // Width of histogram area
+    const histogramLeft = marginLeft + chartWidth + 50; // Position on right side
+
+    return volumeByPrice
+      .map(vbp => {
+        const y = priceToY(vbp.price);
+        const barWidth = (vbp.volume / maxVolumeByPrice) * histogramWidth;
+        const barHeight = 3; // Height of each histogram bar
+
+        // Only show bars that are within the visible chart area
+        if (y < marginTop || y > marginTop + chartHeight) return '';
+
+        return `<rect x="${histogramLeft}" y="${y - barHeight / 2}" width="${barWidth}" height="${barHeight}" fill="#4a90e2" opacity="0.7" />`;
+      })
+      .join('\\n  ');
   })()}
 </svg>
   `.trim();
