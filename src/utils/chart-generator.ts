@@ -1018,8 +1018,9 @@ export const generateSvgChart = (
         legendWidth += 90; // SMA item width
       }
 
+      // Position legend aligned to the right to avoid metrics interference
       const legendX = marginLeft + chartWidth - legendWidth;
-      const legendY = marginTop + 30;
+      const legendY = marginTop - 25; // Position above the chart
 
       let legendSvg = `<g>
         <rect x="${legendX - 5}" y="${legendY - 15}" width="${legendWidth}" height="25" fill="white" stroke="#ccc" stroke-width="1" opacity="0.9" rx="3"/>`;
