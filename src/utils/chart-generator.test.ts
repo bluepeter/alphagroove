@@ -119,6 +119,46 @@ describe('Chart Generator', () => {
     expect(chartPaths[1]).toContain('20230502_masked.png');
   });
 
+  it('should pass suppressSma parameter to generateEntryChart', async () => {
+    const outputPath = await generateEntryChart({
+      ticker: 'SPY',
+      timeframe: '1min',
+      entryPatternName: 'test-pattern-suppress-sma',
+      tradeDate: '2023-05-01',
+      entryTimestamp: '09:35:00',
+      entrySignal: mockSignal,
+      suppressSma: true,
+    });
+
+    expect(outputPath).toContain('test-pattern-suppress-sma');
+    expect(outputPath).toContain('SPY');
+    expect(outputPath).toContain('20230501');
+    expect(outputPath).toContain('masked.png');
+  });
+
+  it('should pass suppressSma parameter to bulk generateEntryCharts', async () => {
+    const mockTrades = [
+      {
+        trade_date: '2023-05-01',
+        entry_time: '2023-05-01 09:35:00',
+        entry_price: 401.0,
+        direction: 'long' as const,
+      },
+    ];
+
+    const chartPaths = await generateEntryCharts(
+      'SPY',
+      '1min',
+      'test-pattern-bulk-suppress',
+      mockTrades,
+      true
+    );
+
+    expect(chartPaths.length).toBe(1);
+    expect(chartPaths[0]).toContain('test-pattern-bulk-suppress');
+    expect(chartPaths[0]).toContain('20230501_masked.png');
+  });
+
   it('should correctly fetch prior trading day data across a weekend', async () => {
     const mondaySignalDate = '2025-01-27'; // A known Monday
     const precedingFriday = '2025-01-24';
@@ -534,10 +574,11 @@ describe('Chart Generator', () => {
         false // not anonymized
       );
 
-      // Should contain VWAP information in header
-      expect(svgContent).toContain('VWAP:');
-      expect(svgContent).toMatch(/VWAP: \$\d+\.\d{2}/); // Format: VWAP: $104.XX
-      expect(svgContent).toMatch(/\$\d+\.\d{2} (ABOVE|BELOW|AT) current price\)/); // Position relative to current price
+      // Should contain VWAP information in header (nice sentence format)
+      expect(svgContent).toContain('Current price of');
+      expect(svgContent).toMatch(
+        /Current price of \$\d+\.\d{2} is \$\d+\.\d{2} (ABOVE|BELOW|AT) VWAP of \$\d+\.\d{2}\./
+      ); // Nice sentence format
 
       // Should contain VWAP line visualization (SVG path element)
       expect(svgContent).toContain('stroke="#ff6b35"'); // VWAP line color
@@ -579,8 +620,8 @@ describe('Chart Generator', () => {
         false
       );
 
-      // Should show VWAP as N/A when no volume data available
-      expect(svgContent).toContain('VWAP: N/A');
+      // Should show VWAP as not available when no volume data available
+      expect(svgContent).toContain('VWAP data is not available.');
 
       // Should not contain VWAP line visualization or legend
       expect(svgContent).not.toContain('stroke="#ff6b35"');
@@ -638,9 +679,11 @@ describe('Chart Generator', () => {
         false
       );
 
-      // VWAP should be calculated and displayed
-      expect(svgContent).toContain('VWAP:');
-      expect(svgContent).toMatch(/VWAP: \$42\d\.\d{2}/); // Should be in the 420s range
+      // VWAP should be calculated and displayed (nice sentence format)
+      expect(svgContent).toContain('Current price of');
+      expect(svgContent).toMatch(
+        /Current price of \$421\.40 is \$\d+\.\d{2} (ABOVE|BELOW|AT) VWAP of \$42\d\.\d{2}\./
+      ); // Should be in the 420s range
 
       // Should show position relative to VWAP
       expect(svgContent).toMatch(/(ABOVE|BELOW|AT)/);
@@ -706,10 +749,11 @@ describe('Chart Generator', () => {
         dailyBars
       );
 
-      // Should contain SMA information in header
-      expect(svgContent).toContain('20-Day SMA:');
-      expect(svgContent).toMatch(/20-Day SMA: \$\d+\.\d{2}/);
-      expect(svgContent).toMatch(/\$\d+\.\d{2} (ABOVE|BELOW|AT) current price\)/);
+      // Should contain SMA information in header (nice sentence format)
+      expect(svgContent).toContain('Current price of');
+      expect(svgContent).toMatch(
+        /Current price of \$105\.00 is \$\d+\.\d{2} (ABOVE|BELOW|AT) SMA of \$\d+\.\d{2}\./
+      );
 
       // Should contain SMA line visualization (horizontal dashed line)
       expect(svgContent).toContain('stroke="#2196F3"'); // SMA line color
@@ -763,8 +807,8 @@ describe('Chart Generator', () => {
         // No dailyBars provided - should aggregate from intraday
       );
 
-      // Should show SMA as N/A (insufficient data for 20-day SMA)
-      expect(svgContent).toContain('20-Day SMA: N/A');
+      // Should show SMA as not available (insufficient data for 20-day SMA)
+      expect(svgContent).toContain('20-Day SMA data is not available.');
 
       // Should not contain SMA line or legend when N/A
       expect(svgContent).not.toContain('stroke="#2196F3"');
@@ -813,9 +857,17 @@ describe('Chart Generator', () => {
         dailyBars
       );
 
-      // Should contain both VWAP and SMA in headers
-      expect(svgContent).toContain('VWAP:');
-      expect(svgContent).toContain('20-Day SMA:');
+      // Should contain both VWAP and SMA in headers (nice sentence format)
+      expect(svgContent).toContain('Current price of');
+      expect(svgContent).toMatch(
+        /Current price of \$105\.00 is \$\d+\.\d{2} (ABOVE|BELOW|AT) VWAP of \$\d+\.\d{2}\./
+      );
+      expect(svgContent).toMatch(
+        /Current price of \$105\.00 is \$\d+\.\d{2} (ABOVE|BELOW|AT) SMA of \$\d+\.\d{2}\./
+      );
+      expect(svgContent).toMatch(
+        /VWAP of \$\d+\.\d{2} is \$\d+\.\d{2} (ABOVE|BELOW|AT) SMA of \$\d+\.\d{2}\./
+      ); // VWAP vs SMA comparison
 
       // Should contain both lines
       expect(svgContent).toContain('stroke="#ff6b35"'); // VWAP line
@@ -859,9 +911,11 @@ describe('Chart Generator', () => {
         dailyBars
       );
 
-      // Should calculate and display SMA
-      expect(svgContent).toContain('20-Day SMA:');
-      expect(svgContent).toMatch(/20-Day SMA: \$41\d\.\d{2}/); // Should be in 410s range
+      // Should calculate and display SMA (nice sentence format)
+      expect(svgContent).toContain('Current price of');
+      expect(svgContent).toMatch(
+        /Current price of \$421\.20 is \$\d+\.\d{2} (ABOVE|BELOW|AT) SMA of \$41\d\.\d{2}\./
+      ); // Should be in 410s range
 
       // Should show position relative to SMA
       expect(svgContent).toMatch(/(ABOVE|BELOW|AT)/);
@@ -869,6 +923,81 @@ describe('Chart Generator', () => {
       // Should include SMA line visualization
       expect(svgContent).toContain('stroke="#2196F3"');
       expect(svgContent).toContain('stroke-dasharray="5,5"');
+    });
+
+    it('should not render SMA line when suppressSma is true', () => {
+      const intradayBars = [
+        // Previous day data
+        {
+          timestamp: '2023-05-01 09:30:00',
+          open: 100,
+          high: 101,
+          low: 99,
+          close: 100.5,
+          volume: 1000,
+          trade_date: '2023-05-01',
+        },
+        // Current day data
+        {
+          timestamp: '2023-05-02 09:30:00',
+          open: 101,
+          high: 102,
+          low: 100,
+          close: 101.5,
+          volume: 1200,
+          trade_date: '2023-05-02',
+        },
+        {
+          timestamp: '2023-05-02 09:35:00',
+          open: 101.5,
+          high: 102.5,
+          low: 101,
+          close: 102,
+          volume: 800,
+          trade_date: '2023-05-02',
+        },
+      ];
+
+      const entrySignal: Signal = {
+        timestamp: '2023-05-02 09:35:00',
+        price: 102,
+        type: 'entry',
+      };
+
+      // Test with suppressSma: true
+      const svgContentSuppressed = generateSvgChart(
+        'SPY',
+        'test-pattern',
+        intradayBars,
+        entrySignal,
+        false,
+        false,
+        undefined,
+        true // suppressSma: true
+      );
+
+      // Should not contain SMA information
+      expect(svgContentSuppressed).not.toContain('20-day SMA');
+      expect(svgContentSuppressed).not.toContain('SMA of $');
+      expect(svgContentSuppressed).not.toContain('ABOVE SMA');
+      expect(svgContentSuppressed).not.toContain('BELOW SMA');
+
+      // Test with suppressSma: false (default behavior)
+      const svgContentWithSma = generateSvgChart(
+        'SPY',
+        'test-pattern',
+        intradayBars,
+        entrySignal,
+        false,
+        false,
+        undefined,
+        false // suppressSma: false
+      );
+
+      // Should contain SMA information (when enough data is available)
+      // Note: This test may not show SMA if there's insufficient historical data,
+      // but it should at least not crash and should differ from suppressed version
+      expect(svgContentWithSma).not.toBe(svgContentSuppressed);
     });
 
     it('should not render SMA line when it is outside chart bounds', () => {
@@ -915,9 +1044,14 @@ describe('Chart Generator', () => {
         dailyBars
       );
 
-      // Should contain SMA information in header (metrics are always shown)
-      expect(svgContent).toContain('20-Day SMA:');
-      expect(svgContent).toMatch(/20-Day SMA: \$150\.\d{2}/);
+      // Should contain SMA information in header (metrics are always shown, nice sentence format)
+      expect(svgContent).toContain('Current price of');
+      expect(svgContent).toMatch(
+        /Current price of \$103\.00 is \$\d+\.\d{2} (ABOVE|BELOW|AT) SMA of \$150\.\d{2}\./
+      );
+      expect(svgContent).toMatch(
+        /VWAP of \$\d+\.\d{2} is \$\d+\.\d{2} (ABOVE|BELOW|AT) SMA of \$150\.\d{2}\./
+      ); // VWAP vs SMA comparison
 
       // Should NOT contain SMA line visualization (it's outside bounds)
       expect(svgContent).not.toContain('stroke-dasharray="5,5"');

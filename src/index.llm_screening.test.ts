@@ -140,7 +140,7 @@ describe('LLM Trade Screening Tests', () => {
     };
     const mockChartName = 'test-chart';
     const getMockAppConfig = (): AppConfig => ({
-      default: { ticker: 'SPY', timeframe: '1min' },
+      default: { ticker: 'SPY', timeframe: '1min', suppressSma: false },
       patterns: { entry: {} },
     });
 
@@ -243,6 +243,41 @@ describe('LLM Trade Screening Tests', () => {
         averagedProposedProfitTarget: mockAveragedPT,
       });
       expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalledTimes(2);
+    });
+
+    it('should pass suppressSma parameter to generateEntryChart', async () => {
+      const { generateEntryChart } = await import('./utils/chart-generator.js');
+      const localMockLlmInstance = new (LlmConfirmationScreen as any)();
+      const screenConfigEnabled = { enabled: true };
+      const currentAppConfig = getMockAppConfig();
+      const currentMergedConfig = {
+        ...mockMergedConfigValue,
+        suppressSma: true, // Test with suppressSma enabled
+      };
+
+      await mainModule.handleLlmTradeScreeningInternal(
+        mockSignal,
+        mockChartName,
+        localMockLlmInstance,
+        screenConfigEnabled,
+        currentMergedConfig,
+        currentAppConfig
+      );
+
+      // Verify generateEntryChart was called with suppressSma: true
+      expect(generateEntryChart).toHaveBeenCalledWith({
+        ticker: mockSignal.ticker,
+        timeframe: currentMergedConfig.timeframe,
+        entryPatternName: mockChartName,
+        tradeDate: mockSignal.trade_date,
+        entryTimestamp: mockSignal.timestamp,
+        entrySignal: {
+          timestamp: mockSignal.timestamp,
+          price: mockSignal.price,
+          type: 'entry',
+        },
+        suppressSma: true,
+      });
     });
   });
 });

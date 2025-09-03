@@ -107,8 +107,13 @@ const validateTradingDate = (bars: Bar[], requestedDate: string): boolean => {
 const fetchDailyBarsForSMA = async (
   polygonService: PolygonApiService,
   ticker: string,
-  tradeDate: string
+  tradeDate: string,
+  suppressSma = false
 ): Promise<DailyBar[]> => {
+  if (suppressSma) {
+    return [];
+  }
+
   try {
     // Calculate date 20 trading days ago (with buffer for weekends/holidays)
     const fromDate = calculateTradingDaysAgo(20, new Date(tradeDate));
@@ -195,7 +200,8 @@ const generateAnalysisChart = async (
   entrySignal: Signal,
   filteredBars: Bar[],
   allBars: Bar[],
-  dailyBars?: DailyBar[]
+  dailyBars?: DailyBar[],
+  suppressSma = false
 ): Promise<string> => {
   const chartOptions: ScoutChartOptions = {
     ticker,
@@ -205,6 +211,7 @@ const generateAnalysisChart = async (
     data: filteredBars,
     allData: allBars,
     dailyBars,
+    suppressSma,
   };
 
   return await generateScoutChart(chartOptions);
@@ -248,7 +255,13 @@ const performLLMAnalysis = async (
     }
 
     // Generate market metrics for LLM prompt
-    const marketMetrics = generateMarketMetricsForPrompt(allBars, entrySignal, dailyBars);
+    const suppressSma = rawConfig.shared?.suppressSma ?? false;
+    const marketMetrics = generateMarketMetricsForPrompt(
+      allBars,
+      entrySignal,
+      dailyBars,
+      suppressSma
+    );
 
     const llmScreen = new LlmConfirmationScreen();
     const llmDecision = await llmScreen.shouldSignalProceed(
@@ -559,8 +572,9 @@ export const main = async (cmdOptions?: any): Promise<void> => {
     // Fetch and process market data
     const allBars = await fetchMarketData(polygonService, ticker, tradeDate, previousDate);
 
-    // Fetch daily bars for SMA calculation
-    const dailyBars = await fetchDailyBarsForSMA(polygonService, ticker, tradeDate);
+    // Fetch daily bars for SMA calculation (unless suppressed)
+    const suppressSma = rawConfig.shared?.suppressSma ?? false;
+    const dailyBars = await fetchDailyBarsForSMA(polygonService, ticker, tradeDate, suppressSma);
 
     // Create entry signal based on current market conditions
     const entrySignal = createEntrySignal(allBars, tradeDate, currentTime);
@@ -585,7 +599,8 @@ export const main = async (cmdOptions?: any): Promise<void> => {
       entrySignal,
       filteredBars,
       tradingHoursBars,
-      dailyBars
+      dailyBars,
+      suppressSma
     );
 
     if (chartPath) {

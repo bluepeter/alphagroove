@@ -229,6 +229,7 @@ const ConfigSchema = z.object({
     .object({
       ticker: z.string(),
       timeframe: z.string(),
+      suppressSma: z.boolean().optional().default(false),
       llmConfirmationScreen: LLMScreenConfigSchema.optional(),
     })
     .optional(),
@@ -257,6 +258,7 @@ const ConfigSchema = z.object({
       date: DateRangeSchema.optional(),
       ticker: z.string(),
       timeframe: z.string(),
+      suppressSma: z.boolean().optional().default(false),
 
       patterns: DefaultPatternsSchema.optional(),
       parallelization: ParallelizationOptionsSchema.optional(),
@@ -293,6 +295,7 @@ const DEFAULT_CONFIG: Config = {
   default: {
     ticker: 'SPY',
     timeframe: '1min',
+    suppressSma: false,
 
     patterns: {
       entry: 'quickRise',
@@ -523,6 +526,7 @@ export const createDefaultConfigFile = (): void => {
 export interface MergedConfig {
   ticker: string;
   timeframe: string;
+  suppressSma?: boolean;
 
   from: string;
   to: string;
@@ -560,6 +564,7 @@ export const mergeConfigWithCliOptions = (
       default: {
         ticker: loadedConfig.shared?.ticker || 'SPY',
         timeframe: loadedConfig.shared?.timeframe || '1min',
+        suppressSma: loadedConfig.shared?.suppressSma ?? false,
 
         date: loadedConfig.backtest?.date,
         parallelization: loadedConfig.backtest?.parallelization,
@@ -667,6 +672,7 @@ export const mergeConfigWithCliOptions = (
   const mergedConfig: MergedConfig = {
     ticker: cliOptions.ticker || compatConfig.default?.ticker || 'SPY',
     timeframe: cliOptions.timeframe || compatConfig.default?.timeframe || '1min',
+    suppressSma: cliOptions.suppressSma ?? (compatConfig.default as any)?.suppressSma ?? false,
 
     from: cliOptions.from || compatConfig.default?.date?.from || '2010-01-01',
     to: cliOptions.to || compatConfig.default?.date?.to || '2025-12-31',
@@ -855,9 +861,8 @@ export const mergeConfigWithCliOptions = (
     };
   }
 
-  // Adjust date range to skip first 20 days for SMA calculation
-  // SMA is always calculated when available, so we need to ensure we have enough historical data
-  if (mergedConfig.from && mergedConfig.to) {
+  // Adjust date range to skip first 20 days for SMA calculation (only if SMA is not suppressed)
+  if (!mergedConfig.suppressSma && mergedConfig.from && mergedConfig.to) {
     const originalFromDate = new Date(mergedConfig.from);
     const smaAdjustedFromDate = new Date(originalFromDate);
 

@@ -26,7 +26,8 @@ export interface MarketMetrics {
 export const generateMarketMetrics = (
   allDataInput: Bar[],
   entrySignal: Signal,
-  dailyBars?: DailyBar[]
+  dailyBars?: DailyBar[],
+  suppressSma?: boolean
 ): MarketMetrics => {
   const entryDate = new Date(entrySignal.timestamp).toISOString().split('T')[0];
   const entryTime = new Date(entrySignal.timestamp).toLocaleTimeString('en-US', {
@@ -48,22 +49,24 @@ export const generateMarketMetrics = (
     marketData.vwapDifferencePercent = vwapResult.priceVsVwapPercent;
   }
 
-  // Calculate 20-day SMA
-  let smaData: DailyBar[] = [];
-  if (dailyBars && dailyBars.length > 0) {
-    // Use provided daily bars (from Polygon for scout)
-    smaData = dailyBars;
-  } else {
-    // Aggregate intraday data to daily bars (for backtest with CSV data)
-    smaData = aggregateIntradayToDaily(allDataInput);
-  }
+  // Calculate 20-day SMA (only if not suppressed)
+  if (!suppressSma) {
+    let smaData: DailyBar[] = [];
+    if (dailyBars && dailyBars.length > 0) {
+      // Use provided daily bars (from Polygon for scout)
+      smaData = dailyBars;
+    } else {
+      // Aggregate intraday data to daily bars (for backtest with CSV data)
+      smaData = aggregateIntradayToDaily(allDataInput);
+    }
 
-  const smaResult = calculateSMAResult(smaData, SMA_PERIODS.MEDIUM, marketData.currentPrice);
-  if (smaResult) {
-    marketData.sma20 = smaResult.sma;
-    marketData.smaPosition = smaResult.position;
-    marketData.smaDifference = smaResult.priceVsSma;
-    marketData.smaDifferencePercent = smaResult.priceVsSmaPercent;
+    const smaResult = calculateSMAResult(smaData, SMA_PERIODS.MEDIUM, marketData.currentPrice);
+    if (smaResult) {
+      marketData.sma20 = smaResult.sma;
+      marketData.smaPosition = smaResult.position;
+      marketData.smaDifference = smaResult.priceVsSma;
+      marketData.smaDifferencePercent = smaResult.priceVsSmaPercent;
+    }
   }
 
   // Enhanced gap information with clear directional language
@@ -98,20 +101,23 @@ export const generateMarketMetrics = (
     vwapInfo = 'VWAP data is not available.';
   }
 
-  // Format SMA information
+  // Format SMA information (only if not suppressed)
   let smaInfo = '';
-  if (marketData.sma20) {
-    const smaDiff = marketData.smaDifference || 0;
-    const absDiff = Math.abs(smaDiff);
-    const position = marketData.smaPosition === 'at' ? 'AT' : marketData.smaPosition?.toUpperCase();
-    smaInfo = `Current price of $${marketData.currentPrice.toFixed(2)} is $${absDiff.toFixed(2)} ${position} SMA of $${marketData.sma20.toFixed(2)}.`;
-  } else {
-    smaInfo = '20-Day SMA data is not available.';
+  if (!suppressSma) {
+    if (marketData.sma20) {
+      const smaDiff = marketData.smaDifference || 0;
+      const absDiff = Math.abs(smaDiff);
+      const position =
+        marketData.smaPosition === 'at' ? 'AT' : marketData.smaPosition?.toUpperCase();
+      smaInfo = `Current price of $${marketData.currentPrice.toFixed(2)} is $${absDiff.toFixed(2)} ${position} SMA of $${marketData.sma20.toFixed(2)}.`;
+    } else {
+      smaInfo = '20-Day SMA data is not available.';
+    }
   }
 
-  // Format VWAP vs SMA comparison
+  // Format VWAP vs SMA comparison (only if SMA not suppressed)
   let vwapVsSmaInfo = '';
-  if (marketData.vwap && marketData.sma20) {
+  if (!suppressSma && marketData.vwap && marketData.sma20) {
     const vwapVsSmaDiff = marketData.vwap - marketData.sma20;
     const position = vwapVsSmaDiff > 0 ? 'ABOVE' : vwapVsSmaDiff < 0 ? 'BELOW' : 'AT';
     vwapVsSmaInfo = `VWAP of $${marketData.vwap.toFixed(2)} is $${Math.abs(vwapVsSmaDiff).toFixed(2)} ${position} SMA of $${marketData.sma20.toFixed(2)}.`;
@@ -135,18 +141,20 @@ export const generateMarketMetrics = (
 export const generateMarketMetricsForPrompt = (
   allDataInput: Bar[],
   entrySignal: Signal,
-  dailyBars?: DailyBar[]
+  dailyBars?: DailyBar[],
+  suppressSma?: boolean
 ): string => {
-  const metrics = generateMarketMetrics(allDataInput, entrySignal, dailyBars);
+  const metrics = generateMarketMetrics(allDataInput, entrySignal, dailyBars, suppressSma);
 
-  const lines = [
-    metrics.marketDataLine1,
-    metrics.marketDataLine2,
-    metrics.vwapInfo,
-    metrics.smaInfo,
-  ];
+  const lines = [metrics.marketDataLine1, metrics.marketDataLine2, metrics.vwapInfo];
 
-  if (metrics.vwapVsSmaInfo) {
+  // Only add SMA info if not suppressed
+  if (!suppressSma && metrics.smaInfo) {
+    lines.push(metrics.smaInfo);
+  }
+
+  // Only add VWAP vs SMA comparison if SMA is not suppressed
+  if (!suppressSma && metrics.vwapVsSmaInfo) {
     lines.push(metrics.vwapVsSmaInfo);
   }
 

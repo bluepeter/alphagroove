@@ -69,6 +69,7 @@ directory:
 shared:
   ticker: 'SPY'
   timeframe: '1min'
+  suppressSma: false # Set to true to disable SMA computation and display
 
   # LLM configuration for intelligent trade analysis
   llmConfirmationScreen:
@@ -139,7 +140,7 @@ scout:
 
 The `alphagroove.config.yaml` file is organized into three sections:
 
-1. **`shared`**: Settings used by both tools (ticker, LLM configuration)
+1. **`shared`**: Settings used by both tools (ticker, LLM configuration, SMA suppression)
 2. **`backtest`**: Backtest-specific settings (date ranges, entry patterns, exit strategies)
 3. **`scout`**: Scout-specific settings (API configuration)
 
@@ -168,6 +169,21 @@ Configuration hierarchy (highest to lowest priority):
 
 All configuration must be explicitly provided. The system will provide clear error messages for
 missing settings rather than using hidden defaults.
+
+**SMA Suppression**
+
+The `suppressSma` option in the shared configuration allows you to disable SMA (Simple Moving
+Average) computation and display across both backtest and scout tools:
+
+- **Performance Benefits**: Eliminates the need to fetch additional historical data for SMA
+  calculation
+- **Faster Execution**: Reduces API calls to Polygon for scout and database queries for backtest
+- **Simplified Analysis**: Focuses analysis on price action, volume, and VWAP without SMA context
+- **Chart Clarity**: Removes SMA line and VWAP vs SMA comparison from charts
+- **LLM Prompts**: Excludes SMA context from market metrics sent to LLMs
+
+Set `suppressSma: true` when you want to focus purely on intraday price action and VWAP analysis
+without the overhead of 20-day SMA calculations.
 
 You can generate a default config file by running:
 
@@ -387,8 +403,8 @@ The LLM receives a **Market Context** section with each prompt containing:
 - **Today's High/Low Range**: Current trading range context
 - **Current Price & Time**: Real-time price action
 - **VWAP Analysis**: Current price relative to Volume Weighted Average Price
-- **SMA Analysis**: Current price relative to 20-day Simple Moving Average
-- **VWAP vs SMA**: Relationship between technical indicators
+- **SMA Analysis**: Current price relative to 20-day Simple Moving Average (if not suppressed)
+- **VWAP vs SMA**: Relationship between technical indicators (if SMA not suppressed)
 
 ### Example Market Context
 
@@ -405,8 +421,11 @@ This context helps the LLM understand:
 
 - **Gap conditions** (up/down from previous close)
 - **Intraday momentum** (relative to VWAP)
-- **Trend context** (relative to 20-day SMA)
-- **Technical alignment** (VWAP vs SMA positioning)
+- **Trend context** (relative to 20-day SMA, when enabled)
+- **Technical alignment** (VWAP vs SMA positioning, when SMA enabled)
+
+**Note**: When `suppressSma: true` is set in configuration, SMA-related metrics are excluded from
+both charts and LLM prompts, focusing analysis on price action and VWAP only.
 
 ## Command Line Options
 

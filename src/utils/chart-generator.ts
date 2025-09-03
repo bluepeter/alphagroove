@@ -8,6 +8,7 @@ import { Bar, Signal } from '../patterns/types';
 import { parseTimestampAsET } from './polygon-data-converter';
 import { isTradingHours } from './date-helpers';
 import { calculateVWAPResult, calculateVWAPLine, filterCurrentDayBars } from './vwap-calculator';
+import { generateMarketMetrics } from './market-metrics';
 import {
   calculateSMAResult,
   aggregateIntradayToDaily,
@@ -142,6 +143,7 @@ interface ChartGeneratorOptions {
   tradeDate: string;
   entryTimestamp: string;
   entrySignal: Signal;
+  suppressSma?: boolean;
 }
 
 /**
@@ -149,7 +151,14 @@ interface ChartGeneratorOptions {
  * Displays the current day's data plus 1 previous actual trading day with data.
  */
 export const generateEntryChart = async (options: ChartGeneratorOptions): Promise<string> => {
-  const { ticker, timeframe, entryPatternName, tradeDate, entrySignal } = options;
+  const {
+    ticker,
+    timeframe,
+    entryPatternName,
+    tradeDate,
+    entrySignal,
+    suppressSma = false,
+  } = options;
 
   const patternDir = path.join('./charts', entryPatternName);
   fs.mkdirSync(patternDir, { recursive: true });
@@ -183,7 +192,8 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
     entrySignal,
     false,
     true,
-    dailyBars
+    dailyBars,
+    suppressSma
   );
   // console.log(`[generateEntryChart DEBUG] Length of svgLlm (LLM chart): ${svgLlm.length}`);
   fs.writeFileSync(svgOutputPathLlm, svgLlm, 'utf-8');
@@ -196,7 +206,8 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
     entrySignal,
     true,
     false,
-    dailyBars
+    dailyBars,
+    suppressSma
   );
   // console.log(
   //   `[generateEntryChart DEBUG] Length of svgComplete (Complete chart): ${svgComplete.length}`
@@ -344,7 +355,8 @@ export const generateSvgChart = (
   entrySignal: Signal,
   showFullDayData?: boolean,
   anonymize?: boolean,
-  dailyBars?: DailyBar[]
+  dailyBars?: DailyBar[],
+  suppressSma?: boolean
 ): string => {
   // Explicit console logs for debugging timestamp matching - REMOVE/COMMENT OUT
   if (!showFullDayData) {
@@ -630,22 +642,24 @@ export const generateSvgChart = (
     marketData.vwapDifferencePercent = vwapResult.priceVsVwapPercent;
   }
 
-  // Calculate 20-day SMA
-  let smaData: DailyBar[] = [];
-  if (dailyBars && dailyBars.length > 0) {
-    // Use provided daily bars (from Polygon for scout)
-    smaData = dailyBars;
-  } else {
-    // Aggregate intraday data to daily bars (for backtest with CSV data)
-    smaData = aggregateIntradayToDaily(allDataInput);
-  }
+  // Calculate 20-day SMA (only if not suppressed)
+  if (!suppressSma) {
+    let smaData: DailyBar[] = [];
+    if (dailyBars && dailyBars.length > 0) {
+      // Use provided daily bars (from Polygon for scout)
+      smaData = dailyBars;
+    } else {
+      // Aggregate intraday data to daily bars (for backtest with CSV data)
+      smaData = aggregateIntradayToDaily(allDataInput);
+    }
 
-  const smaResult = calculateSMAResult(smaData, SMA_PERIODS.MEDIUM, marketData.currentPrice);
-  if (smaResult) {
-    marketData.sma20 = smaResult.sma;
-    marketData.smaPosition = smaResult.position;
-    marketData.smaDifference = smaResult.priceVsSma;
-    marketData.smaDifferencePercent = smaResult.priceVsSmaPercent;
+    const smaResult = calculateSMAResult(smaData, SMA_PERIODS.MEDIUM, marketData.currentPrice);
+    if (smaResult) {
+      marketData.sma20 = smaResult.sma;
+      marketData.smaPosition = smaResult.position;
+      marketData.smaDifference = smaResult.priceVsSma;
+      marketData.smaDifferencePercent = smaResult.priceVsSmaPercent;
+    }
   }
 
   // Enhanced gap information with clear directional language
@@ -670,42 +684,18 @@ export const generateSvgChart = (
   // Market data should always be shown - only ticker and date are anonymized
   const marketDataLine1 = `Prev Close: ${marketData.previousClose ? '$' + marketData.previousClose.toFixed(2) : 'N/A'} | Today Open: ${marketData.currentOpen ? '$' + marketData.currentOpen.toFixed(2) : 'N/A'} | ${gapInfo || 'Gap: N/A'}`;
 
-  // Format VWAP information
-  let vwapInfo = '';
-  if (marketData.vwap) {
-    const vwapDiff = marketData.vwapDifference || 0;
-    const sign = vwapDiff >= 0 ? '+' : '';
-    const position =
-      marketData.vwapPosition === 'at' ? 'AT' : marketData.vwapPosition?.toUpperCase();
-    vwapInfo = `VWAP: $${marketData.vwap.toFixed(2)} (${sign}$${vwapDiff.toFixed(2)} ${position} current price)`;
-  } else {
-    vwapInfo = 'VWAP: N/A';
-  }
+  // Use market metrics for consistent formatting
+  const chartMetrics = generateMarketMetrics(allDataInput, entrySignal, dailyBars, suppressSma);
+  const vwapInfo = chartMetrics.vwapInfo;
 
   const marketDataLine2 = `Today H/L: ${marketData.currentHigh ? '$' + marketData.currentHigh.toFixed(2) : 'N/A'}/${marketData.currentLow ? '$' + marketData.currentLow.toFixed(2) : 'N/A'} | Current: $${marketData.currentPrice.toFixed(2)} @ ${entryTime}`;
 
-  // Format SMA information
-  let smaInfo = '';
-  if (marketData.sma20) {
-    const smaDiff = marketData.smaDifference || 0;
-    const sign = smaDiff >= 0 ? '+' : '';
-    const position = marketData.smaPosition === 'at' ? 'AT' : marketData.smaPosition?.toUpperCase();
-    smaInfo = `20-Day SMA: $${marketData.sma20.toFixed(2)} (${sign}$${smaDiff.toFixed(2)} ${position} current price)`;
-  } else {
-    smaInfo = '20-Day SMA: N/A';
-  }
+  const smaInfo = chartMetrics.smaInfo;
 
   const marketDataLine3 = `${vwapInfo}`;
   const marketDataLine4 = `${smaInfo}`;
 
-  // Format VWAP vs SMA comparison for clear LLM interpretation
-  let marketDataLine5 = '';
-  if (marketData.vwap && marketData.sma20) {
-    const vwapVsSmaDiff = marketData.vwap - marketData.sma20;
-    const sign = vwapVsSmaDiff >= 0 ? '+' : '';
-    const position = vwapVsSmaDiff > 0 ? 'ABOVE' : vwapVsSmaDiff < 0 ? 'BELOW' : 'AT';
-    marketDataLine5 = `VWAP ${sign}$${Math.abs(vwapVsSmaDiff).toFixed(2)} ${position} SMA`;
-  }
+  const marketDataLine5 = chartMetrics.vwapVsSmaInfo;
 
   return `
 <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
@@ -722,9 +712,13 @@ export const generateSvgChart = (
   <text x="${width / 2}" y="85" text-anchor="middle" font-size="11">
     ${marketDataLine3}
   </text>
-  <text x="${width / 2}" y="100" text-anchor="middle" font-size="11">
+  ${
+    smaInfo
+      ? `<text x="${width / 2}" y="100" text-anchor="middle" font-size="11">
     ${marketDataLine4}
-  </text>
+  </text>`
+      : ''
+  }
   ${
     marketDataLine5
       ? `<text x="${width / 2}" y="115" text-anchor="middle" font-size="11">
@@ -848,8 +842,8 @@ export const generateSvgChart = (
   })()}
   
   ${(() => {
-    // Generate 20-day SMA line if available (only on Signal Day)
-    if (marketData.sma20) {
+    // Generate 20-day SMA line if available and not suppressed (only on Signal Day)
+    if (!suppressSma && marketData.sma20) {
       // Use the same priceToY function that other chart elements use
       const smaY = priceToY(marketData.sma20);
 
@@ -884,6 +878,7 @@ export const generateSvgChart = (
     // Add legend for VWAP and/or SMA if present and within bounds
     const hasVwap = !!marketData.vwap;
     const hasSma =
+      !suppressSma &&
       marketData.sma20 &&
       (() => {
         const smaY = priceToY(marketData.sma20);
@@ -946,7 +941,8 @@ export const generateEntryCharts = async (
     entry_time: string;
     entry_price: number;
     direction?: 'long' | 'short';
-  }>
+  }>,
+  suppressSma = false
 ): Promise<string[]> => {
   // Now returns array of PNG paths
   const outputPngPaths: string[] = [];
@@ -967,6 +963,7 @@ export const generateEntryCharts = async (
         tradeDate: trade.trade_date,
         entryTimestamp: trade.entry_time,
         entrySignal,
+        suppressSma,
       });
       if (pngPath) {
         // Check if a path was returned (might be empty on error)

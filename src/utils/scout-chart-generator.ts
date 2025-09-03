@@ -13,6 +13,7 @@ export interface ScoutChartOptions {
   data: Bar[];
   allData: Bar[];
   dailyBars?: DailyBar[];
+  suppressSma?: boolean;
 }
 
 /**
@@ -20,7 +21,16 @@ export interface ScoutChartOptions {
  * This reuses the existing chart generation from utils/chart-generator.ts
  */
 export const generateScoutChart = async (options: ScoutChartOptions): Promise<string> => {
-  const { ticker, entryPatternName, tradeDate, entrySignal, data, allData, dailyBars } = options;
+  const {
+    ticker,
+    entryPatternName,
+    tradeDate,
+    entrySignal,
+    data,
+    allData,
+    dailyBars,
+    suppressSma = false,
+  } = options;
 
   // Create timestamp-based filename for scout charts
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -47,7 +57,8 @@ export const generateScoutChart = async (options: ScoutChartOptions): Promise<st
     entrySignal,
     false,
     true,
-    dailyBars
+    dailyBars,
+    suppressSma
   );
   fs.writeFileSync(svgOutputPathLlm, svgLlm, 'utf-8');
 
@@ -59,7 +70,8 @@ export const generateScoutChart = async (options: ScoutChartOptions): Promise<st
     entrySignal,
     true,
     false,
-    dailyBars
+    dailyBars,
+    suppressSma
   );
   fs.writeFileSync(svgOutputPathComplete, svgComplete, 'utf-8');
 

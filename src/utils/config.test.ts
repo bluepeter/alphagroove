@@ -25,6 +25,7 @@ describe('Configuration System', () => {
       const defaultConfigPart = {
         ticker: 'SPY',
         timeframe: '1min',
+        suppressSma: false,
         direction: 'long' as const,
         date: {
           from: '2023-01-01',
@@ -126,6 +127,7 @@ describe('Configuration System', () => {
     it('should handle legacy risePct option for backward compatibility', () => {
       const config = createTestConfig({
         default: {
+          suppressSma: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -151,6 +153,7 @@ describe('Configuration System', () => {
     it('should use entry pattern specified in config when not provided in CLI', () => {
       const config = createTestConfig({
         default: {
+          suppressSma: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -177,6 +180,7 @@ describe('Configuration System', () => {
     it('should allow overriding exitStrategies.maxHoldTime.minutes in config root section, taking precedence over default section', () => {
       const config = createTestConfig({
         default: {
+          suppressSma: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -198,6 +202,7 @@ describe('Configuration System', () => {
     it('should correctly merge fixed-time-entry pattern options', () => {
       const config = createTestConfig({
         default: {
+          suppressSma: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -220,6 +225,7 @@ describe('Configuration System', () => {
     it('should map new strategyOptions.fixedTimeEntry.entryTime format correctly', () => {
       const config = createTestConfig({
         default: {
+          suppressSma: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -242,6 +248,7 @@ describe('Configuration System', () => {
     it('should prioritize strategyOptions over legacy patterns config', () => {
       const config = createTestConfig({
         default: {
+          suppressSma: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -269,6 +276,7 @@ describe('Configuration System', () => {
     it('should map new strategyOptions.randomTimeEntry format correctly', () => {
       const config = createTestConfig({
         default: {
+          suppressSma: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -293,6 +301,7 @@ describe('Configuration System', () => {
     it('should populate exitStrategies.maxHoldTime with defaults when configured', () => {
       const configWithMaxHoldTime: Config = {
         default: {
+          suppressSma: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -423,6 +432,7 @@ describe('Configuration System', () => {
         shared: {
           ticker: 'SPY',
           timeframe: '1min',
+          suppressSma: false,
           direction: 'llm_decides' as const,
           llmConfirmationScreen: {
             llmProvider: 'anthropic' as const,
@@ -496,6 +506,7 @@ describe('Configuration System', () => {
     it('should maintain backward compatibility with legacy config structure', () => {
       const legacyConfig = {
         default: {
+          suppressSma: false,
           ticker: 'QQQ',
           timeframe: '1min',
           direction: 'long' as const,
@@ -549,6 +560,7 @@ describe('Configuration System', () => {
       const mixedConfig = {
         // Legacy structure
         default: {
+          suppressSma: false,
           ticker: 'LEGACY_TICKER',
           timeframe: '1min',
           direction: 'short' as const,
@@ -568,6 +580,7 @@ describe('Configuration System', () => {
         shared: {
           ticker: 'NEW_TICKER',
           timeframe: '1min',
+          suppressSma: false,
           direction: 'llm_decides' as const,
           llmConfirmationScreen: {
             llmProvider: 'anthropic' as const,
