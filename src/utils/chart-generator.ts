@@ -865,7 +865,7 @@ export const generateSvgChart = (
       const yLow = priceToY(d.low);
       const bodyTop = Math.min(yOpen, yClose);
       const bodyHeight = yOpen === yClose ? 1 : Math.abs(yOpen - yClose);
-      const color = d.close >= d.open ? '#26a69a' : '#ef5350';
+      const color = d.close >= d.open ? '#00C851' : '#FF4444'; // Professional green/red
       const wick = `<line x1="${x}" y1="${yHigh}" x2="${x}" y2="${yLow}" stroke="black" stroke-width="0.5" />`;
       const body = `<rect x="${x - candleWidth / 2}" y="${bodyTop}" width="${candleWidth}" height="${bodyHeight}" fill="${color}" />`;
       return `
@@ -890,7 +890,7 @@ export const generateSvgChart = (
       const barWidth = Math.max(1, Math.min(15, (chartWidth / finalDataForChart.length) * 0.6));
       const h = volumeToHeight(bar.volume);
       const y = volumeTop + volumeHeight - h;
-      const color = bar.close >= bar.open ? 'rgba(0, 128, 0, 0.5)' : 'rgba(255, 0, 0, 0.5)';
+      const color = bar.close >= bar.open ? 'rgba(0, 200, 81, 0.7)' : 'rgba(255, 68, 68, 0.7)'; // Match candlestick colors
       return `<rect x="${x - barWidth / 2}" y="${y}" width="${barWidth}" height="${h}" fill="${color}" />`;
     })
     .join('\n  ')}
@@ -926,7 +926,7 @@ export const generateSvgChart = (
       if (pathPoints.length < 2) return '';
 
       const pathString = `M ${pathPoints.join(' L ')}`;
-      return `<path d="${pathString}" stroke="#ff9500" stroke-width="2" fill="none" opacity="0.8" />`;
+      return `<path d="${pathString}" stroke="#9C27B0" stroke-width="2" fill="none" opacity="0.8" />`; // Purple - distinct from VWAP orange
     })()}
   
   ${(() => {
@@ -989,7 +989,7 @@ export const generateSvgChart = (
 
   
   ${(() => {
-    // Add legend for VWAP and/or SMA if present and within bounds
+    // Add legend for VWAP, SMA, and Volume MA if present and within bounds
     const hasVwap = !suppressVwap && !!marketData.vwap;
     const hasSma =
       !suppressSma &&
@@ -998,8 +998,9 @@ export const generateSvgChart = (
         const smaY = priceToY(marketData.sma20);
         return smaY >= marginTop && smaY <= marginTop + chartHeight;
       })();
+    const hasVolumeMA = finalDataForChart.length >= 20; // Volume MA available if enough data
 
-    if (hasVwap || hasSma) {
+    if (hasVwap || hasSma || hasVolumeMA) {
       const legendItems = [];
       let legendWidth = 10; // Base padding
 
@@ -1018,6 +1019,16 @@ export const generateSvgChart = (
         legendWidth += 90; // SMA item width
       }
 
+      if (hasVolumeMA) {
+        legendItems.push({
+          label: 'Vol MA',
+          color: '#9C27B0',
+          strokeWidth: 2,
+          dashArray: '',
+        });
+        legendWidth += 70; // Volume MA item width
+      }
+
       // Position legend aligned to the right to avoid metrics interference
       const legendX = marginLeft + chartWidth - legendWidth;
       const legendY = marginTop - 25; // Position above the chart
@@ -1031,7 +1042,7 @@ export const generateSvgChart = (
         legendSvg += `
           <line x1="${currentX}" y1="${legendY}" x2="${currentX + 20}" y2="${legendY}" stroke="${item.color}" stroke-width="${item.strokeWidth}" opacity="0.8"${dashAttr}/>
           <text x="${currentX + 25}" y="${legendY + 4}" font-size="11" fill="#333">${item.label}</text>`;
-        currentX += item.label === 'VWAP' ? 70 : 90;
+        currentX += item.label === 'VWAP' ? 70 : item.label === 'Vol MA' ? 70 : 90;
       });
 
       legendSvg += '</g>';
