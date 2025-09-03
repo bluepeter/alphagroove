@@ -21,9 +21,9 @@ shared:
       to the current day as that is what we are trading. The chart will use candlesticks and volume
       bars. These are key items to pay attention to. (Ignore the ticker symbol, current date, etc.)
       We are backtesting a strategy so you must focus on generating an action based solely on chart
-      mechanics, not any historical knowledge you have of that particular day. The SMA and VWAP are
-      also provided but should not be used as primary indicators; they should only be used to inform
-      your decision but not as the primary basis for your decision.
+      mechanics, not any historical knowledge you have of that particular day. The SMA and VWAP may
+      also be provided but should not be used as primary indicators; if included, they should only
+      be used to inform your decision but not as its primary basis.
 
       You strictly follow user instructions for output format. Respond ONLY with the valid JSON
       object described by the user. Do not include any other text, narration, or explanations.
@@ -38,8 +38,7 @@ shared:
 
       - What day trade action would you take: go long, go short, or do_nothing?  
 
-      - Provide a one-sentence rationalization for your decision. Do not reference SMA or VWAP in
-      your output decision.
+      - Provide a one-sentence rationalization for your decision.
 
       - Provide target stop loss and profit target prices (only provide if action is long or short)
       that are realistic exit prices given today's range, remaining time in the day, and the current
@@ -64,7 +63,7 @@ shared:
 # === BACKTEST-SPECIFIC CONFIGURATION ===
 backtest:
   date:
-    from: '2017-01-01'
+    from: '2023-12-01'
     to: '2025-05-30'
   parallelization:
     maxConcurrentDays: 3 # Process up to 3 days concurrently for faster execution
