@@ -231,6 +231,7 @@ const ConfigSchema = z.object({
       timeframe: z.string(),
       suppressSma: z.boolean().optional().default(false),
       suppressVwap: z.boolean().optional().default(false),
+      suppressMetricsInPrompts: z.boolean().optional().default(false),
       llmConfirmationScreen: LLMScreenConfigSchema.optional(),
     })
     .optional(),
@@ -261,6 +262,7 @@ const ConfigSchema = z.object({
       timeframe: z.string(),
       suppressSma: z.boolean().optional().default(false),
       suppressVwap: z.boolean().optional().default(false),
+      suppressMetricsInPrompts: z.boolean().optional().default(false),
 
       patterns: DefaultPatternsSchema.optional(),
       parallelization: ParallelizationOptionsSchema.optional(),
@@ -299,6 +301,7 @@ const DEFAULT_CONFIG: Config = {
     timeframe: '1min',
     suppressSma: false,
     suppressVwap: false,
+    suppressMetricsInPrompts: false,
 
     patterns: {
       entry: 'quickRise',
@@ -570,6 +573,7 @@ export const mergeConfigWithCliOptions = (
         timeframe: loadedConfig.shared?.timeframe || '1min',
         suppressSma: loadedConfig.shared?.suppressSma ?? false,
         suppressVwap: loadedConfig.shared?.suppressVwap ?? false,
+        suppressMetricsInPrompts: loadedConfig.shared?.suppressMetricsInPrompts ?? false,
 
         date: loadedConfig.backtest?.date,
         parallelization: loadedConfig.backtest?.parallelization,

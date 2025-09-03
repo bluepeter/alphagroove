@@ -27,6 +27,7 @@ describe('Configuration System', () => {
         timeframe: '1min',
         suppressSma: false,
         suppressVwap: false,
+        suppressMetricsInPrompts: false,
         direction: 'long' as const,
         date: {
           from: '2023-01-01',
@@ -130,6 +131,7 @@ describe('Configuration System', () => {
         default: {
           suppressSma: false,
           suppressVwap: false,
+          suppressMetricsInPrompts: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -157,6 +159,7 @@ describe('Configuration System', () => {
         default: {
           suppressSma: false,
           suppressVwap: false,
+          suppressMetricsInPrompts: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -185,6 +188,7 @@ describe('Configuration System', () => {
         default: {
           suppressSma: false,
           suppressVwap: false,
+          suppressMetricsInPrompts: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -208,6 +212,7 @@ describe('Configuration System', () => {
         default: {
           suppressSma: false,
           suppressVwap: false,
+          suppressMetricsInPrompts: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -232,6 +237,7 @@ describe('Configuration System', () => {
         default: {
           suppressSma: false,
           suppressVwap: false,
+          suppressMetricsInPrompts: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -256,6 +262,7 @@ describe('Configuration System', () => {
         default: {
           suppressSma: false,
           suppressVwap: false,
+          suppressMetricsInPrompts: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -285,6 +292,7 @@ describe('Configuration System', () => {
         default: {
           suppressSma: false,
           suppressVwap: false,
+          suppressMetricsInPrompts: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -311,6 +319,7 @@ describe('Configuration System', () => {
         default: {
           suppressSma: false,
           suppressVwap: false,
+          suppressMetricsInPrompts: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -443,6 +452,7 @@ describe('Configuration System', () => {
           timeframe: '1min',
           suppressSma: false,
           suppressVwap: false,
+          suppressMetricsInPrompts: false,
           direction: 'llm_decides' as const,
           llmConfirmationScreen: {
             llmProvider: 'anthropic' as const,
@@ -518,6 +528,7 @@ describe('Configuration System', () => {
         default: {
           suppressSma: false,
           suppressVwap: false,
+          suppressMetricsInPrompts: false,
           ticker: 'QQQ',
           timeframe: '1min',
           direction: 'long' as const,
@@ -573,6 +584,7 @@ describe('Configuration System', () => {
         default: {
           suppressSma: false,
           suppressVwap: false,
+          suppressMetricsInPrompts: false,
           ticker: 'LEGACY_TICKER',
           timeframe: '1min',
           direction: 'short' as const,
@@ -594,6 +606,7 @@ describe('Configuration System', () => {
           timeframe: '1min',
           suppressSma: false,
           suppressVwap: false,
+          suppressMetricsInPrompts: false,
           direction: 'llm_decides' as const,
           llmConfirmationScreen: {
             llmProvider: 'anthropic' as const,

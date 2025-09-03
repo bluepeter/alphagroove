@@ -71,6 +71,7 @@ shared:
   timeframe: '1min'
   suppressSma: false # Set to true to disable SMA computation and display
   suppressVwap: false # Set to true to disable VWAP computation and display
+  suppressMetricsInPrompts: false # Set to true to exclude text metrics from LLM prompts
 
   # LLM configuration for intelligent trade analysis
   llmConfirmationScreen:
@@ -200,6 +201,20 @@ Average Price) computation and display across both backtest and scout tools:
 Set `suppressVwap: true` when you want to focus purely on price action and SMA analysis without VWAP
 calculations. You can use both `suppressSma` and `suppressVwap` together to create the most
 streamlined analysis focusing only on basic price action.
+
+**Market Metrics in Prompts Suppression**
+
+The `suppressMetricsInPrompts` option in the shared configuration allows you to exclude all text
+metrics from LLM prompts while keeping them visible in charts:
+
+- **Chart Preservation**: All metrics (VWAP, SMA, gap analysis) remain visible in generated charts
+- **Prompt Simplification**: LLM prompts contain no "Market Context" section with text metrics
+- **Performance Benefits**: Eliminates market metrics calculation overhead for LLM calls
+- **Focus on Visual Analysis**: Forces LLM to rely purely on visual chart analysis
+
+Set `suppressMetricsInPrompts: true` when you want the LLM to make decisions based solely on chart
+patterns without being influenced by numerical market context. This can be useful for testing
+whether the LLM's visual pattern recognition performs better without text-based market data.
 
 You can generate a default config file by running:
 

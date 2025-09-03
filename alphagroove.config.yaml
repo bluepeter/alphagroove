@@ -5,6 +5,7 @@ shared:
   timeframe: '1min'
   suppressSma: true # Set to true to disable SMA computation and display for both backtest and scout
   suppressVwap: true # Set to true to disable VWAP computation and display for both backtest and scout
+  suppressMetricsInPrompts: true # Set to true to exclude all text metrics from LLM prompts (metrics still appear in charts)
   llmConfirmationScreen:
     llmProvider: 'anthropic'
     modelName: 'claude-sonnet-4-20250514'

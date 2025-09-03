@@ -20,13 +20,13 @@ vi.mock('./screens/llm-confirmation.screen');
 vi.mock('./utils/date-helpers');
 
 const mockedLoadConfig = vi.mocked(loadConfig);
-const _mockedPolygonApiService = vi.mocked(PolygonApiService);
+const mockedPolygonApiService = vi.mocked(PolygonApiService);
 const _mockedConvertPolygonData = vi.mocked(convertPolygonData);
 const _mockedFilterTradingData = vi.mocked(filterTradingData);
 const _mockedFilterTradingHoursOnly = vi.mocked(filterTradingHoursOnly);
 const _mockedGenerateScoutChart = vi.mocked(generateScoutChart);
 const _mockedLlmConfirmationScreen = vi.mocked(LlmConfirmationScreen);
-const _mockedGetPreviousTradingDay = vi.mocked(getPreviousTradingDay);
+const mockedGetPreviousTradingDay = vi.mocked(getPreviousTradingDay);
 
 describe('Scout Main Function', () => {
   let consoleSpy: any;
@@ -94,39 +94,152 @@ describe('Scout Main Function', () => {
     expect(processExitSpy).toHaveBeenCalledWith(1);
   });
 
-  it.skip('should handle missing API key environment variable', () => {
-    // This test is complex to mock properly because it involves
-    // the interaction between loadConfig mocking and environment variable checks
-    // The core functionality is tested in integration
+  it('should handle missing API key environment variable', async () => {
+    delete process.env.POLYGON_API_KEY;
+
+    mockedLoadConfig.mockResolvedValue({
+      shared: { ticker: 'SPY' },
+      scout: { polygon: { apiKeyEnvVar: 'POLYGON_API_KEY' } },
+    } as any);
+
+    // Mock the constructor to throw the right error
+    mockedPolygonApiService.mockImplementation(() => {
+      throw new Error('Environment variable POLYGON_API_KEY not set');
+    });
+
+    try {
+      await main({ date: '2025-08-29', time: '10:40' });
+    } catch {
+      // Expected to throw
+    }
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Error in scout analysis:',
+      expect.objectContaining({
+        message: 'Environment variable POLYGON_API_KEY not set',
+      })
+    );
+    expect(processExitSpy).toHaveBeenCalledWith(1);
   });
 
-  // Skip the complex integration tests that require extensive mocking
-  it.skip('should execute full scout analysis successfully', () => {
-    // This test requires complex mocking of the entire data flow
-    // and is prone to breaking with implementation changes
+  it('should execute full scout analysis successfully', async () => {
+    // Setup proper mocking for successful flow
+    mockedLoadConfig.mockResolvedValue({
+      shared: {
+        ticker: 'SPY',
+        llmConfirmationScreen: {
+          llmProvider: 'anthropic',
+          modelName: 'claude-sonnet-4-20250514',
+          apiKeyEnvVar: 'ANTHROPIC_API_KEY',
+        },
+      },
+      scout: { polygon: { apiKeyEnvVar: 'POLYGON_API_KEY' } },
+    } as any);
+
+    // Mock successful data flow
+    const mockPolygonInstance = {
+      fetchPolygonData: vi.fn().mockResolvedValue([]),
+      fetchDailyBars: vi.fn().mockResolvedValue([]),
+    };
+    mockedPolygonApiService.mockImplementation(() => mockPolygonInstance as any);
+
+    vi.mocked(convertPolygonData).mockReturnValue([]);
+    vi.mocked(filterTradingData).mockReturnValue([]);
+    vi.mocked(filterTradingHoursOnly).mockReturnValue([]);
+    vi.mocked(generateScoutChart).mockResolvedValue('/path/to/chart.png');
+    mockedGetPreviousTradingDay.mockResolvedValue('2025-08-28');
+
+    // Mock LLM screen
+    const mockLlmInstance = {
+      shouldSignalProceed: vi.fn().mockResolvedValue({
+        proceed: false,
+        cost: 0.01,
+        rationale: 'Test rationale',
+      }),
+    };
+    vi.mocked(LlmConfirmationScreen).mockImplementation(() => mockLlmInstance as any);
+
+    await main({ date: '2025-08-29', time: '10:40' });
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('AlphaGroove Entry Scout'));
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Ticker: SPY'));
   });
 
-  it.skip('should handle Polygon API fetch errors', () => {
-    // This test requires mocking the entire data flow
+  it('should handle Polygon API fetch errors', async () => {
+    mockedLoadConfig.mockResolvedValue({
+      shared: { ticker: 'SPY' },
+      scout: { polygon: { apiKeyEnvVar: 'POLYGON_API_KEY' } },
+    } as any);
+
+    const mockPolygonInstance = {
+      fetchPolygonData: vi.fn().mockRejectedValue(new Error('API Error')),
+      fetchDailyBars: vi.fn().mockResolvedValue([]),
+    };
+    mockedPolygonApiService.mockImplementation(() => mockPolygonInstance as any);
+
+    await main({ date: '2025-08-29', time: '10:40' });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      'Error in scout analysis:',
+      expect.objectContaining({ message: 'API Error' })
+    );
+    expect(processExitSpy).toHaveBeenCalledWith(1);
   });
 
-  it.skip('should handle chart generation failure', () => {
-    // This test requires mocking the entire data flow
+  it('should use command line options to override config', async () => {
+    mockedLoadConfig.mockResolvedValue({
+      shared: { ticker: 'SPY' },
+      scout: { polygon: { apiKeyEnvVar: 'POLYGON_API_KEY' } },
+    } as any);
+
+    const mockPolygonInstance = {
+      fetchPolygonData: vi.fn().mockResolvedValue([]),
+      fetchDailyBars: vi.fn().mockResolvedValue([]),
+    };
+    mockedPolygonApiService.mockImplementation(() => mockPolygonInstance as any);
+
+    const mockData = [
+      {
+        timestamp: '2025-08-29 10:40:00',
+        open: 100,
+        high: 101,
+        low: 99,
+        close: 100,
+        volume: 1000,
+        trade_date: '2025-08-29',
+      },
+    ];
+    vi.mocked(convertPolygonData).mockReturnValue(mockData);
+    vi.mocked(filterTradingData).mockReturnValue(mockData);
+    vi.mocked(filterTradingHoursOnly).mockReturnValue(mockData);
+    vi.mocked(generateScoutChart).mockResolvedValue('/path/to/chart.png');
+    mockedGetPreviousTradingDay.mockResolvedValue('2025-08-28');
+
+    await main({ ticker: 'AAPL', date: '2025-08-29', time: '10:40' });
+
+    expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('Ticker: AAPL'));
   });
 
-  it.skip('should handle LLM analysis errors gracefully', () => {
-    // This test requires mocking the entire data flow
-  });
+  it('should handle no trading data for current time', async () => {
+    mockedLoadConfig.mockResolvedValue({
+      shared: { ticker: 'SPY' },
+      scout: { polygon: { apiKeyEnvVar: 'POLYGON_API_KEY' } },
+    } as any);
 
-  it.skip('should skip LLM analysis when no LLM configuration found', () => {
-    // This test requires mocking the entire data flow
-  });
+    const mockPolygonInstance = {
+      fetchPolygonData: vi.fn().mockResolvedValue([]),
+      fetchDailyBars: vi.fn().mockResolvedValue([]),
+    };
+    mockedPolygonApiService.mockImplementation(() => mockPolygonInstance as any);
 
-  it.skip('should use command line options to override config', () => {
-    // This test requires mocking the entire data flow
-  });
+    vi.mocked(convertPolygonData).mockReturnValue([]);
+    vi.mocked(filterTradingData).mockReturnValue([]); // No data for current time
+    vi.mocked(filterTradingHoursOnly).mockReturnValue([]);
+    mockedGetPreviousTradingDay.mockResolvedValue('2025-08-28');
 
-  it.skip('should handle no trading data for current time', () => {
-    // This test requires mocking the entire data flow and complex date handling
+    await main({ date: '2025-08-29', time: '10:40' });
+
+    expect(consoleErrorSpy).toHaveBeenCalledWith('Error in scout analysis:', expect.any(Error));
+    expect(processExitSpy).toHaveBeenCalledWith(1);
   });
 });

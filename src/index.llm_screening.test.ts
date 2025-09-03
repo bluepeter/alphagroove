@@ -142,7 +142,13 @@ describe('LLM Trade Screening Tests', () => {
     };
     const mockChartName = 'test-chart';
     const getMockAppConfig = (): AppConfig => ({
-      default: { ticker: 'SPY', timeframe: '1min', suppressSma: false, suppressVwap: false },
+      default: {
+        ticker: 'SPY',
+        timeframe: '1min',
+        suppressSma: false,
+        suppressVwap: false,
+        suppressMetricsInPrompts: false,
+      },
       patterns: { entry: {} },
     });
 
@@ -317,6 +323,94 @@ describe('LLM Trade Screening Tests', () => {
         suppressSma: false,
         suppressVwap: true,
       });
+    });
+
+    it('should not generate market metrics when suppressMetricsInPrompts is true', async () => {
+      const localMockLlmInstance = new (LlmConfirmationScreen as any)();
+      const screenConfigEnabled = { enabled: true };
+      const currentAppConfig = getMockAppConfig();
+      const currentMergedConfig = {
+        ...mockMergedConfigValue,
+      };
+
+      // Mock raw config with suppressMetricsInPrompts enabled
+      const rawConfigWithSuppressedMetrics = {
+        ...currentAppConfig,
+        shared: {
+          ...currentAppConfig.default,
+          suppressMetricsInPrompts: true,
+        },
+      };
+
+      vi.mocked(localMockLlmInstance.shouldSignalProceed).mockResolvedValueOnce({
+        proceed: true,
+        cost: 0.005,
+        direction: 'long',
+      });
+
+      await mainModule.handleLlmTradeScreeningInternal(
+        mockSignal,
+        mockChartName,
+        localMockLlmInstance,
+        screenConfigEnabled,
+        currentMergedConfig,
+        rawConfigWithSuppressedMetrics
+      );
+
+      // Verify that shouldSignalProceed was called with undefined market metrics
+      expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalledWith(
+        mockSignal,
+        'path/to/chart.png',
+        screenConfigEnabled,
+        rawConfigWithSuppressedMetrics,
+        undefined, // context
+        undefined, // debug
+        undefined // market metrics should be undefined when suppressed
+      );
+    });
+
+    it('should generate market metrics when suppressMetricsInPrompts is false', async () => {
+      const localMockLlmInstance = new (LlmConfirmationScreen as any)();
+      const screenConfigEnabled = { enabled: true };
+      const currentAppConfig = getMockAppConfig();
+      const currentMergedConfig = {
+        ...mockMergedConfigValue,
+      };
+
+      // Mock raw config with suppressMetricsInPrompts disabled
+      const rawConfigWithEnabledMetrics = {
+        ...currentAppConfig,
+        shared: {
+          ...currentAppConfig.default,
+          suppressMetricsInPrompts: false,
+        },
+      };
+
+      vi.mocked(localMockLlmInstance.shouldSignalProceed).mockResolvedValueOnce({
+        proceed: true,
+        cost: 0.005,
+        direction: 'long',
+      });
+
+      await mainModule.handleLlmTradeScreeningInternal(
+        mockSignal,
+        mockChartName,
+        localMockLlmInstance,
+        screenConfigEnabled,
+        currentMergedConfig,
+        rawConfigWithEnabledMetrics
+      );
+
+      // Verify that shouldSignalProceed was called with market metrics
+      expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalledWith(
+        mockSignal,
+        'path/to/chart.png',
+        screenConfigEnabled,
+        rawConfigWithEnabledMetrics,
+        undefined, // context
+        undefined, // debug
+        'Test market metrics' // market metrics should be present when not suppressed
+      );
     });
   });
 });

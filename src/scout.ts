@@ -256,16 +256,14 @@ const performLLMAnalysis = async (
       return;
     }
 
-    // Generate market metrics for LLM prompt
+    // Generate market metrics for LLM prompt (if not suppressed)
     const suppressSma = rawConfig.shared?.suppressSma ?? false;
     const suppressVwap = rawConfig.shared?.suppressVwap ?? false;
-    const marketMetrics = generateMarketMetricsForPrompt(
-      allBars,
-      entrySignal,
-      dailyBars,
-      suppressSma,
-      suppressVwap
-    );
+    const suppressMetricsInPrompts = rawConfig.shared?.suppressMetricsInPrompts ?? false;
+
+    const marketMetrics = suppressMetricsInPrompts
+      ? undefined
+      : generateMarketMetricsForPrompt(allBars, entrySignal, dailyBars, suppressSma, suppressVwap);
 
     const llmScreen = new LlmConfirmationScreen();
     const llmDecision = await llmScreen.shouldSignalProceed(

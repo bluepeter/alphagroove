@@ -50,6 +50,7 @@ describe('initializeAnalysis', () => {
       timeframe: '1min',
       suppressSma: false,
       suppressVwap: false,
+      suppressMetricsInPrompts: false,
 
       patterns: {
         entry: 'test-pattern',

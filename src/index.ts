@@ -138,38 +138,44 @@ export const handleLlmTradeScreeningInternal = async (
     chartEntryPatternName
   );
 
-  // Generate market metrics for backtest LLM prompts
+  // Generate market metrics for backtest LLM prompts (if not suppressed)
   // Fetch the same multi-day data that the chart generator uses
   const { fetchMultiDayData } = await import('./utils/chart-generator');
   const { generateMarketMetricsForPrompt } = await import('./utils/market-metrics');
 
   let marketMetrics: string | undefined = undefined;
-  try {
-    // Fetch multi-day data for market metrics calculation (same as chart generation)
-    const allBars = await fetchMultiDayData(
-      currentSignal.ticker,
-      mergedConfig.timeframe,
-      currentSignal.trade_date,
-      25
-    );
 
-    // Create entry signal for market metrics
-    const entrySignal = {
-      timestamp: currentSignal.timestamp,
-      price: currentSignal.price,
-      type: 'entry' as const,
-    };
+  // Check if metrics should be suppressed in prompts
+  const suppressMetricsInPrompts = rawConfig.shared?.suppressMetricsInPrompts ?? false;
 
-    // Generate market metrics (no daily bars for backtest - will aggregate from intraday)
-    marketMetrics = generateMarketMetricsForPrompt(
-      allBars,
-      entrySignal,
-      undefined,
-      mergedConfig.suppressSma,
-      mergedConfig.suppressVwap
-    );
-  } catch (error) {
-    console.warn('[LLM Prep] Failed to generate market metrics for backtest:', error);
+  if (!suppressMetricsInPrompts) {
+    try {
+      // Fetch multi-day data for market metrics calculation (same as chart generation)
+      const allBars = await fetchMultiDayData(
+        currentSignal.ticker,
+        mergedConfig.timeframe,
+        currentSignal.trade_date,
+        25
+      );
+
+      // Create entry signal for market metrics
+      const entrySignal = {
+        timestamp: currentSignal.timestamp,
+        price: currentSignal.price,
+        type: 'entry' as const,
+      };
+
+      // Generate market metrics (no daily bars for backtest - will aggregate from intraday)
+      marketMetrics = generateMarketMetricsForPrompt(
+        allBars,
+        entrySignal,
+        undefined,
+        mergedConfig.suppressSma,
+        mergedConfig.suppressVwap
+      );
+    } catch (error) {
+      console.warn('[LLM Prep] Failed to generate market metrics for backtest:', error);
+    }
   }
 
   const screenDecision = await llmScreenInstance.shouldSignalProceed(

@@ -109,6 +109,22 @@ VWAP of $101.25 is $0.50 ABOVE SMA of $100.75.`;
       expect(promptText).not.toContain('Market Context:');
     });
 
+    it('should not include market context section when undefined market metrics provided', async () => {
+      const chartPath = '/path/to/chart.png';
+      const marketMetrics = undefined;
+
+      await llmService.getTradeDecisions(chartPath, marketMetrics);
+
+      expect(mockAnthropicCreate).toHaveBeenCalledTimes(2);
+
+      // Check that no market context is included when undefined provided
+      const firstCall = mockAnthropicCreate.mock.calls[0][0];
+      const promptText = firstCall.messages[0].content[0].text;
+      expect(promptText).not.toContain('Market Context:');
+      expect(promptText).toContain('You are a conservative trader.');
+      expect(promptText).toContain('Respond in JSON format.');
+    });
+
     it('should properly format market context section in prompt', async () => {
       const chartPath = '/path/to/chart.png';
       const marketMetrics = 'Line 1\nLine 2\nLine 3';
