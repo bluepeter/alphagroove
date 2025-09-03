@@ -853,10 +853,13 @@ export const generateSvgChart = (
       // Use the same priceToY function that other chart elements use
       const smaY = priceToY(marketData.sma20);
 
-      // Only show SMA on Signal Day (from first day boundary line to right edge)
-      const signalDayStartX = dayBoundaryLines.length > 0 ? dayBoundaryLines[0].x : marginLeft;
+      // Check if SMA line would be within visible chart bounds
+      if (smaY >= marginTop && smaY <= marginTop + chartHeight) {
+        // Only show SMA on Signal Day (from first day boundary line to right edge)
+        const signalDayStartX = dayBoundaryLines.length > 0 ? dayBoundaryLines[0].x : marginLeft;
 
-      return `<line x1="${signalDayStartX}" y1="${smaY}" x2="${marginLeft + chartWidth}" y2="${smaY}" stroke="#2196F3" stroke-width="2" fill="none" opacity="0.8" stroke-dasharray="5,5" />`;
+        return `<line x1="${signalDayStartX}" y1="${smaY}" x2="${marginLeft + chartWidth}" y2="${smaY}" stroke="#2196F3" stroke-width="2" fill="none" opacity="0.8" stroke-dasharray="5,5" />`;
+      }
     }
     return '';
   })()}
@@ -878,9 +881,14 @@ export const generateSvgChart = (
   <text x="${marginLeft + chartWidth / 2}" y="${height - 25}" text-anchor="middle" font-size="14">Time</text>
   
   ${(() => {
-    // Add legend for VWAP and/or SMA if present
+    // Add legend for VWAP and/or SMA if present and within bounds
     const hasVwap = !!marketData.vwap;
-    const hasSma = !!marketData.sma20;
+    const hasSma =
+      marketData.sma20 &&
+      (() => {
+        const smaY = priceToY(marketData.sma20);
+        return smaY >= marginTop && smaY <= marginTop + chartHeight;
+      })();
 
     if (hasVwap || hasSma) {
       const legendItems = [];

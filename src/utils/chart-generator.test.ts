@@ -870,5 +870,60 @@ describe('Chart Generator', () => {
       expect(svgContent).toContain('stroke="#2196F3"');
       expect(svgContent).toContain('stroke-dasharray="5,5"');
     });
+
+    it('should not render SMA line when it is outside chart bounds', () => {
+      const intradayBars = [
+        // Current day data with price range 100-105
+        {
+          timestamp: '2023-05-02 09:30:00',
+          open: 103,
+          high: 105,
+          low: 100,
+          close: 104,
+          volume: 10000,
+          trade_date: '2023-05-02',
+        },
+        {
+          timestamp: '2023-05-02 10:30:00',
+          open: 104,
+          high: 105,
+          low: 102,
+          close: 103,
+          volume: 8000,
+          trade_date: '2023-05-02',
+        },
+      ];
+
+      // Create daily bars with SMA that would be way outside the chart bounds
+      // Chart price range will be ~99.5-105.5, but SMA will be 150 (way above)
+      const dailyBars = Array.from({ length: 20 }, (_, i) => ({
+        date: `2023-04-${String(i + 10).padStart(2, '0')}`,
+        open: 150 + i * 0.1,
+        high: 151 + i * 0.1,
+        low: 149 + i * 0.1,
+        close: 150 + i * 0.1,
+        volume: 1000000,
+      }));
+
+      const svgContent = generateSvgChart(
+        'SPY',
+        'sma-bounds-test',
+        intradayBars,
+        { timestamp: '2023-05-02 10:30:00', price: 103, type: 'entry' },
+        false,
+        false,
+        dailyBars
+      );
+
+      // Should contain SMA information in header (metrics are always shown)
+      expect(svgContent).toContain('20-Day SMA:');
+      expect(svgContent).toMatch(/20-Day SMA: \$150\.\d{2}/);
+
+      // Should NOT contain SMA line visualization (it's outside bounds)
+      expect(svgContent).not.toContain('stroke-dasharray="5,5"');
+
+      // Should NOT contain SMA legend (no line to show)
+      expect(svgContent).not.toContain('20-Day SMA</text>');
+    });
   });
 });
