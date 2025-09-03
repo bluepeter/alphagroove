@@ -230,6 +230,7 @@ const ConfigSchema = z.object({
       ticker: z.string(),
       timeframe: z.string(),
       suppressSma: z.boolean().optional().default(false),
+      suppressVwap: z.boolean().optional().default(false),
       llmConfirmationScreen: LLMScreenConfigSchema.optional(),
     })
     .optional(),
@@ -259,6 +260,7 @@ const ConfigSchema = z.object({
       ticker: z.string(),
       timeframe: z.string(),
       suppressSma: z.boolean().optional().default(false),
+      suppressVwap: z.boolean().optional().default(false),
 
       patterns: DefaultPatternsSchema.optional(),
       parallelization: ParallelizationOptionsSchema.optional(),
@@ -296,6 +298,7 @@ const DEFAULT_CONFIG: Config = {
     ticker: 'SPY',
     timeframe: '1min',
     suppressSma: false,
+    suppressVwap: false,
 
     patterns: {
       entry: 'quickRise',
@@ -527,6 +530,7 @@ export interface MergedConfig {
   ticker: string;
   timeframe: string;
   suppressSma?: boolean;
+  suppressVwap?: boolean;
 
   from: string;
   to: string;
@@ -565,6 +569,7 @@ export const mergeConfigWithCliOptions = (
         ticker: loadedConfig.shared?.ticker || 'SPY',
         timeframe: loadedConfig.shared?.timeframe || '1min',
         suppressSma: loadedConfig.shared?.suppressSma ?? false,
+        suppressVwap: loadedConfig.shared?.suppressVwap ?? false,
 
         date: loadedConfig.backtest?.date,
         parallelization: loadedConfig.backtest?.parallelization,
@@ -673,6 +678,7 @@ export const mergeConfigWithCliOptions = (
     ticker: cliOptions.ticker || compatConfig.default?.ticker || 'SPY',
     timeframe: cliOptions.timeframe || compatConfig.default?.timeframe || '1min',
     suppressSma: cliOptions.suppressSma ?? (compatConfig.default as any)?.suppressSma ?? false,
+    suppressVwap: cliOptions.suppressVwap ?? (compatConfig.default as any)?.suppressVwap ?? false,
 
     from: cliOptions.from || compatConfig.default?.date?.from || '2010-01-01',
     to: cliOptions.to || compatConfig.default?.date?.to || '2025-12-31',

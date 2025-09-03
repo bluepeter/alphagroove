@@ -4,6 +4,7 @@ shared:
   ticker: 'SPY'
   timeframe: '1min'
   suppressSma: true # Set to true to disable SMA computation and display for both backtest and scout
+  suppressVwap: true # Set to true to disable VWAP computation and display for both backtest and scout
   llmConfirmationScreen:
     llmProvider: 'anthropic'
     modelName: 'claude-sonnet-4-20250514'

@@ -14,6 +14,7 @@ export interface ScoutChartOptions {
   allData: Bar[];
   dailyBars?: DailyBar[];
   suppressSma?: boolean;
+  suppressVwap?: boolean;
 }
 
 /**
@@ -30,6 +31,7 @@ export const generateScoutChart = async (options: ScoutChartOptions): Promise<st
     allData,
     dailyBars,
     suppressSma = false,
+    suppressVwap = false,
   } = options;
 
   // Create timestamp-based filename for scout charts
@@ -58,7 +60,8 @@ export const generateScoutChart = async (options: ScoutChartOptions): Promise<st
     false,
     true,
     dailyBars,
-    suppressSma
+    suppressSma,
+    suppressVwap
   );
   fs.writeFileSync(svgOutputPathLlm, svgLlm, 'utf-8');
 
@@ -71,7 +74,8 @@ export const generateScoutChart = async (options: ScoutChartOptions): Promise<st
     true,
     false,
     dailyBars,
-    suppressSma
+    suppressSma,
+    suppressVwap
   );
   fs.writeFileSync(svgOutputPathComplete, svgComplete, 'utf-8');
 

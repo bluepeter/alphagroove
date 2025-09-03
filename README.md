@@ -70,6 +70,7 @@ shared:
   ticker: 'SPY'
   timeframe: '1min'
   suppressSma: false # Set to true to disable SMA computation and display
+  suppressVwap: false # Set to true to disable VWAP computation and display
 
   # LLM configuration for intelligent trade analysis
   llmConfirmationScreen:
@@ -184,6 +185,21 @@ Average) computation and display across both backtest and scout tools:
 
 Set `suppressSma: true` when you want to focus purely on intraday price action and VWAP analysis
 without the overhead of 20-day SMA calculations.
+
+**VWAP Suppression**
+
+The `suppressVwap` option in the shared configuration allows you to disable VWAP (Volume Weighted
+Average Price) computation and display across both backtest and scout tools:
+
+- **Performance Benefits**: Eliminates VWAP calculations during chart generation
+- **Faster Execution**: Reduces computation overhead for volume-weighted price analysis
+- **Simplified Analysis**: Focuses analysis on price action and SMA without VWAP context
+- **Chart Clarity**: Removes VWAP line and VWAP vs SMA comparison from charts
+- **LLM Prompts**: Excludes VWAP context from market metrics sent to LLMs
+
+Set `suppressVwap: true` when you want to focus purely on price action and SMA analysis without VWAP
+calculations. You can use both `suppressSma` and `suppressVwap` together to create the most
+streamlined analysis focusing only on basic price action.
 
 You can generate a default config file by running:
 
@@ -402,9 +418,9 @@ The LLM receives a **Market Context** section with each prompt containing:
 - **Previous Close & Today's Open**: Gap analysis with percentage and direction
 - **Today's High/Low Range**: Current trading range context
 - **Current Price & Time**: Real-time price action
-- **VWAP Analysis**: Current price relative to Volume Weighted Average Price
+- **VWAP Analysis**: Current price relative to Volume Weighted Average Price (if not suppressed)
 - **SMA Analysis**: Current price relative to 20-day Simple Moving Average (if not suppressed)
-- **VWAP vs SMA**: Relationship between technical indicators (if SMA not suppressed)
+- **VWAP vs SMA**: Relationship between technical indicators (if neither VWAP nor SMA suppressed)
 
 ### Example Market Context
 

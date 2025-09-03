@@ -122,6 +122,8 @@ describe('LLM Trade Screening Tests', () => {
       timeframe: '1min',
       direction: 'long',
       llmConfirmationScreen: { enabled: false },
+      suppressSma: false,
+      suppressVwap: false,
 
       someBaseOpt: 'value',
       config: 'path/to/config.yaml',
@@ -140,7 +142,7 @@ describe('LLM Trade Screening Tests', () => {
     };
     const mockChartName = 'test-chart';
     const getMockAppConfig = (): AppConfig => ({
-      default: { ticker: 'SPY', timeframe: '1min', suppressSma: false },
+      default: { ticker: 'SPY', timeframe: '1min', suppressSma: false, suppressVwap: false },
       patterns: { entry: {} },
     });
 
@@ -277,6 +279,43 @@ describe('LLM Trade Screening Tests', () => {
           type: 'entry',
         },
         suppressSma: true,
+        suppressVwap: false,
+      });
+    });
+
+    it('should pass suppressVwap parameter to generateEntryChart', async () => {
+      const { generateEntryChart } = await import('./utils/chart-generator.js');
+      const localMockLlmInstance = new (LlmConfirmationScreen as any)();
+      const screenConfigEnabled = { enabled: true };
+      const currentAppConfig = getMockAppConfig();
+      const currentMergedConfig = {
+        ...mockMergedConfigValue,
+        suppressVwap: true, // Test with suppressVwap enabled
+      };
+
+      await mainModule.handleLlmTradeScreeningInternal(
+        mockSignal,
+        mockChartName,
+        localMockLlmInstance,
+        screenConfigEnabled,
+        currentMergedConfig,
+        currentAppConfig
+      );
+
+      // Verify generateEntryChart was called with suppressVwap: true
+      expect(generateEntryChart).toHaveBeenCalledWith({
+        ticker: mockSignal.ticker,
+        timeframe: currentMergedConfig.timeframe,
+        entryPatternName: mockChartName,
+        tradeDate: mockSignal.trade_date,
+        entryTimestamp: mockSignal.timestamp,
+        entrySignal: {
+          timestamp: mockSignal.timestamp,
+          price: mockSignal.price,
+          type: 'entry',
+        },
+        suppressSma: false,
+        suppressVwap: true,
       });
     });
   });

@@ -91,6 +91,7 @@ const generateChartForLLMDecision = async (
       entryTimestamp: signalData.timestamp,
       entrySignal: entrySignalForChart,
       suppressSma: appOrMergedConfig.suppressSma,
+      suppressVwap: appOrMergedConfig.suppressVwap,
     });
 
     if (!chartPath) {
@@ -164,7 +165,8 @@ export const handleLlmTradeScreeningInternal = async (
       allBars,
       entrySignal,
       undefined,
-      mergedConfig.suppressSma
+      mergedConfig.suppressSma,
+      mergedConfig.suppressVwap
     );
   } catch (error) {
     console.warn('[LLM Prep] Failed to generate market metrics for backtest:', error);
@@ -671,7 +673,8 @@ export const finalizeAnalysis = async (
         mergedConfig.timeframe,
         entryPattern.name,
         tradesForBulkCharts,
-        mergedConfig.suppressSma
+        mergedConfig.suppressSma,
+        mergedConfig.suppressVwap
       );
       console.log(`\nGenerated ${chartPaths.length} charts in ./charts/${entryPattern.name}/`);
     }

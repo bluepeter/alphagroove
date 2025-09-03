@@ -159,6 +159,47 @@ describe('Chart Generator', () => {
     expect(chartPaths[0]).toContain('20230501_masked.png');
   });
 
+  it('should pass suppressVwap parameter to generateEntryChart', async () => {
+    const outputPath = await generateEntryChart({
+      ticker: 'SPY',
+      timeframe: '1min',
+      entryPatternName: 'test-pattern-suppress-vwap',
+      tradeDate: '2023-05-01',
+      entryTimestamp: '09:35:00',
+      entrySignal: mockSignal,
+      suppressVwap: true,
+    });
+
+    expect(outputPath).toContain('test-pattern-suppress-vwap');
+    expect(outputPath).toContain('SPY');
+    expect(outputPath).toContain('20230501');
+    expect(outputPath).toContain('masked.png');
+  });
+
+  it('should pass suppressVwap parameter to bulk generateEntryCharts', async () => {
+    const mockTrades = [
+      {
+        trade_date: '2023-05-01',
+        entry_time: '2023-05-01 09:35:00',
+        entry_price: 401.0,
+        direction: 'long' as const,
+      },
+    ];
+
+    const chartPaths = await generateEntryCharts(
+      'SPY',
+      '1min',
+      'test-pattern-bulk-suppress-vwap',
+      mockTrades,
+      false,
+      true
+    );
+
+    expect(chartPaths.length).toBe(1);
+    expect(chartPaths[0]).toContain('test-pattern-bulk-suppress-vwap');
+    expect(chartPaths[0]).toContain('20230501_masked.png');
+  });
+
   it('should correctly fetch prior trading day data across a weekend', async () => {
     const mondaySignalDate = '2025-01-27'; // A known Monday
     const precedingFriday = '2025-01-24';
@@ -998,6 +1039,84 @@ describe('Chart Generator', () => {
       // Note: This test may not show SMA if there's insufficient historical data,
       // but it should at least not crash and should differ from suppressed version
       expect(svgContentWithSma).not.toBe(svgContentSuppressed);
+    });
+
+    it('should not render VWAP line when suppressVwap is true', () => {
+      const intradayBars = [
+        // Previous day data
+        {
+          timestamp: '2023-05-01 09:30:00',
+          open: 100,
+          high: 101,
+          low: 99,
+          close: 100.5,
+          volume: 1000,
+          trade_date: '2023-05-01',
+        },
+        // Current day data
+        {
+          timestamp: '2023-05-02 09:30:00',
+          open: 101,
+          high: 102,
+          low: 100,
+          close: 101.5,
+          volume: 1200,
+          trade_date: '2023-05-02',
+        },
+        {
+          timestamp: '2023-05-02 09:35:00',
+          open: 101.5,
+          high: 102.5,
+          low: 101,
+          close: 102,
+          volume: 800,
+          trade_date: '2023-05-02',
+        },
+      ];
+
+      const entrySignal: Signal = {
+        timestamp: '2023-05-02 09:35:00',
+        price: 102,
+        type: 'entry',
+      };
+
+      // Test with suppressVwap: true
+      const svgContentSuppressed = generateSvgChart(
+        'SPY',
+        'test-pattern',
+        intradayBars,
+        entrySignal,
+        false,
+        false,
+        undefined,
+        false, // suppressSma: false
+        true // suppressVwap: true
+      );
+
+      // Should not contain VWAP information
+      expect(svgContentSuppressed).not.toContain('VWAP');
+      expect(svgContentSuppressed).not.toContain('ABOVE VWAP');
+      expect(svgContentSuppressed).not.toContain('BELOW VWAP');
+      expect(svgContentSuppressed).not.toContain('#ff6b35'); // VWAP line color
+      // Should not contain VWAP text in chart headers
+      expect(svgContentSuppressed).not.toContain('BELOW VWAP of');
+      expect(svgContentSuppressed).not.toContain('ABOVE VWAP of');
+
+      // Test with suppressVwap: false (default behavior)
+      const svgContentWithVwap = generateSvgChart(
+        'SPY',
+        'test-pattern',
+        intradayBars,
+        entrySignal,
+        false,
+        false,
+        undefined,
+        false, // suppressSma: false
+        false // suppressVwap: false
+      );
+
+      // Should differ from suppressed version
+      expect(svgContentWithVwap).not.toBe(svgContentSuppressed);
     });
 
     it('should not render SMA line when it is outside chart bounds', () => {

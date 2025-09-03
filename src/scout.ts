@@ -201,7 +201,8 @@ const generateAnalysisChart = async (
   filteredBars: Bar[],
   allBars: Bar[],
   dailyBars?: DailyBar[],
-  suppressSma = false
+  suppressSma = false,
+  suppressVwap = false
 ): Promise<string> => {
   const chartOptions: ScoutChartOptions = {
     ticker,
@@ -212,6 +213,7 @@ const generateAnalysisChart = async (
     allData: allBars,
     dailyBars,
     suppressSma,
+    suppressVwap,
   };
 
   return await generateScoutChart(chartOptions);
@@ -256,11 +258,13 @@ const performLLMAnalysis = async (
 
     // Generate market metrics for LLM prompt
     const suppressSma = rawConfig.shared?.suppressSma ?? false;
+    const suppressVwap = rawConfig.shared?.suppressVwap ?? false;
     const marketMetrics = generateMarketMetricsForPrompt(
       allBars,
       entrySignal,
       dailyBars,
-      suppressSma
+      suppressSma,
+      suppressVwap
     );
 
     const llmScreen = new LlmConfirmationScreen();
@@ -574,6 +578,7 @@ export const main = async (cmdOptions?: any): Promise<void> => {
 
     // Fetch daily bars for SMA calculation (unless suppressed)
     const suppressSma = rawConfig.shared?.suppressSma ?? false;
+    const suppressVwap = rawConfig.shared?.suppressVwap ?? false;
     const dailyBars = await fetchDailyBarsForSMA(polygonService, ticker, tradeDate, suppressSma);
 
     // Create entry signal based on current market conditions
@@ -600,7 +605,8 @@ export const main = async (cmdOptions?: any): Promise<void> => {
       filteredBars,
       tradingHoursBars,
       dailyBars,
-      suppressSma
+      suppressSma,
+      suppressVwap
     );
 
     if (chartPath) {

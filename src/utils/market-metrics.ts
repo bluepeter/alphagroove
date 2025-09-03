@@ -27,7 +27,8 @@ export const generateMarketMetrics = (
   allDataInput: Bar[],
   entrySignal: Signal,
   dailyBars?: DailyBar[],
-  suppressSma?: boolean
+  suppressSma?: boolean,
+  suppressVwap?: boolean
 ): MarketMetrics => {
   const entryDate = new Date(entrySignal.timestamp).toISOString().split('T')[0];
   const entryTime = new Date(entrySignal.timestamp).toLocaleTimeString('en-US', {
@@ -39,14 +40,16 @@ export const generateMarketMetrics = (
   const marketData = calculateMarketDataContext(allDataInput, entryDate);
   marketData.currentPrice = entrySignal.price;
 
-  // Calculate VWAP for current day
-  const currentDayBars = filterCurrentDayBars(allDataInput, entryDate);
-  const vwapResult = calculateVWAPResult(currentDayBars, marketData.currentPrice);
-  if (vwapResult) {
-    marketData.vwap = vwapResult.vwap;
-    marketData.vwapPosition = vwapResult.position;
-    marketData.vwapDifference = vwapResult.priceVsVwap;
-    marketData.vwapDifferencePercent = vwapResult.priceVsVwapPercent;
+  // Calculate VWAP for current day (only if not suppressed)
+  if (!suppressVwap) {
+    const currentDayBars = filterCurrentDayBars(allDataInput, entryDate);
+    const vwapResult = calculateVWAPResult(currentDayBars, marketData.currentPrice);
+    if (vwapResult) {
+      marketData.vwap = vwapResult.vwap;
+      marketData.vwapPosition = vwapResult.position;
+      marketData.vwapDifference = vwapResult.priceVsVwap;
+      marketData.vwapDifferencePercent = vwapResult.priceVsVwapPercent;
+    }
   }
 
   // Calculate 20-day SMA (only if not suppressed)
@@ -89,16 +92,18 @@ export const generateMarketMetrics = (
 
   const marketDataLine2 = `Today H/L: ${marketData.currentHigh ? '$' + marketData.currentHigh.toFixed(2) : 'N/A'}/${marketData.currentLow ? '$' + marketData.currentLow.toFixed(2) : 'N/A'} | Current: $${marketData.currentPrice.toFixed(2)} @ ${entryTime}`;
 
-  // Format VWAP information
+  // Format VWAP information (only if not suppressed)
   let vwapInfo = '';
-  if (marketData.vwap) {
-    const vwapDiff = marketData.vwapDifference || 0;
-    const absDiff = Math.abs(vwapDiff);
-    const position =
-      marketData.vwapPosition === 'at' ? 'AT' : marketData.vwapPosition?.toUpperCase();
-    vwapInfo = `Current price of $${marketData.currentPrice.toFixed(2)} is $${absDiff.toFixed(2)} ${position} VWAP of $${marketData.vwap.toFixed(2)}.`;
-  } else {
-    vwapInfo = 'VWAP data is not available.';
+  if (!suppressVwap) {
+    if (marketData.vwap) {
+      const vwapDiff = marketData.vwapDifference || 0;
+      const absDiff = Math.abs(vwapDiff);
+      const position =
+        marketData.vwapPosition === 'at' ? 'AT' : marketData.vwapPosition?.toUpperCase();
+      vwapInfo = `Current price of $${marketData.currentPrice.toFixed(2)} is $${absDiff.toFixed(2)} ${position} VWAP of $${marketData.vwap.toFixed(2)}.`;
+    } else {
+      vwapInfo = 'VWAP data is not available.';
+    }
   }
 
   // Format SMA information (only if not suppressed)
@@ -115,9 +120,9 @@ export const generateMarketMetrics = (
     }
   }
 
-  // Format VWAP vs SMA comparison (only if SMA not suppressed)
+  // Format VWAP vs SMA comparison (only if neither VWAP nor SMA are suppressed)
   let vwapVsSmaInfo = '';
-  if (!suppressSma && marketData.vwap && marketData.sma20) {
+  if (!suppressSma && !suppressVwap && marketData.vwap && marketData.sma20) {
     const vwapVsSmaDiff = marketData.vwap - marketData.sma20;
     const position = vwapVsSmaDiff > 0 ? 'ABOVE' : vwapVsSmaDiff < 0 ? 'BELOW' : 'AT';
     vwapVsSmaInfo = `VWAP of $${marketData.vwap.toFixed(2)} is $${Math.abs(vwapVsSmaDiff).toFixed(2)} ${position} SMA of $${marketData.sma20.toFixed(2)}.`;
@@ -142,19 +147,31 @@ export const generateMarketMetricsForPrompt = (
   allDataInput: Bar[],
   entrySignal: Signal,
   dailyBars?: DailyBar[],
-  suppressSma?: boolean
+  suppressSma?: boolean,
+  suppressVwap?: boolean
 ): string => {
-  const metrics = generateMarketMetrics(allDataInput, entrySignal, dailyBars, suppressSma);
+  const metrics = generateMarketMetrics(
+    allDataInput,
+    entrySignal,
+    dailyBars,
+    suppressSma,
+    suppressVwap
+  );
 
-  const lines = [metrics.marketDataLine1, metrics.marketDataLine2, metrics.vwapInfo];
+  const lines = [metrics.marketDataLine1, metrics.marketDataLine2];
+
+  // Only add VWAP info if not suppressed
+  if (!suppressVwap && metrics.vwapInfo) {
+    lines.push(metrics.vwapInfo);
+  }
 
   // Only add SMA info if not suppressed
   if (!suppressSma && metrics.smaInfo) {
     lines.push(metrics.smaInfo);
   }
 
-  // Only add VWAP vs SMA comparison if SMA is not suppressed
-  if (!suppressSma && metrics.vwapVsSmaInfo) {
+  // Only add VWAP vs SMA comparison if neither VWAP nor SMA are suppressed
+  if (!suppressSma && !suppressVwap && metrics.vwapVsSmaInfo) {
     lines.push(metrics.vwapVsSmaInfo);
   }
 

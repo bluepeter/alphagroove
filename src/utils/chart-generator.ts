@@ -144,6 +144,7 @@ interface ChartGeneratorOptions {
   entryTimestamp: string;
   entrySignal: Signal;
   suppressSma?: boolean;
+  suppressVwap?: boolean;
 }
 
 /**
@@ -158,6 +159,7 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
     tradeDate,
     entrySignal,
     suppressSma = false,
+    suppressVwap = false,
   } = options;
 
   const patternDir = path.join('./charts', entryPatternName);
@@ -193,7 +195,8 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
     false,
     true,
     dailyBars,
-    suppressSma
+    suppressSma,
+    suppressVwap
   );
   // console.log(`[generateEntryChart DEBUG] Length of svgLlm (LLM chart): ${svgLlm.length}`);
   fs.writeFileSync(svgOutputPathLlm, svgLlm, 'utf-8');
@@ -207,7 +210,8 @@ export const generateEntryChart = async (options: ChartGeneratorOptions): Promis
     true,
     false,
     dailyBars,
-    suppressSma
+    suppressSma,
+    suppressVwap
   );
   // console.log(
   //   `[generateEntryChart DEBUG] Length of svgComplete (Complete chart): ${svgComplete.length}`
@@ -356,7 +360,8 @@ export const generateSvgChart = (
   showFullDayData?: boolean,
   anonymize?: boolean,
   dailyBars?: DailyBar[],
-  suppressSma?: boolean
+  suppressSma?: boolean,
+  suppressVwap?: boolean
 ): string => {
   // Explicit console logs for debugging timestamp matching - REMOVE/COMMENT OUT
   if (!showFullDayData) {
@@ -685,7 +690,13 @@ export const generateSvgChart = (
   const marketDataLine1 = `Prev Close: ${marketData.previousClose ? '$' + marketData.previousClose.toFixed(2) : 'N/A'} | Today Open: ${marketData.currentOpen ? '$' + marketData.currentOpen.toFixed(2) : 'N/A'} | ${gapInfo || 'Gap: N/A'}`;
 
   // Use market metrics for consistent formatting
-  const chartMetrics = generateMarketMetrics(allDataInput, entrySignal, dailyBars, suppressSma);
+  const chartMetrics = generateMarketMetrics(
+    allDataInput,
+    entrySignal,
+    dailyBars,
+    suppressSma,
+    suppressVwap
+  );
   const vwapInfo = chartMetrics.vwapInfo;
 
   const marketDataLine2 = `Today H/L: ${marketData.currentHigh ? '$' + marketData.currentHigh.toFixed(2) : 'N/A'}/${marketData.currentLow ? '$' + marketData.currentLow.toFixed(2) : 'N/A'} | Current: $${marketData.currentPrice.toFixed(2)} @ ${entryTime}`;
@@ -709,9 +720,13 @@ export const generateSvgChart = (
   <text x="${width / 2}" y="70" text-anchor="middle" font-size="11">
     ${marketDataLine2}
   </text>
-  <text x="${width / 2}" y="85" text-anchor="middle" font-size="11">
+  ${
+    vwapInfo
+      ? `<text x="${width / 2}" y="85" text-anchor="middle" font-size="11">
     ${marketDataLine3}
-  </text>
+  </text>`
+      : ''
+  }
   ${
     smaInfo
       ? `<text x="${width / 2}" y="100" text-anchor="middle" font-size="11">
@@ -814,8 +829,8 @@ export const generateSvgChart = (
   <line x1="${marginLeft}" y1="${volumeTop + volumeHeight}" x2="${marginLeft + chartWidth}" y2="${volumeTop + volumeHeight}" stroke="#333" stroke-width="1" />
   
   ${(() => {
-    // Generate VWAP line if available
-    if (marketData.vwap) {
+    // Generate VWAP line if available and not suppressed
+    if (!suppressVwap && marketData.vwap) {
       const vwapLine = calculateVWAPLine(currentDayBars);
       if (vwapLine.length > 1) {
         // Map VWAP points to chart coordinates
@@ -876,7 +891,7 @@ export const generateSvgChart = (
   
   ${(() => {
     // Add legend for VWAP and/or SMA if present and within bounds
-    const hasVwap = !!marketData.vwap;
+    const hasVwap = !suppressVwap && !!marketData.vwap;
     const hasSma =
       !suppressSma &&
       marketData.sma20 &&
@@ -942,7 +957,8 @@ export const generateEntryCharts = async (
     entry_price: number;
     direction?: 'long' | 'short';
   }>,
-  suppressSma = false
+  suppressSma = false,
+  suppressVwap = false
 ): Promise<string[]> => {
   // Now returns array of PNG paths
   const outputPngPaths: string[] = [];
@@ -964,6 +980,7 @@ export const generateEntryCharts = async (
         entryTimestamp: trade.entry_time,
         entrySignal,
         suppressSma,
+        suppressVwap,
       });
       if (pngPath) {
         // Check if a path was returned (might be empty on error)

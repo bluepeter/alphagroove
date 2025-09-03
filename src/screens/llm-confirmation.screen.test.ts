@@ -84,6 +84,7 @@ const _getBaseAppConfig = (): AppConfig => ({
     ticker: 'SPY',
     timeframe: '1min',
     suppressSma: false,
+    suppressVwap: false,
 
     patterns: { entry: 'quickRise' },
     date: { from: '2023-01-01', to: '2023-12-31' },

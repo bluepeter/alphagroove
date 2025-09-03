@@ -26,6 +26,7 @@ describe('Configuration System', () => {
         ticker: 'SPY',
         timeframe: '1min',
         suppressSma: false,
+        suppressVwap: false,
         direction: 'long' as const,
         date: {
           from: '2023-01-01',
@@ -128,6 +129,7 @@ describe('Configuration System', () => {
       const config = createTestConfig({
         default: {
           suppressSma: false,
+          suppressVwap: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -154,6 +156,7 @@ describe('Configuration System', () => {
       const config = createTestConfig({
         default: {
           suppressSma: false,
+          suppressVwap: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -181,6 +184,7 @@ describe('Configuration System', () => {
       const config = createTestConfig({
         default: {
           suppressSma: false,
+          suppressVwap: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -203,6 +207,7 @@ describe('Configuration System', () => {
       const config = createTestConfig({
         default: {
           suppressSma: false,
+          suppressVwap: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -226,6 +231,7 @@ describe('Configuration System', () => {
       const config = createTestConfig({
         default: {
           suppressSma: false,
+          suppressVwap: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -249,6 +255,7 @@ describe('Configuration System', () => {
       const config = createTestConfig({
         default: {
           suppressSma: false,
+          suppressVwap: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -277,6 +284,7 @@ describe('Configuration System', () => {
       const config = createTestConfig({
         default: {
           suppressSma: false,
+          suppressVwap: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -302,6 +310,7 @@ describe('Configuration System', () => {
       const configWithMaxHoldTime: Config = {
         default: {
           suppressSma: false,
+          suppressVwap: false,
           ticker: 'SPY',
           timeframe: '1min',
 
@@ -433,6 +442,7 @@ describe('Configuration System', () => {
           ticker: 'SPY',
           timeframe: '1min',
           suppressSma: false,
+          suppressVwap: false,
           direction: 'llm_decides' as const,
           llmConfirmationScreen: {
             llmProvider: 'anthropic' as const,
@@ -507,6 +517,7 @@ describe('Configuration System', () => {
       const legacyConfig = {
         default: {
           suppressSma: false,
+          suppressVwap: false,
           ticker: 'QQQ',
           timeframe: '1min',
           direction: 'long' as const,
@@ -561,6 +572,7 @@ describe('Configuration System', () => {
         // Legacy structure
         default: {
           suppressSma: false,
+          suppressVwap: false,
           ticker: 'LEGACY_TICKER',
           timeframe: '1min',
           direction: 'short' as const,
@@ -581,6 +593,7 @@ describe('Configuration System', () => {
           ticker: 'NEW_TICKER',
           timeframe: '1min',
           suppressSma: false,
+          suppressVwap: false,
           direction: 'llm_decides' as const,
           llmConfirmationScreen: {
             llmProvider: 'anthropic' as const,
