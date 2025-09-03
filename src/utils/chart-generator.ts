@@ -581,23 +581,14 @@ export const generateSvgChart = (
             actualTime.getHours() === RTH_END_HOUR &&
             actualTime.getMinutes() === RTH_END_MINUTE;
 
-          if (isMarketOpen || isMarketClose || (isFullLabelHour && actualTime.getMinutes() === 0)) {
-            let timeText = '';
-            if (isMarketOpen) {
-              timeText = actualTime.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true,
-              });
-            } else if (isMarketClose) {
-              timeText = actualTime.toLocaleTimeString('en-US', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true,
-              });
-            } else if (isFullLabelHour) {
-              timeText = actualTime.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
-            }
+          // Standard hourly markers: 10 AM, 11 AM, 12 PM, 1 PM, 2 PM, 3 PM
+          const isStandardTime = hour >= 10 && hour <= 15 && minute === 0;
+
+          if (isStandardTime) {
+            const timeText = actualTime.toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              hour12: true,
+            });
 
             const tooClose = xTicksAndLabels.some(l => l.isTime && Math.abs(l.x - xPos) < 30);
             if (!tooClose && timeText) {
@@ -622,10 +613,11 @@ export const generateSvgChart = (
     month: 'short',
     day: 'numeric',
   });
-  const entryTime = new Date(entrySignal.timestamp).toLocaleTimeString('en-US', {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const entryTime =
+    new Date(entrySignal.timestamp).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }) + ' ET';
 
   // Calculate market data context for LLM
   const entryDate = new Date(entrySignal.timestamp).toISOString().split('T')[0];
@@ -747,7 +739,7 @@ export const generateSvgChart = (
   ${dayBoundaryLines
     .map(
       line =>
-        `<line x1="${line.x}" y1="${marginTop}" x2="${line.x}" y2="${marginTop + chartHeight}" stroke="#999" stroke-width="1" stroke-dasharray="5,5" />`
+        `<line x1="${line.x}" y1="${marginTop}" x2="${line.x}" y2="${marginTop + chartHeight}" stroke="#666" stroke-width="2" />`
     )
     .join('\n')}
     
@@ -760,19 +752,72 @@ export const generateSvgChart = (
     .join('\n  ')}
   
   <line x1="${marginLeft}" y1="${marginTop}" x2="${marginLeft}" y2="${marginTop + chartHeight}" stroke="#333" stroke-width="1" />
-  ${Array.from({ length: 6 }, (_, i) => {
-    const price = minPrice + (i / 5) * priceRange;
-    return `<text x="${marginLeft - 10}" y="${priceToY(price)}" text-anchor="end" dominant-baseline="middle" font-size="12">$${price.toFixed(2)}</text>`;
-  }).join('\n  ')}
+  ${(() => {
+    const wholeNumberPrices = [];
+    const minWholePrice = Math.ceil(minPrice);
+    const maxWholePrice = Math.floor(maxPrice);
+    for (let price = minWholePrice; price <= maxWholePrice; price++) {
+      wholeNumberPrices.push(price);
+    }
+    return wholeNumberPrices
+      .map(price => {
+        const y = priceToY(price);
+        if (y < marginTop + 10 || y > marginTop + chartHeight - 10) return '';
+        return `<text x="${marginLeft - 8}" y="${y}" text-anchor="end" dominant-baseline="middle" font-size="12" fill="#666">$${price}</text>`;
+      })
+      .join('\n  ');
+  })()}
   <line x1="${marginLeft}" y1="${marginTop + chartHeight}" x2="${marginLeft + chartWidth}" y2="${marginTop + chartHeight}" stroke="#333" stroke-width="1" />
   
+  {/* Right axis price indicators */}
+  ${(() => {
+    const wholeNumberPrices = [];
+    const minWholePrice = Math.ceil(minPrice);
+    const maxWholePrice = Math.floor(maxPrice);
+    for (let price = minWholePrice; price <= maxWholePrice; price++) {
+      wholeNumberPrices.push(price);
+    }
+    return wholeNumberPrices
+      .map(price => {
+        const y = priceToY(price);
+        if (y < marginTop + 10 || y > marginTop + chartHeight - 10) return '';
+        return `<text x="${marginLeft + chartWidth + 8}" y="${y}" text-anchor="start" dominant-baseline="middle" font-size="12" fill="#666">$${price}</text>`;
+      })
+      .join('\n  ');
+  })()}
+  
   {/* Horizontal Grid Lines */}
-  ${Array.from({ length: 6 }, (_, i) => {
-    const price = minPrice + (i / 5) * priceRange;
-    const y = priceToY(price);
-    if (y < marginTop + 5 || y > marginTop + chartHeight - 5) return '';
-    return `<line x1="${marginLeft}" y1="${y}" x2="${marginLeft + chartWidth}" y2="${y}" stroke="#e0e0e0" stroke-width="0.5" stroke-dasharray="2,2" />`;
-  }).join('\n  ')}
+  ${(() => {
+    const wholeNumberPrices = [];
+    const minWholePrice = Math.ceil(minPrice);
+    const maxWholePrice = Math.floor(maxPrice);
+    for (let price = minWholePrice; price <= maxWholePrice; price++) {
+      wholeNumberPrices.push(price);
+    }
+    return wholeNumberPrices
+      .map(price => {
+        const y = priceToY(price);
+        if (y < marginTop + 5 || y > marginTop + chartHeight - 5) return '';
+        return `<line x1="${marginLeft}" y1="${y}" x2="${marginLeft + chartWidth}" y2="${y}" stroke="#e8e8e8" stroke-width="0.5" />`;
+      })
+      .join('\n  ');
+  })()}
+  
+  {/* Vertical Time Grid Lines - Price Chart */}
+  ${uniqueXTicksAndLabels
+    .filter(label => label.isTime)
+    .map(label => {
+      return `<line x1="${label.x}" y1="${marginTop}" x2="${label.x}" y2="${marginTop + chartHeight}" stroke="#e8e8e8" stroke-width="0.5" />`;
+    })
+    .join('\n  ')}
+  
+  {/* Vertical Time Grid Lines - Volume Chart */}
+  ${uniqueXTicksAndLabels
+    .filter(label => label.isTime)
+    .map(label => {
+      return `<line x1="${label.x}" y1="${volumeTop}" x2="${label.x}" y2="${volumeTop + volumeHeight}" stroke="#e8e8e8" stroke-width="0.5" />`;
+    })
+    .join('\n  ')}
   
   {/* Candlestick drawing logic START */}
   ${finalDataForChart
@@ -800,7 +845,7 @@ export const generateSvgChart = (
   ${dayBoundaryLines
     .map(
       line =>
-        `<line x1="${line.x}" y1="${volumeTop}" x2="${line.x}" y2="${volumeTop + volumeHeight}" stroke="#999" stroke-width="1" stroke-dasharray="5,5" />`
+        `<line x1="${line.x}" y1="${volumeTop}" x2="${line.x}" y2="${volumeTop + volumeHeight}" stroke="#666" stroke-width="2" />`
     )
     .join('\n')}
     
@@ -879,15 +924,13 @@ export const generateSvgChart = (
         return `<line x1="${label.x}" y1="${volumeTop + volumeHeight}" x2="${label.x}" y2="${volumeTop + volumeHeight + 5}" stroke="#333" stroke-width="1" />`;
       }
       if (label.isTime && label.text) {
-        return `<text x="${label.x}" y="${volumeTop + volumeHeight + 20}" text-anchor="middle" font-size="11" transform="rotate(45, ${label.x}, ${volumeTop + volumeHeight + 20})">${label.text}</text>`;
+        return `<text x="${label.x}" y="${volumeTop + volumeHeight + 18}" text-anchor="middle" font-size="12" font-weight="500" fill="#444">${label.text}</text>`;
       }
       return '';
     })
     .join('\n  ')}
   
-  <text x="${marginLeft - 45}" y="${marginTop + chartHeight / 2}" text-anchor="middle" transform="rotate(-90, ${marginLeft - 45}, ${marginTop + chartHeight / 2})" font-size="14">Price ($)</text>
-  <text x="${marginLeft - 45}" y="${volumeTop + volumeHeight / 2}" text-anchor="middle" transform="rotate(-90, ${marginLeft - 45}, ${volumeTop + volumeHeight / 2})" font-size="12">Volume</text>
-  <text x="${marginLeft + chartWidth / 2}" y="${height - 25}" text-anchor="middle" font-size="14">Time</text>
+
   
   ${(() => {
     // Add legend for VWAP and/or SMA if present and within bounds

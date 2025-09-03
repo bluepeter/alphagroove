@@ -3,8 +3,8 @@
 shared:
   ticker: 'SPY'
   timeframe: '1min'
-  suppressSma: true # Set to true to disable SMA computation and display for both backtest and scout
-  suppressVwap: true # Set to true to disable VWAP computation and display for both backtest and scout
+  suppressSma: false # Set to true to disable SMA computation and display for both backtest and scout
+  suppressVwap: false # Set to true to disable VWAP computation and display for both backtest and scout
   suppressMetricsInPrompts: true # Set to true to exclude all text metrics from LLM prompts (metrics still appear in charts)
   llmConfirmationScreen:
     llmProvider: 'anthropic'
@@ -12,7 +12,7 @@ shared:
     apiKeyEnvVar: 'ANTHROPIC_API_KEY'
     numCalls: 2
     agreementThreshold: 2
-    temperatures: [0.1, 1.0]
+    temperatures: [0.1, 1.0, 1.0, 0.5]
     systemPrompt: >-
       You are a seasoned day trader. You know when to save your powder and wait. You don't assume
       you always need to be in the market. Only when you're sure will you go long or short.
@@ -33,7 +33,10 @@ shared:
         continuations, and other interesting patterns.
       - You are a quant trader that still has a knack for spotting patterns and trends. You were top
         of your class at MIT and Stanford.
-    #   - You are a YOLO trader that is super-savvy and has exceptional intuition. Your rationale must be in WSB lingo.
+      #- You are a YOLO trader that is super-savvy and has exceptional intuition. You are a master of
+      #  the game. Wall Street Bets is your bible. Lingo is your weapon.
+      #- You are a technical analyst that is a master of the charts. You are a master of the game.
+      #  Reply in 1920s Wall Street lingo.
     commonPromptSuffixForJson: >-
       Based on the provided chart: 
 
