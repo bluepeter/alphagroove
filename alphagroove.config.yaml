@@ -45,8 +45,12 @@ shared:
       - Provide a one-sentence rationalization for your decision.
 
       - Provide target stop loss and profit target prices (only provide if action is long or short)
-      that are realistic exit prices given today's range, remaining time in the day, and the current
-      price.
+      that are realistic exit prices given today's range and the current price.
+
+      Double-check your assumptions about price, volume, and time; in particular, watch out for
+      confusing yesterday's closing volume with today's opening volume. Indeed, since you are an
+      LLM, you frequently confuse today's data with prior day's data. The chart will clearly
+      indicate "Prior Day" and "Signal Day".
 
       Your response MUST be a valid JSON object and nothing else.  JSON in the following format:
 

@@ -1,12 +1,130 @@
 import { Bar, Signal } from '../patterns/types';
-import { calculateMarketDataContext } from './chart-generator';
 import { calculateVWAPResult, filterCurrentDayBars } from './vwap-calculator';
+import { parseTimestampAsET } from './polygon-data-converter';
+import { isTradingHours } from './date-helpers';
 import {
   calculateSMAResult,
   aggregateIntradayToDaily,
   SMA_PERIODS,
   DailyBar,
 } from './sma-calculator';
+
+/**
+ * Parse timestamp correctly for both CSV (already in ET) and Polygon (UTC) data
+ * This function ensures both backtest (CSV) and scout (Polygon) use the same logic
+ */
+const parseTimestampForChart = (timestamp: string): number => {
+  // Check if this looks like CSV data (simple YYYY-MM-DD HH:mm:ss format)
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(timestamp)) {
+    // CSV data is already in Eastern Time - parse it as such
+    const [datePart, timePart] = timestamp.split(' ');
+    const [year, month, day] = datePart.split('-').map(Number);
+    const [hours, minutes, seconds = 0] = timePart.split(':').map(Number);
+
+    // Create the timestamp as if it were UTC, then we'll adjust for ET
+    const utcTime = Date.UTC(year, month - 1, day, hours, minutes, seconds);
+
+    // Since CSV data is in ET, we need to add the ET offset to get the correct UTC timestamp
+    // that represents this ET time. ET is UTC-5 (EST) or UTC-4 (EDT)
+    // For simplicity, we'll determine if it's EST or EDT based on the date
+    const date = new Date(year, month - 1, day);
+    const isDST = isDaylightSavingTime(date);
+    const etOffsetHours = isDST ? 4 : 5; // EDT = UTC-4, EST = UTC-5
+
+    return utcTime + etOffsetHours * 60 * 60 * 1000;
+  }
+
+  // Otherwise, assume it's Polygon data that needs UTC->ET conversion
+  return parseTimestampAsET(timestamp);
+};
+
+/**
+ * Simple daylight saving time check for US Eastern Time
+ */
+const isDaylightSavingTime = (date: Date): boolean => {
+  const year = date.getFullYear();
+
+  // DST starts second Sunday in March, ends first Sunday in November
+  const march = new Date(year, 2, 1); // March 1
+  const november = new Date(year, 10, 1); // November 1
+
+  // Find second Sunday in March
+  const dstStart = new Date(year, 2, 8 + ((7 - march.getDay()) % 7));
+  // Find first Sunday in November
+  const dstEnd = new Date(year, 10, 1 + ((7 - november.getDay()) % 7));
+
+  return date >= dstStart && date < dstEnd;
+};
+
+export interface MarketDataContext {
+  previousClose?: number;
+  currentOpen?: number;
+  currentHigh?: number;
+  currentLow?: number;
+  currentPrice: number;
+  vwap?: number;
+  vwapPosition?: 'above' | 'below' | 'at';
+  vwapDifference?: number;
+  vwapDifferencePercent?: number;
+  sma20?: number;
+  smaPosition?: 'above' | 'below' | 'at';
+  smaDifference?: number;
+  smaDifferencePercent?: number;
+}
+
+/**
+ * Calculate market data context for chart headers and metrics
+ */
+export const calculateMarketDataContext = (
+  allData: Bar[],
+  entryDate: string
+): MarketDataContext => {
+  // Get current day data (trading hours only)
+  const currentDayBars = allData.filter(bar => {
+    const barTimestamp = parseTimestampForChart(bar.timestamp);
+    const barDate = new Date(barTimestamp).toISOString().split('T')[0];
+    return barDate === entryDate && isTradingHours(barTimestamp);
+  });
+
+  // Get previous day data (trading hours only)
+  const previousDayBars = allData.filter(bar => {
+    const barTimestamp = parseTimestampForChart(bar.timestamp);
+    const barDate = new Date(barTimestamp).toISOString().split('T')[0];
+    return barDate < entryDate && isTradingHours(barTimestamp);
+  });
+
+  // Calculate previous day close (last trading bar of previous day)
+  const previousClose =
+    previousDayBars.length > 0 ? previousDayBars[previousDayBars.length - 1].close : undefined;
+
+  // Calculate current day OHLC (trading hours only)
+  let currentOpen: number | undefined;
+  let currentHigh: number | undefined;
+  let currentLow: number | undefined;
+
+  if (currentDayBars.length > 0) {
+    // Sort by timestamp to ensure we get the first trading bar (9:30 AM)
+    const sortedCurrentDayBars = currentDayBars.sort(
+      (a, b) => parseTimestampForChart(a.timestamp) - parseTimestampForChart(b.timestamp)
+    );
+
+    currentOpen = sortedCurrentDayBars[0].open; // First trading bar of the day
+    currentHigh = Math.max(...currentDayBars.map(bar => bar.high));
+    currentLow = Math.min(...currentDayBars.map(bar => bar.low));
+  }
+
+  return {
+    previousClose,
+    currentOpen,
+    currentHigh,
+    currentLow,
+    currentPrice: 0, // Will be set from entrySignal.price
+    vwap: undefined, // Will be calculated separately with current day data
+    vwapPosition: undefined,
+    vwapDifference: undefined,
+    vwapDifferencePercent: undefined,
+  };
+};
 
 export interface MarketMetrics {
   marketDataLine1: string; // Prev Close | Today Open | Gap
@@ -35,6 +153,33 @@ export const generateMarketMetrics = (
     hour: '2-digit',
     minute: '2-digit',
   });
+
+  // Calculate remaining time in trading day
+  const calculateRemainingTime = (signalTimestamp: string): string => {
+    const signalDate = new Date(signalTimestamp);
+
+    // Market close is 4:00 PM ET (16:00)
+    const marketCloseDate = new Date(signalDate);
+    marketCloseDate.setHours(16, 0, 0, 0);
+
+    const remainingMs = marketCloseDate.getTime() - signalDate.getTime();
+
+    if (remainingMs <= 0) {
+      return 'Market Closed';
+    }
+
+    const remainingMinutes = Math.floor(remainingMs / (1000 * 60));
+    const hours = Math.floor(remainingMinutes / 60);
+    const minutes = remainingMinutes % 60;
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m remaining`;
+    } else {
+      return `${minutes}m remaining`;
+    }
+  };
+
+  const remainingTime = calculateRemainingTime(entrySignal.timestamp);
 
   // Calculate market data context
   const marketData = calculateMarketDataContext(allDataInput, entryDate);
@@ -90,7 +235,7 @@ export const generateMarketMetrics = (
   // Format market data lines
   const marketDataLine1 = `Prev Close: ${marketData.previousClose ? '$' + marketData.previousClose.toFixed(2) : 'N/A'} | Today Open: ${marketData.currentOpen ? '$' + marketData.currentOpen.toFixed(2) : 'N/A'} | ${gapInfo || 'Gap: N/A'}`;
 
-  const marketDataLine2 = `Today H/L: ${marketData.currentHigh ? '$' + marketData.currentHigh.toFixed(2) : 'N/A'}/${marketData.currentLow ? '$' + marketData.currentLow.toFixed(2) : 'N/A'} | Current: $${marketData.currentPrice.toFixed(2)} @ ${entryTime}`;
+  const marketDataLine2 = `Today H/L: ${marketData.currentHigh ? '$' + marketData.currentHigh.toFixed(2) : 'N/A'}/${marketData.currentLow ? '$' + marketData.currentLow.toFixed(2) : 'N/A'} | Current: $${marketData.currentPrice.toFixed(2)} @ ${entryTime} | ${remainingTime}`;
 
   // Format VWAP information (only if not suppressed)
   let vwapInfo = '';

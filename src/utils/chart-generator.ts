@@ -5,133 +5,9 @@ import path from 'path';
 import sharp from 'sharp';
 
 import { Bar, Signal } from '../patterns/types';
-import { parseTimestampAsET } from './polygon-data-converter';
-import { isTradingHours } from './date-helpers';
-import { calculateVWAPResult, calculateVWAPLine, filterCurrentDayBars } from './vwap-calculator';
+import { calculateVWAPLine, filterCurrentDayBars } from './vwap-calculator';
 import { generateMarketMetrics } from './market-metrics';
-import {
-  calculateSMAResult,
-  aggregateIntradayToDaily,
-  type DailyBar,
-  SMA_PERIODS,
-} from './sma-calculator';
-
-/**
- * Parse timestamp correctly for both CSV (already in ET) and Polygon (UTC) data
- * This function ensures both backtest (CSV) and scout (Polygon) use the same logic
- */
-const parseTimestampForChart = (timestamp: string): number => {
-  // Check if this looks like CSV data (simple YYYY-MM-DD HH:mm:ss format)
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(timestamp)) {
-    // CSV data is already in Eastern Time - parse it as such
-    const [datePart, timePart] = timestamp.split(' ');
-    const [year, month, day] = datePart.split('-').map(Number);
-    const [hours, minutes, seconds = 0] = timePart.split(':').map(Number);
-
-    // Create the timestamp as if it were UTC, then we'll adjust for ET
-    const utcTime = Date.UTC(year, month - 1, day, hours, minutes, seconds);
-
-    // Since CSV data is in ET, we need to add the ET offset to get the correct UTC timestamp
-    // that represents this ET time. ET is UTC-5 (EST) or UTC-4 (EDT)
-    // For simplicity, we'll determine if it's EST or EDT based on the date
-    const date = new Date(year, month - 1, day);
-    const isDST = isDaylightSavingTime(date);
-    const etOffsetHours = isDST ? 4 : 5; // EDT = UTC-4, EST = UTC-5
-
-    return utcTime + etOffsetHours * 60 * 60 * 1000;
-  }
-
-  // Otherwise, assume it's Polygon data that needs UTC->ET conversion
-  return parseTimestampAsET(timestamp);
-};
-
-/**
- * Simple daylight saving time check for US Eastern Time
- */
-const isDaylightSavingTime = (date: Date): boolean => {
-  const year = date.getFullYear();
-
-  // DST starts second Sunday in March, ends first Sunday in November
-  const march = new Date(year, 2, 1); // March 1
-  const november = new Date(year, 10, 1); // November 1
-
-  // Find second Sunday in March
-  const dstStart = new Date(year, 2, 8 + ((7 - march.getDay()) % 7));
-  // Find first Sunday in November
-  const dstEnd = new Date(year, 10, 1 + ((7 - november.getDay()) % 7));
-
-  return date >= dstStart && date < dstEnd;
-};
-
-export interface MarketDataContext {
-  previousClose?: number;
-  currentOpen?: number;
-  currentHigh?: number;
-  currentLow?: number;
-  currentPrice: number;
-  vwap?: number;
-  vwapPosition?: 'above' | 'below' | 'at';
-  vwapDifference?: number;
-  vwapDifferencePercent?: number;
-  sma20?: number;
-  smaPosition?: 'above' | 'below' | 'at';
-  smaDifference?: number;
-  smaDifferencePercent?: number;
-}
-
-/**
- * Calculate market data context for chart headers
- */
-export const calculateMarketDataContext = (
-  allData: Bar[],
-  entryDate: string
-): MarketDataContext => {
-  // Get current day data (trading hours only)
-  const currentDayBars = allData.filter(bar => {
-    const barTimestamp = parseTimestampForChart(bar.timestamp);
-    const barDate = new Date(barTimestamp).toISOString().split('T')[0];
-    return barDate === entryDate && isTradingHours(barTimestamp);
-  });
-
-  // Get previous day data (trading hours only)
-  const previousDayBars = allData.filter(bar => {
-    const barTimestamp = parseTimestampForChart(bar.timestamp);
-    const barDate = new Date(barTimestamp).toISOString().split('T')[0];
-    return barDate < entryDate && isTradingHours(barTimestamp);
-  });
-
-  // Calculate previous day close (last trading bar of previous day)
-  const previousClose =
-    previousDayBars.length > 0 ? previousDayBars[previousDayBars.length - 1].close : undefined;
-
-  // Calculate current day OHLC (trading hours only)
-  let currentOpen: number | undefined;
-  let currentHigh: number | undefined;
-  let currentLow: number | undefined;
-
-  if (currentDayBars.length > 0) {
-    // Sort by timestamp to ensure we get the first trading bar (9:30 AM)
-    const sortedCurrentDayBars = currentDayBars.sort(
-      (a, b) => parseTimestampForChart(a.timestamp) - parseTimestampForChart(b.timestamp)
-    );
-
-    currentOpen = sortedCurrentDayBars[0].open; // First trading bar of the day
-    currentHigh = Math.max(...currentDayBars.map(bar => bar.high));
-    currentLow = Math.min(...currentDayBars.map(bar => bar.low));
-  }
-
-  return {
-    previousClose,
-    currentOpen,
-    currentHigh,
-    currentLow,
-    currentPrice: 0, // Will be set from entrySignal.price
-    vwap: undefined, // Will be calculated separately with current day data
-    vwapPosition: undefined,
-    vwapDifference: undefined,
-    vwapDifferencePercent: undefined,
-  };
-};
+import { type DailyBar } from './sma-calculator';
 
 // Choose lightweight-charts from Trading View as the charting library
 // This provides professional-grade charts with candlesticks and volume support
@@ -648,75 +524,15 @@ export const generateSvgChart = (
     month: 'short',
     day: 'numeric',
   });
-  const entryTime =
-    new Date(entrySignal.timestamp).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    }) + ' ET';
-
-  // Calculate market data context for LLM
-  const entryDate = new Date(entrySignal.timestamp).toISOString().split('T')[0];
-  const marketData = calculateMarketDataContext(allDataInput, entryDate);
 
   const chartTitle = anonymize ? `XXX - ${patternName}` : `${ticker} - ${patternName}`;
   const headerDateText = anonymize ? 'XXX' : entryDateFormatted;
 
-  // Format market data for display
-  marketData.currentPrice = entrySignal.price;
-
-  // Calculate VWAP for current day
+  // Calculate entry date and current day bars (still needed for chart generation)
+  const entryDate = new Date(entrySignal.timestamp).toISOString().split('T')[0];
   const currentDayBars = filterCurrentDayBars(allDataInput, entryDate);
-  const vwapResult = calculateVWAPResult(currentDayBars, marketData.currentPrice);
-  if (vwapResult) {
-    marketData.vwap = vwapResult.vwap;
-    marketData.vwapPosition = vwapResult.position;
-    marketData.vwapDifference = vwapResult.priceVsVwap;
-    marketData.vwapDifferencePercent = vwapResult.priceVsVwapPercent;
-  }
 
-  // Calculate 20-day SMA (only if not suppressed)
-  if (!suppressSma) {
-    let smaData: DailyBar[] = [];
-    if (dailyBars && dailyBars.length > 0) {
-      // Use provided daily bars (from Polygon for scout)
-      smaData = dailyBars;
-    } else {
-      // Aggregate intraday data to daily bars (for backtest with CSV data)
-      smaData = aggregateIntradayToDaily(allDataInput);
-    }
-
-    const smaResult = calculateSMAResult(smaData, SMA_PERIODS.MEDIUM, marketData.currentPrice);
-    if (smaResult) {
-      marketData.sma20 = smaResult.sma;
-      marketData.smaPosition = smaResult.position;
-      marketData.smaDifference = smaResult.priceVsSma;
-      marketData.smaDifferencePercent = smaResult.priceVsSmaPercent;
-    }
-  }
-
-  // Enhanced gap information with clear directional language
-  let gapInfo = '';
-  let gapDirection = '';
-  if (marketData.previousClose && marketData.currentOpen) {
-    const gapAmount = marketData.currentOpen - marketData.previousClose;
-    const gapPercent = ((Math.abs(gapAmount) / marketData.previousClose) * 100).toFixed(2);
-
-    if (gapAmount > 0) {
-      gapDirection = 'GAP UP';
-      gapInfo = `${gapDirection}: +$${gapAmount.toFixed(2)} (+${gapPercent}%)`;
-    } else if (gapAmount < 0) {
-      gapDirection = 'GAP DOWN';
-      gapInfo = `${gapDirection}: $${gapAmount.toFixed(2)} (-${gapPercent}%)`;
-    } else {
-      gapDirection = 'NO GAP';
-      gapInfo = `${gapDirection}: $0.00 (0.00%)`;
-    }
-  }
-
-  // Market data should always be shown - only ticker and date are anonymized
-  const marketDataLine1 = `Prev Close: ${marketData.previousClose ? '$' + marketData.previousClose.toFixed(2) : 'N/A'} | Today Open: ${marketData.currentOpen ? '$' + marketData.currentOpen.toFixed(2) : 'N/A'} | ${gapInfo || 'Gap: N/A'}`;
-
-  // Use market metrics for consistent formatting
+  // Use centralized market metrics for all calculations
   const chartMetrics = generateMarketMetrics(
     allDataInput,
     entrySignal,
@@ -724,10 +540,11 @@ export const generateSvgChart = (
     suppressSma,
     suppressVwap
   );
+
+  // Extract all market data from centralized source
+  const marketDataLine1 = chartMetrics.marketDataLine1;
+  const marketDataLine2 = chartMetrics.marketDataLine2;
   const vwapInfo = chartMetrics.vwapInfo;
-
-  const marketDataLine2 = `Today H/L: ${marketData.currentHigh ? '$' + marketData.currentHigh.toFixed(2) : 'N/A'}/${marketData.currentLow ? '$' + marketData.currentLow.toFixed(2) : 'N/A'} | Current: $${marketData.currentPrice.toFixed(2)} @ ${entryTime}`;
-
   const smaInfo = chartMetrics.smaInfo;
 
   const marketDataLine3 = `${vwapInfo}`;
@@ -931,7 +748,7 @@ export const generateSvgChart = (
   
   ${(() => {
     // Generate VWAP line if available and not suppressed
-    if (!suppressVwap && marketData.vwap) {
+    if (!suppressVwap && chartMetrics.vwap) {
       const vwapLine = calculateVWAPLine(currentDayBars);
       if (vwapLine.length > 1) {
         // Map VWAP points to chart coordinates
@@ -959,9 +776,9 @@ export const generateSvgChart = (
   
   ${(() => {
     // Generate 20-day SMA line if available and not suppressed (only on Signal Day)
-    if (!suppressSma && marketData.sma20) {
+    if (!suppressSma && chartMetrics.sma20) {
       // Use the same priceToY function that other chart elements use
-      const smaY = priceToY(marketData.sma20);
+      const smaY = priceToY(chartMetrics.sma20);
 
       // Check if SMA line would be within visible chart bounds
       if (smaY >= marginTop && smaY <= marginTop + chartHeight) {
@@ -990,12 +807,12 @@ export const generateSvgChart = (
   
   ${(() => {
     // Add legend for VWAP, SMA, and Volume MA if present and within bounds
-    const hasVwap = !suppressVwap && !!marketData.vwap;
+    const hasVwap = !suppressVwap && !!chartMetrics.vwap;
     const hasSma =
       !suppressSma &&
-      marketData.sma20 &&
+      chartMetrics.sma20 &&
       (() => {
-        const smaY = priceToY(marketData.sma20);
+        const smaY = priceToY(chartMetrics.sma20);
         return smaY >= marginTop && smaY <= marginTop + chartHeight;
       })();
     const hasVolumeMA = finalDataForChart.length >= 20; // Volume MA available if enough data
