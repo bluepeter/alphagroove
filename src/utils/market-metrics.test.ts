@@ -117,12 +117,12 @@ describe('Market Metrics', () => {
     it('should generate complete market metrics with all data', () => {
       const result = generateMarketMetrics(mockBars, mockEntrySignal, mockDailyBars);
 
-      expect(result.marketDataLine1).toContain('Prev Close: $100.50');
+      expect(result.marketDataLine1).toContain('Prior Day Close: $100.50');
       expect(result.marketDataLine1).toContain('GAP UP: +$0.50');
-      expect(result.marketDataLine2).toContain('Today H/L: $102.00/$100.75');
-      expect(result.marketDataLine2).toContain('Current: $101.50');
-      expect(result.vwapInfo).toBe('Current price of $101.50 is $0.25 ABOVE VWAP of $101.25.');
-      expect(result.smaInfo).toBe('Current price of $101.50 is $0.75 ABOVE SMA of $100.75.');
+      expect(result.marketDataLine2).toContain('Signal Day H/L: $102.00/$100.75');
+      expect(result.marketDataLine2).toContain('Signal Day Current: $101.50');
+      expect(result.vwapInfo).toBe('Signal Day price of $101.50 is $0.25 ABOVE VWAP of $101.25.');
+      expect(result.smaInfo).toBe('Signal Day price of $101.50 is $0.75 ABOVE SMA of $100.75.');
       expect(result.vwapVsSmaInfo).toBe('VWAP of $101.25 is $0.50 ABOVE SMA of $100.75.');
       expect(result.vwap).toBe(101.25);
       expect(result.sma20).toBe(100.75);
@@ -240,7 +240,7 @@ describe('Market Metrics', () => {
 
       const result = generateMarketMetrics(mockBars, mockEntrySignal, mockDailyBars);
 
-      expect(result.vwapInfo).toBe('Current price of $101.50 is $0.50 BELOW VWAP of $102.00.');
+      expect(result.vwapInfo).toBe('Signal Day price of $101.50 is $0.50 BELOW VWAP of $102.00.');
     });
 
     it('should handle AT VWAP positioning', async () => {
@@ -255,7 +255,7 @@ describe('Market Metrics', () => {
 
       const result = generateMarketMetrics(mockBars, mockEntrySignal, mockDailyBars);
 
-      expect(result.vwapInfo).toBe('Current price of $101.50 is $0.00 AT VWAP of $101.50.');
+      expect(result.vwapInfo).toBe('Signal Day price of $101.50 is $0.00 AT VWAP of $101.50.');
     });
 
     it('should handle missing VWAP vs SMA comparison when both are missing', async () => {
@@ -275,12 +275,12 @@ describe('Market Metrics', () => {
       const result = generateMarketMetricsForPrompt(mockBars, mockEntrySignal, mockDailyBars);
 
       const lines = result.split('\n');
-      expect(lines).toHaveLength(5); // 4 main lines + 1 VWAP vs SMA line
-      expect(lines[0]).toContain('Prev Close: $100.50');
-      expect(lines[1]).toContain('Today H/L: $102.00/$100.75');
-      expect(lines[2]).toContain('Current price of $101.50 is $0.25 ABOVE VWAP');
-      expect(lines[3]).toContain('Current price of $101.50 is $0.75 ABOVE SMA');
-      expect(lines[4]).toContain('VWAP of $101.25 is $0.50 ABOVE SMA');
+      expect(lines).toHaveLength(7); // 2 main lines + 2 summary lines + 2 indicator lines + 1 VWAP vs SMA line
+      expect(lines[0]).toContain('Prior Day Close: $100.50');
+      expect(lines[1]).toContain('Signal Day H/L: $102.00/$100.75');
+      expect(lines[4]).toContain('Signal Day price of $101.50 is $0.25 ABOVE VWAP');
+      expect(lines[5]).toContain('Signal Day price of $101.50 is $0.75 ABOVE SMA');
+      expect(lines[6]).toContain('VWAP of $101.25 is $0.50 ABOVE SMA');
     });
 
     it('should omit VWAP vs SMA line when not available', async () => {
@@ -290,9 +290,9 @@ describe('Market Metrics', () => {
       const result = generateMarketMetricsForPrompt(mockBars, mockEntrySignal, mockDailyBars);
 
       const lines = result.split('\n');
-      expect(lines).toHaveLength(4); // No VWAP vs SMA line
-      expect(lines[2]).toBe('VWAP data is not available.');
-      expect(lines[3]).toContain('Current price of $101.50 is $0.75 ABOVE SMA');
+      expect(lines).toHaveLength(6); // 2 main lines + 2 summary lines + 2 indicator lines, no VWAP vs SMA line
+      expect(lines[4]).toBe('VWAP data is not available.');
+      expect(lines[5]).toContain('Signal Day price of $101.50 is $0.75 ABOVE SMA');
     });
 
     it('should handle empty metrics gracefully', async () => {

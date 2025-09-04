@@ -88,11 +88,14 @@ describe('Timestamp Parsing for Chart Generation', () => {
         false // not anonymized
       );
 
-      // Should correctly identify trading hours data
-      expect(svgContent).toContain('Prev Close: $101.50'); // From 15:30 (3:30 PM), not 17:00 (5:00 PM)
-      expect(svgContent).toContain('Today Open: $103.00'); // From 09:30 (9:30 AM), not 08:30 (8:30 AM)
+      // Should correctly identify trading hours data with new comprehensive format
+      expect(svgContent).toContain(
+        'PRIOR DAY SUMMARY: Open $100.50 | High $102.00 | Low $100.00 | Close $101.50'
+      );
+      expect(svgContent).toContain(
+        'SIGNAL DAY PERFORMANCE: Open $103.00 | High $106.00 | Low $102.00'
+      );
       expect(svgContent).toContain('GAP UP: +$1.50 (+1.48%)'); // 103.00 - 101.50 = +1.50
-      expect(svgContent).toContain('Today H/L: $106.00/$102.00'); // Market hours only
     });
   });
 
@@ -180,11 +183,15 @@ describe('Timestamp Parsing for Chart Generation', () => {
         false
       );
 
-      // Both should correctly identify market hours regardless of EST/EDT
-      expect(estSvg).toContain('Prev Close: $100.50');
-      expect(estSvg).toContain('Today Open: $101.00');
-      expect(edtSvg).toContain('Prev Close: $200.50');
-      expect(edtSvg).toContain('Today Open: $201.00');
+      // Both should correctly identify market hours regardless of EST/EDT with new format
+      expect(estSvg).toContain(
+        'PRIOR DAY SUMMARY: Open $100.00 | High $101.00 | Low $99.00 | Close $100.50'
+      );
+      expect(estSvg).toContain('SIGNAL DAY PERFORMANCE: Open $101.00');
+      expect(edtSvg).toContain(
+        'PRIOR DAY SUMMARY: Open $200.00 | High $201.00 | Low $199.00 | Close $200.50'
+      );
+      expect(edtSvg).toContain('SIGNAL DAY PERFORMANCE: Open $201.00');
     });
   });
 });

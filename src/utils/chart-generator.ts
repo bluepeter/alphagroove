@@ -541,9 +541,7 @@ export const generateSvgChart = (
     suppressVwap
   );
 
-  // Extract all market data from centralized source
-  const marketDataLine1 = chartMetrics.marketDataLine1;
-  const marketDataLine2 = chartMetrics.marketDataLine2;
+  // Extract market data from centralized source
   const vwapInfo = chartMetrics.vwapInfo;
   const smaInfo = chartMetrics.smaInfo;
 

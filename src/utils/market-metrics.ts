@@ -303,7 +303,7 @@ export const generateMarketMetrics = (
     priorDaySummary = `PRIOR DAY SUMMARY: Open $${priorDayData[0].open.toFixed(2)} | High $${priorHigh.toFixed(2)} | Low $${priorLow.toFixed(2)} | Close $${priorClose.toFixed(2)}`;
   }
 
-  const signalDayPerformance = `SIGNAL DAY PERFORMANCE: Open $${marketData.currentOpen ? marketData.currentOpen.toFixed(2) : 'N/A'} | High $${marketData.currentHigh ? marketData.currentHigh.toFixed(2) : 'N/A'} | Low $${marketData.currentLow ? marketData.currentLow.toFixed(2) : 'N/A'} | Current $${marketData.currentPrice.toFixed(2)} @ ${entryTime} | ${remainingTime}${marketData.currentOpen ? ' | Change +$' + (marketData.currentPrice - marketData.currentOpen).toFixed(2) + ' from open' : ''}`;
+  const signalDayPerformance = `SIGNAL DAY PERFORMANCE: Open $${marketData.currentOpen ? marketData.currentOpen.toFixed(2) : 'N/A'} | High $${marketData.currentHigh ? marketData.currentHigh.toFixed(2) : 'N/A'} | Low $${marketData.currentLow ? marketData.currentLow.toFixed(2) : 'N/A'} | Current $${marketData.currentPrice.toFixed(2)} @ ${entryTime} | ${remainingTime}${marketData.currentOpen ? ' | Change +$' + (marketData.currentPrice - marketData.currentOpen).toFixed(2) + ' from open' : ''} | ${gapInfo || 'Gap: N/A'}`;
 
   // Format VWAP information (only if not suppressed)
   let vwapInfo = '';

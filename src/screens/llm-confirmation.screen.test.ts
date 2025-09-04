@@ -79,28 +79,6 @@ const _mockLLMResponse = (
   };
 };
 
-const _getBaseAppConfig = (): AppConfig => ({
-  default: {
-    ticker: 'SPY',
-    timeframe: '1min',
-    suppressSma: false,
-    suppressVwap: false,
-    suppressMetricsInPrompts: false,
-
-    patterns: { entry: 'quickRise' },
-    date: { from: '2023-01-01', to: '2023-12-31' },
-  },
-  patterns: {
-    entry: { quickRise: { risePct: 0.3, withinMinutes: 5 } },
-  },
-  llmConfirmationScreen: getBaseScreenConfig(),
-});
-
-// TODO: Tests for LlmConfirmationScreen logic (excluding calculateAverageProposedPrices)
-// were disabled due to persistent and intractable Vitest mocking issues for LlmApiService.
-// These tests need to be revisited, possibly with a different testing strategy or after
-// further investigation into the Vitest + TS module mocking behavior in this specific context.
-
 describe('LlmConfirmationScreen', () => {
   let screen: LlmConfirmationScreen;
   const mockChartPath = 'path/to/chart.png';
@@ -141,90 +119,6 @@ describe('LlmConfirmationScreen', () => {
     expect(mockConstructorFn).toHaveBeenCalled();
     expect(mockIsEnabledFn).toHaveBeenCalled();
   });
-
-  // Temporarily commenting out tests due to persistent mocking issues
-  /*
-  it('should correctly process LLM responses for a configured direction (e.g., long)', async () => {
-    mockGetTradeDecisionsFn.mockResolvedValue([
-      _mockLLMResponse('long', 'r1', undefined, 10, 5, 100, 110, 7),
-      _mockLLMResponse('long', 'r2', undefined, 10, 5, 101, 111, 9),
-      _mockLLMResponse('short', 'r3', undefined, 10, 5, 99, 109, 5), 
-    ]);
-    const screenConfig = { ...getBaseScreenConfig(), agreementThreshold: 2 };
-    const appConfig = {
-      ...baseAppConfig,
-      default: { ...baseAppConfig.default, direction: 'long' as 'long' },
-      llmConfirmationScreen: screenConfig,
-    };
-    const result = await screen.shouldSignalProceed(
-      _getBaseSignal(),
-      mockChartPath,
-      screenConfig,
-      appConfig
-    );
-    expect(mockConstructorFn).toHaveBeenCalledWith(screenConfig);
-    expect(mockIsEnabledFn).toHaveBeenCalled();
-    expect(mockGetTradeDecisionsFn).toHaveBeenCalled();
-    expect(result.proceed).toBe(true);
-    expect(result.direction).toBe('long');
-
-    expect(result.averagedProposedStopLoss).toBeCloseTo(100.5);
-    expect(result.averagedProposedProfitTarget).toBeCloseTo(110.5);
-  });
-
-  it('should correctly process LLM responses for llm_decides strategy (long outcome)', async () => {
-    mockGetTradeDecisionsFn.mockResolvedValue([
-      _mockLLMResponse('long', 'go long1', undefined, 10, 5, 100, 110, 8),
-      _mockLLMResponse('long', 'go long2', undefined, 10, 5, 102, 112, 9),
-      _mockLLMResponse('short', 'go short1', undefined, 10, 5, 90, 80, 7),
-    ]);
-    const screenConfig = { ...getBaseScreenConfig(), agreementThreshold: 2, numCalls: 3 };
-    const appConfig = {
-      ...baseAppConfig,
-      default: { ...baseAppConfig.default, direction: 'llm_decides' as 'llm_decides' },
-      llmConfirmationScreen: screenConfig,
-    };
-    const result = await screen.shouldSignalProceed(
-      _getBaseSignal(),
-      mockChartPath,
-      screenConfig,
-      appConfig
-    );
-    expect(mockConstructorFn).toHaveBeenCalledWith(screenConfig);
-    expect(mockIsEnabledFn).toHaveBeenCalled();
-    expect(mockGetTradeDecisionsFn).toHaveBeenCalled();
-    expect(result.proceed).toBe(true);
-    expect(result.direction).toBe('long');
-
-    expect(result.averagedProposedStopLoss).toBeCloseTo(101);
-    expect(result.averagedProposedProfitTarget).toBeCloseTo(111);
-  });
-
-  it('should not proceed if LLM consensus does not meet threshold for configured direction', async () => {
-    mockGetTradeDecisionsFn.mockResolvedValue([
-      _mockLLMResponse('long', 'r1', undefined, 10, 5, 100, 110, 7),
-      _mockLLMResponse('short', 'r2', undefined, 10, 5, 101, 111, 9),
-      _mockLLMResponse('do_nothing', 'r3', undefined, 10, 5, 99, 109, 5),
-    ]);
-    const screenConfig = { ...getBaseScreenConfig(), agreementThreshold: 2 };
-    const appConfig = {
-      ...baseAppConfig,
-      default: { ...baseAppConfig.default, direction: 'long' as 'long' },
-      llmConfirmationScreen: screenConfig,
-    };
-    const result = await screen.shouldSignalProceed(
-      _getBaseSignal(),
-      mockChartPath,
-      screenConfig,
-      appConfig
-    );
-    expect(mockConstructorFn).toHaveBeenCalledWith(screenConfig);
-    expect(mockIsEnabledFn).toHaveBeenCalled();
-    expect(mockGetTradeDecisionsFn).toHaveBeenCalled();
-    expect(result.proceed).toBe(false);
-    expect(result.rationale).toContain('does not meet threshold for configured direction');
-  });
-  */
 });
 
 describe('calculateAverageProposedPrices', () => {
