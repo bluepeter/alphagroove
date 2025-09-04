@@ -86,12 +86,33 @@ export const calculateMarketDataContext = (
     return barDate === entryDate && isTradingHours(barTimestamp);
   });
 
-  // Get previous day data (trading hours only)
-  const previousDayBars = allData.filter(bar => {
+  // Get previous day data (trading hours only) - only the immediate prior trading day
+  const allPriorDayBars = allData.filter(bar => {
     const barTimestamp = parseTimestampForChart(bar.timestamp);
     const barDate = new Date(barTimestamp).toISOString().split('T')[0];
     return barDate < entryDate && isTradingHours(barTimestamp);
   });
+
+  // Get only the most recent prior trading day
+  const priorDayDates = [
+    ...new Set(
+      allPriorDayBars.map(bar => {
+        const barTimestamp = parseTimestampForChart(bar.timestamp);
+        return new Date(barTimestamp).toISOString().split('T')[0];
+      })
+    ),
+  ]
+    .sort()
+    .reverse(); // Most recent first
+
+  const mostRecentPriorDate = priorDayDates[0];
+  const previousDayBars = mostRecentPriorDate
+    ? allPriorDayBars.filter(bar => {
+        const barTimestamp = parseTimestampForChart(bar.timestamp);
+        const barDate = new Date(barTimestamp).toISOString().split('T')[0];
+        return barDate === mostRecentPriorDate;
+      })
+    : [];
 
   // Calculate previous day close (last trading bar of previous day)
   const previousClose =
@@ -240,12 +261,33 @@ export const generateMarketMetrics = (
   const marketDataLine2 = `Signal Day H/L: ${marketData.currentHigh ? '$' + marketData.currentHigh.toFixed(2) : 'N/A'}/${marketData.currentLow ? '$' + marketData.currentLow.toFixed(2) : 'N/A'} | Signal Day Current: $${marketData.currentPrice.toFixed(2)} @ ${entryTime} | ${remainingTime}`;
 
   // Add day summary lines with actual data ranges
-  // Get prior day data using the same logic as calculateMarketDataContext
-  const priorDayData = allDataInput.filter(bar => {
+  // Get prior day data - only the immediate prior trading day (same logic as calculateMarketDataContext)
+  const allPriorDayBarsForSummary = allDataInput.filter(bar => {
     const barTimestamp = parseTimestampForChart(bar.timestamp);
     const barDate = new Date(barTimestamp).toISOString().split('T')[0];
     return barDate < entryDate && isTradingHours(barTimestamp);
   });
+
+  // Get only the most recent prior trading day
+  const priorDayDatesForSummary = [
+    ...new Set(
+      allPriorDayBarsForSummary.map(bar => {
+        const barTimestamp = parseTimestampForChart(bar.timestamp);
+        return new Date(barTimestamp).toISOString().split('T')[0];
+      })
+    ),
+  ]
+    .sort()
+    .reverse(); // Most recent first
+
+  const mostRecentPriorDateForSummary = priorDayDatesForSummary[0];
+  const priorDayData = mostRecentPriorDateForSummary
+    ? allPriorDayBarsForSummary.filter(bar => {
+        const barTimestamp = parseTimestampForChart(bar.timestamp);
+        const barDate = new Date(barTimestamp).toISOString().split('T')[0];
+        return barDate === mostRecentPriorDateForSummary;
+      })
+    : [];
 
   let priorDaySummary = 'PRIOR DAY SUMMARY: N/A';
   if (priorDayData.length > 0) {
@@ -257,6 +299,7 @@ export const generateMarketMetrics = (
     const priorLow = Math.min(...priorDayData.map(b => b.low));
     const priorHigh = Math.max(...priorDayData.map(b => b.high));
     const priorClose = sortedPriorDayBars[sortedPriorDayBars.length - 1].close; // Last bar close
+
     priorDaySummary = `PRIOR DAY SUMMARY: $${priorClose.toFixed(2)} close, $${priorLow.toFixed(2)} low, $${priorHigh.toFixed(2)} high`;
   }
 
