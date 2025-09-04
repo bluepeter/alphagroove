@@ -586,6 +586,39 @@ export const generateSvgChart = (
       : ''
   }
   
+  <!-- Day background rectangles -->
+  ${(() => {
+    const dayBackgrounds: string[] = [];
+    const sortedDayStrings = [...displayDayStrings].sort();
+
+    sortedDayStrings.forEach((dateStr, dayIdx) => {
+      const dayData = tradingDaysForLabels[dateStr];
+      if (!dayData || dayData.length === 0) return;
+
+      const firstBarOfDayIndex = finalDataForChart.findIndex(
+        b => b.timestamp === dayData[0].timestamp
+      );
+      const lastBarOfDayIndex = finalDataForChart.findIndex(
+        b => b.timestamp === dayData[dayData.length - 1].timestamp
+      );
+
+      if (firstBarOfDayIndex === -1 || lastBarOfDayIndex === -1) return;
+
+      const xStart = getXPosition(firstBarOfDayIndex);
+      const xEnd = getXPosition(lastBarOfDayIndex) + chartWidth / finalDataForChart.length;
+      const width = xEnd - xStart;
+
+      // Prior day gets light gray background, signal day gets white
+      const fillColor = dayIdx === 0 ? '#f8f9fa' : '#ffffff';
+
+      dayBackgrounds.push(
+        `<rect x="${xStart}" y="${marginTop}" width="${width}" height="${chartHeight}" fill="${fillColor}" stroke="none" />`
+      );
+    });
+
+    return dayBackgrounds.join('\n  ');
+  })()}
+  
   <rect x="${marginLeft}" y="${marginTop}" width="${chartWidth}" height="${chartHeight}" fill="none" stroke="none" />
   
   ${dayBoundaryLines

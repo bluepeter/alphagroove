@@ -47,10 +47,13 @@ shared:
       - Provide target stop loss and profit target prices (only provide if action is long or short)
       that are realistic exit prices given today's range and the current price.
 
-      Double-check your assumptions about price, volume, and time; in particular, watch out for
-      confusing yesterday's closing volume with today's opening volume. Indeed, since you are an
-      LLM, you frequently confuse today's data with prior day's data. The chart will clearly
-      indicate "Prior Day" and "Signal Day".
+      Double-check your assumptions about price, volume, and time.
+
+      CRITICAL: This chart shows TWO distinct trading days:
+         - LEFT SIDE: Prior trading day
+         - RIGHT SIDE: Current signal day (your decision day)
+         - Vertical line separates the days
+         - Do not confuse prior day moves with current day moves 
 
       Your response MUST be a valid JSON object and nothing else.  JSON in the following format:
 
