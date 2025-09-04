@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 
 import Anthropic from '@anthropic-ai/sdk';
+import OpenAI from 'openai';
 
 import { type LLMScreenConfig } from '../screens/types'; // Assuming path to LLMScreenConfig
 
@@ -20,12 +21,13 @@ export interface LLMResponse {
 
 export class LlmApiService {
   private anthropic: Anthropic | null = null;
+  private openai: OpenAI | null = null;
   private config: LLMScreenConfig;
   private apiKey: string | undefined;
 
-  // Pricing for Claude 3.7 Sonnet (ensure this matches the actual model if it changes)
-  private readonly INPUT_COST_PER_MILLION_TOKENS = 3;
-  private readonly OUTPUT_COST_PER_MILLION_TOKENS = 15;
+  // Pricing per million tokens - will be set based on provider
+  private INPUT_COST_PER_MILLION_TOKENS = 3;
+  private OUTPUT_COST_PER_MILLION_TOKENS = 15;
 
   constructor(config: LLMScreenConfig) {
     this.config = config;
@@ -36,7 +38,17 @@ export class LlmApiService {
         `LLM API Key not found in environment variable ${this.config.apiKeyEnvVar}. The LLM API service will not be able to make calls.`
       );
     } else if (this.config.llmProvider === 'anthropic') {
+      // Claude pricing (per million tokens)
+      this.INPUT_COST_PER_MILLION_TOKENS = 3;
+      this.OUTPUT_COST_PER_MILLION_TOKENS = 15;
       this.anthropic = new Anthropic({
+        apiKey: this.apiKey,
+      });
+    } else if (this.config.llmProvider === 'openai') {
+      // GPT-4o pricing (as of 2024)
+      this.INPUT_COST_PER_MILLION_TOKENS = 2.5;
+      this.OUTPUT_COST_PER_MILLION_TOKENS = 10;
+      this.openai = new OpenAI({
         apiKey: this.apiKey,
       });
     }
@@ -73,7 +85,7 @@ export class LlmApiService {
     marketMetrics?: string,
     debug?: boolean
   ): Promise<LLMResponse[]> {
-    if (!this.isEnabled() || !this.anthropic) {
+    if (!this.isEnabled() || (!this.anthropic && !this.openai)) {
       console.warn('LLM API service is not enabled or not configured correctly.');
       return Array.from({ length: this.config.numCalls || 1 }, () => ({
         action: 'do_nothing',
@@ -121,121 +133,14 @@ export class LlmApiService {
       }
 
       const call = async (): Promise<LLMResponse> => {
-        let callCost = 0;
         try {
-          const messagesContent: Anthropic.MessageParam['content'] = [];
-          if (imageBase64 && mediaType !== 'application/octet-stream') {
-            messagesContent.push({
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
-                data: imageBase64,
-              },
-            });
-          } else if (!imageBase64) {
-            console.warn('No image data provided for LLM call. Prompting with text only.');
+          if (this.config.llmProvider === 'anthropic') {
+            return await this.callAnthropic(fullPrompt, temperature, imageBase64, mediaType);
+          } else if (this.config.llmProvider === 'openai') {
+            return await this.callOpenAI(fullPrompt, temperature, imageBase64, mediaType);
+          } else {
+            throw new Error(`Unsupported LLM provider: ${this.config.llmProvider}`);
           }
-          messagesContent.push({
-            type: 'text',
-            text: fullPrompt,
-          });
-
-          const systemPromptContent = this.config.systemPrompt;
-
-          // Cast to any to access usage, as it might not be on the default type
-          const response: Anthropic.Messages.Message = await this.anthropic!.messages.create({
-            model: this.config.modelName,
-            max_tokens: this.config.maxOutputTokens,
-            temperature: temperature,
-            ...(systemPromptContent && { system: systemPromptContent }),
-            messages: [
-              {
-                role: 'user',
-                content: messagesContent,
-              },
-            ],
-          });
-
-          // Calculate cost if usage data is available
-          if (response.usage) {
-            const inputTokens = response.usage.input_tokens;
-            const outputTokens = response.usage.output_tokens;
-            callCost =
-              (inputTokens / 1_000_000) * this.INPUT_COST_PER_MILLION_TOKENS +
-              (outputTokens / 1_000_000) * this.OUTPUT_COST_PER_MILLION_TOKENS;
-          }
-
-          const messageTextContent =
-            response.content &&
-            Array.isArray(response.content) &&
-            response.content[0] &&
-            'text' in response.content[0]
-              ? response.content[0].text
-              : '';
-
-          let parsedAction: 'long' | 'short' | 'do_nothing' = 'do_nothing';
-          let parsedRationalization: string | undefined = undefined;
-          let parsedStopLoss: number | undefined = undefined;
-          let parsedProfitTarget: number | undefined = undefined;
-
-          try {
-            // Try to extract JSON from markdown formatting if present
-            let jsonText = messageTextContent;
-
-            // Remove markdown code blocks if present
-            const codeBlockMatch = messageTextContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            if (codeBlockMatch) {
-              jsonText = codeBlockMatch[1].trim();
-            }
-
-            // Remove leading/trailing backticks if present
-            jsonText = jsonText.replace(/^`+|`+$/g, '');
-
-            const parsedJson = JSON.parse(jsonText);
-            if (
-              typeof parsedJson.action === 'string' &&
-              ['long', 'short', 'do_nothing'].includes(parsedJson.action)
-            ) {
-              parsedAction = parsedJson.action as 'long' | 'short' | 'do_nothing';
-            }
-            if (typeof parsedJson.rationalization === 'string') {
-              parsedRationalization = parsedJson.rationalization;
-            }
-            if (
-              typeof parsedJson.proposedStopLoss === 'string' ||
-              typeof parsedJson.proposedStopLoss === 'number'
-            ) {
-              const sl = parseFloat(parsedJson.proposedStopLoss);
-              if (!isNaN(sl)) {
-                parsedStopLoss = sl;
-              }
-            }
-            if (
-              typeof parsedJson.proposedProfitTarget === 'string' ||
-              typeof parsedJson.proposedProfitTarget === 'number'
-            ) {
-              const pt = parseFloat(parsedJson.proposedProfitTarget);
-              if (!isNaN(pt)) {
-                parsedProfitTarget = pt;
-              }
-            }
-          } catch (parseError: any) {
-            console.warn(
-              `[DEBUG LlmApiService] JSON.parse failed for raw text. Error: ${parseError.message}`
-            );
-          }
-
-          return {
-            action: parsedAction,
-            rationalization: parsedRationalization,
-            stopLoss: parsedStopLoss,
-            profitTarget: parsedProfitTarget,
-
-            cost: callCost,
-            debugRawText: messageTextContent,
-            rawResponse: response,
-          };
         } catch (error: any) {
           console.error(
             `Error in LLM API call ${i + 1} to ${this.config.modelName}:`,
@@ -262,19 +167,192 @@ export class LlmApiService {
     return Promise.all(apiCalls);
   }
 
-  // Cost estimation logic is now part of getTradeDecisions for actual costs
-  // The estimateCost function can be removed or kept if a pre-estimation is ever needed.
-  // For now, removing it to avoid confusion as actual costs are calculated.
-  /*
-  public estimateCost(
-    _promptTokens: number,
-    _completionTokens: number,
-    _numImages: number
-  ): number {
-    // Placeholder - actual calculation depends on specific model and Anthropic pricing structure
-    // e.g. (promptTokens / 1_000_000 * inputPricePerMillion) + (completionTokens / 1_000_000 * outputPricePerMillion) + (numImages * pricePerImage)
-    console.warn('Cost estimation not fully implemented.');
-    return 0.0;
+  private async callAnthropic(
+    fullPrompt: string,
+    temperature: number,
+    imageBase64?: string,
+    mediaType?: string
+  ): Promise<LLMResponse> {
+    const messagesContent: Anthropic.MessageParam['content'] = [];
+
+    if (imageBase64 && mediaType !== 'application/octet-stream') {
+      messagesContent.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: mediaType as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp',
+          data: imageBase64,
+        },
+      });
+    } else if (!imageBase64) {
+      console.warn('No image data provided for LLM call. Prompting with text only.');
+    }
+
+    messagesContent.push({
+      type: 'text',
+      text: fullPrompt,
+    });
+
+    const response: Anthropic.Messages.Message = await this.anthropic!.messages.create({
+      model: this.config.modelName,
+      max_tokens: this.config.maxOutputTokens,
+      temperature: temperature,
+      ...(this.config.systemPrompt && { system: this.config.systemPrompt }),
+      messages: [
+        {
+          role: 'user',
+          content: messagesContent,
+        },
+      ],
+    });
+
+    let callCost = 0;
+    if (response.usage) {
+      const inputTokens = response.usage.input_tokens;
+      const outputTokens = response.usage.output_tokens;
+      callCost =
+        (inputTokens / 1_000_000) * this.INPUT_COST_PER_MILLION_TOKENS +
+        (outputTokens / 1_000_000) * this.OUTPUT_COST_PER_MILLION_TOKENS;
+    }
+
+    const messageTextContent =
+      response.content &&
+      Array.isArray(response.content) &&
+      response.content[0] &&
+      'text' in response.content[0]
+        ? response.content[0].text
+        : '';
+
+    return this.parseResponse(messageTextContent, response, callCost);
   }
-  */
+
+  private async callOpenAI(
+    fullPrompt: string,
+    temperature: number,
+    imageBase64?: string,
+    mediaType?: string
+  ): Promise<LLMResponse> {
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+
+    if (this.config.systemPrompt) {
+      messages.push({
+        role: 'system',
+        content: this.config.systemPrompt,
+      });
+    }
+
+    if (imageBase64 && mediaType !== 'application/octet-stream') {
+      messages.push({
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: fullPrompt,
+          },
+          {
+            type: 'image_url',
+            image_url: {
+              url: `data:${mediaType};base64,${imageBase64}`,
+            },
+          },
+        ],
+      });
+    } else {
+      if (!imageBase64) {
+        console.warn('No image data provided for LLM call. Prompting with text only.');
+      }
+      messages.push({
+        role: 'user',
+        content: fullPrompt,
+      });
+    }
+
+    const response = await this.openai!.chat.completions.create({
+      model: this.config.modelName,
+      messages: messages,
+      max_tokens: this.config.maxOutputTokens,
+      temperature: temperature,
+    });
+
+    let callCost = 0;
+    if (response.usage) {
+      const inputTokens = response.usage.prompt_tokens;
+      const outputTokens = response.usage.completion_tokens;
+      callCost =
+        (inputTokens / 1_000_000) * this.INPUT_COST_PER_MILLION_TOKENS +
+        (outputTokens / 1_000_000) * this.OUTPUT_COST_PER_MILLION_TOKENS;
+    }
+
+    const messageTextContent = response.choices[0]?.message?.content || '';
+
+    return this.parseResponse(messageTextContent, response, callCost);
+  }
+
+  private parseResponse(
+    messageTextContent: string,
+    rawResponse: any,
+    callCost: number
+  ): LLMResponse {
+    let parsedAction: 'long' | 'short' | 'do_nothing' = 'do_nothing';
+    let parsedRationalization: string | undefined = undefined;
+    let parsedStopLoss: number | undefined = undefined;
+    let parsedProfitTarget: number | undefined = undefined;
+
+    try {
+      // Try to extract JSON from markdown formatting if present
+      let jsonText = messageTextContent;
+
+      // Remove markdown code blocks if present
+      const codeBlockMatch = messageTextContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (codeBlockMatch) {
+        jsonText = codeBlockMatch[1].trim();
+      }
+
+      // Remove leading/trailing backticks if present
+      jsonText = jsonText.replace(/^`+|`+$/g, '');
+
+      const parsedJson = JSON.parse(jsonText);
+      if (
+        typeof parsedJson.action === 'string' &&
+        ['long', 'short', 'do_nothing'].includes(parsedJson.action)
+      ) {
+        parsedAction = parsedJson.action as 'long' | 'short' | 'do_nothing';
+      }
+      if (typeof parsedJson.rationalization === 'string') {
+        parsedRationalization = parsedJson.rationalization;
+      }
+      if (
+        typeof parsedJson.proposedStopLoss === 'string' ||
+        typeof parsedJson.proposedStopLoss === 'number'
+      ) {
+        const sl = parseFloat(parsedJson.proposedStopLoss);
+        if (!isNaN(sl)) {
+          parsedStopLoss = sl;
+        }
+      }
+      if (
+        typeof parsedJson.proposedProfitTarget === 'string' ||
+        typeof parsedJson.proposedProfitTarget === 'number'
+      ) {
+        const pt = parseFloat(parsedJson.proposedProfitTarget);
+        if (!isNaN(pt)) {
+          parsedProfitTarget = pt;
+        }
+      }
+    } catch (parseError: any) {
+      console.warn(
+        `[DEBUG LlmApiService] JSON.parse failed for raw text. Error: ${parseError.message}`
+      );
+    }
+
+    return {
+      action: parsedAction,
+      rationalization: parsedRationalization,
+      stopLoss: parsedStopLoss,
+      profitTarget: parsedProfitTarget,
+      cost: callCost,
+      debugRawText: messageTextContent,
+      rawResponse: rawResponse,
+    };
+  }
 }

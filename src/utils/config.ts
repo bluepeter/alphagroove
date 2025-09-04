@@ -185,9 +185,9 @@ const ParallelizationOptionsSchema = z.object({
 // but Zod schema is the source of truth for validation and type inference here.
 const LLMScreenConfigSchema = z
   .object({
-    llmProvider: z.enum(['anthropic', 'openai']).default('anthropic'),
-    modelName: z.string().default('claude-sonnet-4-20250514'),
-    apiKeyEnvVar: z.string().default('ANTHROPIC_API_KEY'),
+    llmProvider: z.enum(['anthropic', 'openai']).default('openai'),
+    modelName: z.string().default('gpt-5'),
+    apiKeyEnvVar: z.string().default('OPENAI_API_KEY'),
     numCalls: z.number().int().min(1).optional(),
     agreementThreshold: z.number().int().min(1).default(2),
     temperatures: z.array(z.number()).optional(),
@@ -207,9 +207,9 @@ const LLMScreenConfigSchema = z
     timeoutMs: z.number().int().optional(),
   })
   .default({
-    llmProvider: 'anthropic',
-    modelName: 'claude-sonnet-4-20250514',
-    apiKeyEnvVar: 'ANTHROPIC_API_KEY',
+    llmProvider: 'openai',
+    modelName: 'gpt-5',
+    apiKeyEnvVar: 'OPENAI_API_KEY',
     agreementThreshold: 2,
     prompts:
       'You are an experienced day trader. Based on this chart, what action would you take: go long, short, or do nothing? Provide a brief one-sentence rationalization for your decision.',

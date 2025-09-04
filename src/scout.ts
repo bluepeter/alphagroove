@@ -559,11 +559,14 @@ export const main = async (cmdOptions?: any): Promise<void> => {
     // Display LLM configuration if available
     const llmConfig = rawConfig.shared?.llmConfirmationScreen;
     if (llmConfig) {
+      const provider = llmConfig.llmProvider || 'unknown';
+      const model = llmConfig.modelName || 'unknown';
       const numCalls = llmConfig.numCalls || 1;
       const temperatures = llmConfig.temperatures
         ? `[${llmConfig.temperatures.join(', ')}]`
         : 'default';
       const threshold = llmConfig.agreementThreshold || 1;
+      console.log(chalk.dim(`LLM Provider: ${provider} | Model: ${model} 🤖`));
       console.log(
         chalk.dim(
           `LLM Analysis: ${numCalls} calls, temps ${temperatures}, threshold ${threshold} 🧠`

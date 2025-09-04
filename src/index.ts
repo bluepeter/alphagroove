@@ -723,6 +723,8 @@ export const runAnalysis = async (cliOptions: Record<string, any>): Promise<void
             numCalls: mergedConfig.llmConfirmationScreen.numCalls,
             temperatures: mergedConfig.llmConfirmationScreen.temperatures,
             agreementThreshold: mergedConfig.llmConfirmationScreen.agreementThreshold,
+            llmProvider: mergedConfig.llmConfirmationScreen.llmProvider,
+            modelName: mergedConfig.llmConfirmationScreen.modelName,
           }
         : undefined
     );
