@@ -269,7 +269,7 @@ export const generateSvgChart = (
 
   const width = 1200;
   const height = 800;
-  const marginTop = 165; // Increased to accommodate separate VWAP and SMA lines plus day summaries
+  const marginTop = 145; // Compact header with comprehensive day summaries at top
   const marginRight = 120; // Increased for volume-by-price histogram
   const marginBottom = 150;
   const marginLeft = 70;
@@ -558,12 +558,15 @@ export const generateSvgChart = (
   <text x="${width / 2}" y="40" text-anchor="middle" font-size="12">
     Date: ${headerDateText}
   </text>
-  <text x="${width / 2}" y="55" text-anchor="middle" font-size="11">
-    ${marketDataLine1}
+  
+  <!-- Comprehensive Day Summary Lines -->
+  <text x="${width / 2}" y="55" text-anchor="middle" font-size="11" font-weight="bold">
+    ${chartMetrics.priorDaySummary}
   </text>
-  <text x="${width / 2}" y="70" text-anchor="middle" font-size="11">
-    ${marketDataLine2}
+  <text x="${width / 2}" y="70" text-anchor="middle" font-size="11" font-weight="bold">
+    ${chartMetrics.signalDayPerformance}
   </text>
+  
   ${
     vwapInfo
       ? `<text x="${width / 2}" y="85" text-anchor="middle" font-size="11">
@@ -585,14 +588,6 @@ export const generateSvgChart = (
   </text>`
       : ''
   }
-  
-  <!-- Day Summary Lines -->
-  <text x="${width / 2}" y="130" text-anchor="middle" font-size="11" font-weight="bold">
-    ${chartMetrics.priorDaySummary}
-  </text>
-  <text x="${width / 2}" y="145" text-anchor="middle" font-size="11" font-weight="bold">
-    ${chartMetrics.signalDayPerformance}
-  </text>
   
   <!-- Day background rectangles -->
   ${(() => {

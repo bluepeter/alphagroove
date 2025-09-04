@@ -300,10 +300,10 @@ export const generateMarketMetrics = (
     const priorHigh = Math.max(...priorDayData.map(b => b.high));
     const priorClose = sortedPriorDayBars[sortedPriorDayBars.length - 1].close; // Last bar close
 
-    priorDaySummary = `PRIOR DAY SUMMARY: $${priorClose.toFixed(2)} close, $${priorLow.toFixed(2)} low, $${priorHigh.toFixed(2)} high`;
+    priorDaySummary = `PRIOR DAY SUMMARY: Open $${priorDayData[0].open.toFixed(2)} | High $${priorHigh.toFixed(2)} | Low $${priorLow.toFixed(2)} | Close $${priorClose.toFixed(2)}`;
   }
 
-  const signalDayPerformance = `SIGNAL DAY PERFORMANCE: ${marketData.currentOpen ? '$' + marketData.currentOpen.toFixed(2) + ' open' : 'N/A open'} → $${marketData.currentPrice.toFixed(2)} current${marketData.currentOpen ? ' (+$' + (marketData.currentPrice - marketData.currentOpen).toFixed(2) + ' from open)' : ''}`;
+  const signalDayPerformance = `SIGNAL DAY PERFORMANCE: Open $${marketData.currentOpen ? marketData.currentOpen.toFixed(2) : 'N/A'} | High $${marketData.currentHigh ? marketData.currentHigh.toFixed(2) : 'N/A'} | Low $${marketData.currentLow ? marketData.currentLow.toFixed(2) : 'N/A'} | Current $${marketData.currentPrice.toFixed(2)} @ ${entryTime} | ${remainingTime}${marketData.currentOpen ? ' | Change +$' + (marketData.currentPrice - marketData.currentOpen).toFixed(2) + ' from open' : ''}`;
 
   // Format VWAP information (only if not suppressed)
   let vwapInfo = '';
