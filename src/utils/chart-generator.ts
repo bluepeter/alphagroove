@@ -269,7 +269,7 @@ export const generateSvgChart = (
 
   const width = 1200;
   const height = 800;
-  const marginTop = 135; // Increased to accommodate separate VWAP and SMA lines
+  const marginTop = 165; // Increased to accommodate separate VWAP and SMA lines plus day summaries
   const marginRight = 120; // Increased for volume-by-price histogram
   const marginBottom = 150;
   const marginLeft = 70;
@@ -586,6 +586,14 @@ export const generateSvgChart = (
       : ''
   }
   
+  <!-- Day Summary Lines -->
+  <text x="${width / 2}" y="130" text-anchor="middle" font-size="11" font-weight="bold">
+    ${chartMetrics.priorDaySummary}
+  </text>
+  <text x="${width / 2}" y="145" text-anchor="middle" font-size="11" font-weight="bold">
+    ${chartMetrics.signalDayPerformance}
+  </text>
+  
   <!-- Day background rectangles -->
   ${(() => {
     const dayBackgrounds: string[] = [];
@@ -632,7 +640,7 @@ export const generateSvgChart = (
   ${dateLabelsForChartArea
     .map(
       label =>
-        `<text x="${label.x}" y="${marginTop + 15}" font-size="10" fill="#333" font-weight="bold">${label.text}</text>`
+        `<text x="${label.x}" y="${marginTop + 15}" font-size="14" fill="#333" font-weight="bold">${label.text}</text>`
     )
     .join('\n  ')}
   
@@ -725,6 +733,39 @@ export const generateSvgChart = (
     })
     .join('\n  ')}
   {/* Candlestick drawing logic END */}
+
+  <!-- Volume chart day background rectangles -->
+  ${(() => {
+    const volumeDayBackgrounds: string[] = [];
+    const sortedDayStrings = [...displayDayStrings].sort();
+
+    sortedDayStrings.forEach((dateStr, dayIdx) => {
+      const dayData = tradingDaysForLabels[dateStr];
+      if (!dayData || dayData.length === 0) return;
+
+      const firstBarOfDayIndex = finalDataForChart.findIndex(
+        b => b.timestamp === dayData[0].timestamp
+      );
+      const lastBarOfDayIndex = finalDataForChart.findIndex(
+        b => b.timestamp === dayData[dayData.length - 1].timestamp
+      );
+
+      if (firstBarOfDayIndex === -1 || lastBarOfDayIndex === -1) return;
+
+      const xStart = getXPosition(firstBarOfDayIndex);
+      const xEnd = getXPosition(lastBarOfDayIndex) + chartWidth / finalDataForChart.length;
+      const width = xEnd - xStart;
+
+      // Prior day gets light gray background, signal day gets white
+      const fillColor = dayIdx === 0 ? '#f8f9fa' : '#ffffff';
+
+      volumeDayBackgrounds.push(
+        `<rect x="${xStart}" y="${volumeTop}" width="${width}" height="${volumeHeight}" fill="${fillColor}" stroke="none" />`
+      );
+    });
+
+    return volumeDayBackgrounds.join('\n  ');
+  })()}
 
   <rect x="${marginLeft}" y="${volumeTop}" width="${chartWidth}" height="${volumeHeight}" fill="none" stroke="none" />
   ${dayBoundaryLines

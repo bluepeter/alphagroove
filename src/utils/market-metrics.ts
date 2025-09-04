@@ -127,8 +127,10 @@ export const calculateMarketDataContext = (
 };
 
 export interface MarketMetrics {
-  marketDataLine1: string; // Prev Close | Today Open | Gap
-  marketDataLine2: string; // Today H/L | Current
+  marketDataLine1: string; // Prior Day Close | Signal Day Open | Gap
+  marketDataLine2: string; // Signal Day H/L | Signal Day Current
+  priorDaySummary: string; // PRIOR DAY SUMMARY line
+  signalDayPerformance: string; // SIGNAL DAY PERFORMANCE line
   vwapInfo: string; // VWAP information
   smaInfo: string; // SMA information
   vwapVsSmaInfo: string; // VWAP vs SMA comparison
@@ -232,10 +234,33 @@ export const generateMarketMetrics = (
     }
   }
 
-  // Format market data lines
-  const marketDataLine1 = `Prev Close: ${marketData.previousClose ? '$' + marketData.previousClose.toFixed(2) : 'N/A'} | Today Open: ${marketData.currentOpen ? '$' + marketData.currentOpen.toFixed(2) : 'N/A'} | ${gapInfo || 'Gap: N/A'}`;
+  // Format market data lines with explicit day references
+  const marketDataLine1 = `Prior Day Close: ${marketData.previousClose ? '$' + marketData.previousClose.toFixed(2) : 'N/A'} | Signal Day Open: ${marketData.currentOpen ? '$' + marketData.currentOpen.toFixed(2) : 'N/A'} | ${gapInfo || 'Gap: N/A'}`;
 
-  const marketDataLine2 = `Today H/L: ${marketData.currentHigh ? '$' + marketData.currentHigh.toFixed(2) : 'N/A'}/${marketData.currentLow ? '$' + marketData.currentLow.toFixed(2) : 'N/A'} | Current: $${marketData.currentPrice.toFixed(2)} @ ${entryTime} | ${remainingTime}`;
+  const marketDataLine2 = `Signal Day H/L: ${marketData.currentHigh ? '$' + marketData.currentHigh.toFixed(2) : 'N/A'}/${marketData.currentLow ? '$' + marketData.currentLow.toFixed(2) : 'N/A'} | Signal Day Current: $${marketData.currentPrice.toFixed(2)} @ ${entryTime} | ${remainingTime}`;
+
+  // Add day summary lines with actual data ranges
+  // Get prior day data using the same logic as calculateMarketDataContext
+  const priorDayData = allDataInput.filter(bar => {
+    const barTimestamp = parseTimestampForChart(bar.timestamp);
+    const barDate = new Date(barTimestamp).toISOString().split('T')[0];
+    return barDate < entryDate && isTradingHours(barTimestamp);
+  });
+
+  let priorDaySummary = 'PRIOR DAY SUMMARY: N/A';
+  if (priorDayData.length > 0) {
+    // Sort by timestamp to ensure we get the correct close (last bar of prior day)
+    const sortedPriorDayBars = priorDayData.sort(
+      (a, b) => parseTimestampForChart(a.timestamp) - parseTimestampForChart(b.timestamp)
+    );
+
+    const priorLow = Math.min(...priorDayData.map(b => b.low));
+    const priorHigh = Math.max(...priorDayData.map(b => b.high));
+    const priorClose = sortedPriorDayBars[sortedPriorDayBars.length - 1].close; // Last bar close
+    priorDaySummary = `PRIOR DAY SUMMARY: $${priorClose.toFixed(2)} close, $${priorLow.toFixed(2)} low, $${priorHigh.toFixed(2)} high`;
+  }
+
+  const signalDayPerformance = `SIGNAL DAY PERFORMANCE: ${marketData.currentOpen ? '$' + marketData.currentOpen.toFixed(2) + ' open' : 'N/A open'} → $${marketData.currentPrice.toFixed(2)} current${marketData.currentOpen ? ' (+$' + (marketData.currentPrice - marketData.currentOpen).toFixed(2) + ' from open)' : ''}`;
 
   // Format VWAP information (only if not suppressed)
   let vwapInfo = '';
@@ -245,7 +270,7 @@ export const generateMarketMetrics = (
       const absDiff = Math.abs(vwapDiff);
       const position =
         marketData.vwapPosition === 'at' ? 'AT' : marketData.vwapPosition?.toUpperCase();
-      vwapInfo = `Current price of $${marketData.currentPrice.toFixed(2)} is $${absDiff.toFixed(2)} ${position} VWAP of $${marketData.vwap.toFixed(2)}.`;
+      vwapInfo = `Signal Day price of $${marketData.currentPrice.toFixed(2)} is $${absDiff.toFixed(2)} ${position} VWAP of $${marketData.vwap.toFixed(2)}.`;
     } else {
       vwapInfo = 'VWAP data is not available.';
     }
@@ -259,7 +284,7 @@ export const generateMarketMetrics = (
       const absDiff = Math.abs(smaDiff);
       const position =
         marketData.smaPosition === 'at' ? 'AT' : marketData.smaPosition?.toUpperCase();
-      smaInfo = `Current price of $${marketData.currentPrice.toFixed(2)} is $${absDiff.toFixed(2)} ${position} SMA of $${marketData.sma20.toFixed(2)}.`;
+      smaInfo = `Signal Day price of $${marketData.currentPrice.toFixed(2)} is $${absDiff.toFixed(2)} ${position} SMA of $${marketData.sma20.toFixed(2)}.`;
     } else {
       smaInfo = '20-Day SMA data is not available.';
     }
@@ -276,6 +301,8 @@ export const generateMarketMetrics = (
   return {
     marketDataLine1,
     marketDataLine2,
+    priorDaySummary,
+    signalDayPerformance,
     vwapInfo,
     smaInfo,
     vwapVsSmaInfo,
@@ -303,7 +330,12 @@ export const generateMarketMetricsForPrompt = (
     suppressVwap
   );
 
-  const lines = [metrics.marketDataLine1, metrics.marketDataLine2];
+  const lines = [
+    metrics.marketDataLine1,
+    metrics.marketDataLine2,
+    metrics.priorDaySummary,
+    metrics.signalDayPerformance,
+  ];
 
   // Only add VWAP info if not suppressed
   if (!suppressVwap && metrics.vwapInfo) {
