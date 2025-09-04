@@ -76,5 +76,3 @@ export const getAvailableEntryPatterns = (): string[] => {
 export const getAvailableExitPatterns = (): string[] => {
   return Object.keys(exitPatterns);
 };
-
-// export const a = 1;

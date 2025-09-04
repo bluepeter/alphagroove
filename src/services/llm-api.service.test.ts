@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vite
 
 import { type LLMScreenConfig } from '../screens/types';
 
-import { LlmApiService as ActualLlmApiService /*, type LLMResponse */ } from './llm-api.service'; // Commented out unused LLMResponse import
+import { LlmApiService as ActualLlmApiService } from './llm-api.service';
 
 // Mock dependencies
 vi.mock('node:fs/promises');

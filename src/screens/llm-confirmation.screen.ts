@@ -9,6 +9,19 @@ import { type EnrichedSignal, type ScreenDecision } from './types';
 import { type EntryScreen, type EntryScreenContext, type LLMScreenConfig } from './types';
 
 // Helper function to average proposed prices from LLM responses
+const getActionEmoji = (action: string): string => {
+  switch (action) {
+    case 'long':
+      return '🔼';
+    case 'short':
+      return '🔽';
+    case 'do_nothing':
+      return '⏸️';
+    default:
+      return '';
+  }
+};
+
 export const calculateAverageProposedPrices = (
   responses: LLMResponse[],
   consensusAction: 'long' | 'short'
@@ -108,18 +121,7 @@ export class LlmConfirmationScreen implements EntryScreen {
         const costString =
           typeof response.cost === 'number' ? ` (Cost: $${response.cost.toFixed(6)})` : '';
 
-        let actionEmoji = '';
-        switch (response.action) {
-          case 'long':
-            actionEmoji = '🔼';
-            break;
-          case 'short':
-            actionEmoji = '🔽';
-            break;
-          case 'do_nothing':
-            actionEmoji = '⏸️';
-            break;
-        }
+        const actionEmoji = getActionEmoji(response.action);
 
         if (debugMode) {
           console.log(
