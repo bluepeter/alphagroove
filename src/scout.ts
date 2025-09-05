@@ -31,8 +31,6 @@ import {
   type DailyBar,
 } from './utils/sma-calculator';
 
-// Note: OutputCapture class removed as we're using generateOutputSummary instead
-
 // Initialize command line interface
 const program = new Command();
 
@@ -324,7 +322,7 @@ const performLLMAnalysis = async (
 
       // Save terminal output to files
       // We'll capture this by reconstructing the key output information
-      const outputContent = await generateOutputSummary(
+      const outputContent = await _generateOutputSummary(
         ticker,
         tradeDate,
         entrySignal,
@@ -563,7 +561,7 @@ const displayIndividualLLMResponses = (responses: any[]): void => {
 /**
  * Generate a summary of the terminal output for saving to file
  */
-const generateOutputSummary = async (
+const _generateOutputSummary = async (
   ticker: string,
   tradeDate: string,
   entrySignal: Signal,

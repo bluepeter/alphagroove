@@ -47,6 +47,8 @@ import {
 } from './patterns/exit/exit-strategy.js';
 import { calculateATRStopLoss } from './utils/calculations.js';
 import { calculateEntryAtr, evaluateExitStrategies } from './utils/trade-processing';
+import { processLlmResult, type BacktestOutputData } from './utils/llm-result-processor';
+import { type LlmDecision } from './utils/scout-chart-generator';
 
 // Group trades by year and then by individual trading days for parallel processing
 const groupTradesByYearAndDay = (tradesFromQuery: any[]): Map<string, Map<string, any[]>> => {
@@ -128,6 +130,11 @@ export const handleLlmTradeScreeningInternal = async (
   cost: number;
   averagedProposedStopLoss?: number;
   averagedProposedProfitTarget?: number;
+  rationale?: string;
+  _debug?: {
+    responses?: Array<any>;
+    rawData?: any;
+  };
 }> => {
   if (!llmScreenInstance || !screenSpecificLLMConfig) {
     return { proceed: true, cost: 0 }; // No LLM screen active
@@ -189,19 +196,17 @@ export const handleLlmTradeScreeningInternal = async (
   );
 
   // screenDecision already includes proceed, cost, and LLM analysis
-  if (!screenDecision.proceed) {
-    return { ...screenDecision, chartPath: undefined, cost: screenDecision.cost ?? 0 }; // Ensure chartPath is not set and cost is number
-  } else {
-    // Include averaged prices if proceeding
-    return {
-      proceed: screenDecision.proceed,
-      direction: screenDecision.direction,
-      chartPath: chartPathForLLM,
-      cost: screenDecision.cost ?? 0,
-      averagedProposedStopLoss: screenDecision.averagedProposedStopLoss,
-      averagedProposedProfitTarget: screenDecision.averagedProposedProfitTarget,
-    };
-  }
+  // Always return the chart path so we can create overlays for all decisions
+  return {
+    proceed: screenDecision.proceed,
+    direction: screenDecision.direction,
+    chartPath: chartPathForLLM, // Always include chart path for overlay creation
+    cost: screenDecision.cost ?? 0,
+    averagedProposedStopLoss: screenDecision.averagedProposedStopLoss,
+    averagedProposedProfitTarget: screenDecision.averagedProposedProfitTarget,
+    rationale: screenDecision.rationale,
+    _debug: screenDecision._debug,
+  };
 };
 
 // Export for testing
@@ -413,6 +418,8 @@ const processDayTrades = async (
       direction: llmDirection,
       averagedProposedStopLoss: llmAveragedStopLoss,
       averagedProposedProfitTarget: llmAveragedProfitTarget,
+      rationale: llmRationale,
+      _debug: llmDebug,
     } = await handleLlmTradeScreeningInternal(
       currentSignal,
       entryPattern.name,
@@ -425,8 +432,44 @@ const processDayTrades = async (
 
     llmCost += screeningCost;
 
+    // Store LLM result data for later processing (after trade calculations)
+    let llmResultData: BacktestOutputData | null = null;
+    if (llmChartPath) {
+      const decision: LlmDecision =
+        proceedFromLlm && llmDirection ? (llmDirection as LlmDecision) : 'do_nothing';
+
+      llmResultData = {
+        ticker: mergedConfig.ticker,
+        tradeDate,
+        entrySignal: {
+          timestamp: currentSignal.timestamp,
+          price: currentSignal.price,
+          type: 'entry' as const,
+        },
+        decision,
+        proceed: proceedFromLlm,
+        direction: llmDirection,
+        cost: screeningCost,
+        rationale: llmRationale,
+        averagedProposedStopLoss: llmAveragedStopLoss,
+        averagedProposedProfitTarget: llmAveragedProfitTarget,
+        _debug: llmDebug,
+        executionPrice: executionBarClosePrice,
+      };
+    }
+
     if (!proceedFromLlm || !llmDirection) {
-      // LLM returned do_nothing - silently skip this trade
+      // LLM returned do_nothing - process result and continue to next trade
+      if (llmResultData && llmChartPath) {
+        try {
+          const chartDir = llmChartPath.substring(0, llmChartPath.lastIndexOf('/'));
+          await processLlmResult(llmChartPath, llmResultData, chartDir, false); // isScout = false
+        } catch (error) {
+          if (debug) {
+            console.warn(`[Backtest] Could not create result chart for ${tradeDate}:`, error);
+          }
+        }
+      }
       continue;
     }
 
@@ -626,6 +669,23 @@ const processDayTrades = async (
 
     // Print trade details immediately as each trade completes
     printTradeDetails(trade);
+
+    // Process LLM result with final trade data (create overlay chart and output files)
+    if (llmResultData && llmChartPath) {
+      try {
+        // Update result data with final trade calculations
+        llmResultData.atrValue = entryAtrValue;
+        llmResultData.stopLossPrice = initialStopLossPrice;
+        llmResultData.profitTargetPrice = initialProfitTargetPrice;
+
+        const chartDir = llmChartPath.substring(0, llmChartPath.lastIndexOf('/'));
+        await processLlmResult(llmChartPath, llmResultData, chartDir, false); // isScout = false
+      } catch (error) {
+        if (debug) {
+          console.warn(`[Backtest] Could not create result chart for ${tradeDate}:`, error);
+        }
+      }
+    }
 
     if (actualTradeDirection === 'long') {
       longTrades.push(trade);

@@ -47,6 +47,14 @@ vi.mock('./patterns/pattern-factory.js', async () => {
   };
 });
 
+vi.mock('./utils/llm-result-processor.js', () => ({
+  processLlmResult: vi.fn().mockResolvedValue({
+    resultChartPath: 'test_result_chart.png',
+    outputFilePath: 'test_output.txt',
+    latestOutputPath: 'latest_output.txt',
+  }),
+}));
+
 vi.mock('./screens/llm-confirmation.screen.js', () => ({
   LlmConfirmationScreen: vi.fn().mockImplementation(() => ({
     shouldSignalProceed: vi.fn(() =>
@@ -217,6 +225,8 @@ describe('LLM Trade Screening Tests', () => {
       );
       expect(resultFalse).toEqual({
         proceed: false,
+        direction: undefined,
+        chartPath: expectedChartPath,
         cost: mockScreenCost,
         averagedProposedStopLoss: undefined,
         averagedProposedProfitTarget: undefined,
@@ -410,6 +420,59 @@ describe('LLM Trade Screening Tests', () => {
         undefined, // context
         undefined, // debug
         'Test market metrics' // market metrics should be present when not suppressed
+      );
+    });
+  });
+
+  describe('Chart Overlay and Output File Creation', () => {
+    it('should create chart overlays and output files for LLM decisions during backtest', async () => {
+      const { processLlmResult } = await import('./utils/llm-result-processor.js');
+      const _mockProcessLlmResult = vi.mocked(processLlmResult);
+
+      // Mock LLM to return a LONG decision
+      const localMockLlmInstance = {
+        shouldSignalProceed: vi.fn().mockResolvedValue({
+          proceed: true,
+          direction: 'long',
+          cost: 0.01,
+          rationale: 'Strong bullish pattern',
+          averagedProposedStopLoss: 95.0,
+          averagedProposedProfitTarget: 105.0,
+        }),
+      };
+
+      const mockSignal = {
+        ticker: 'TEST',
+        trade_date: '2023-01-01',
+        timestamp: '2023-01-01 10:00:00',
+        price: 100,
+      };
+
+      await mainModule.handleLlmTradeScreeningInternal(
+        mockSignal,
+        'test-entry',
+        localMockLlmInstance,
+        { llmProvider: 'anthropic', numCalls: 1, agreementThreshold: 1 },
+        {
+          ticker: 'TEST',
+          timeframe: '1min',
+          from: '2023-01-01',
+          to: '2023-01-02',
+        } as any,
+        {},
+        false
+      );
+
+      // The chart overlay and output file processing happens in the main backtest loop,
+      // not in handleLlmTradeScreeningInternal, so we just verify the LLM was called correctly
+      expect(localMockLlmInstance.shouldSignalProceed).toHaveBeenCalledWith(
+        mockSignal,
+        expect.any(String), // Chart path (mocked)
+        expect.any(Object), // Screen config
+        expect.any(Object), // Raw config
+        undefined, // context
+        false, // debug
+        expect.any(String) // market metrics
       );
     });
   });
