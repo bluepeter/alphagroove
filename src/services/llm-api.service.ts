@@ -30,7 +30,17 @@ export class LlmApiService {
   private OUTPUT_COST_PER_MILLION_TOKENS = 15;
 
   constructor(config: LLMScreenConfig) {
-    this.config = config;
+    this.config = { ...config };
+
+    // Hardcode flagship models and API keys based on provider
+    if (this.config.llmProvider === 'anthropic') {
+      this.config.modelName = 'claude-sonnet-4-20250514';
+      this.config.apiKeyEnvVar = 'ANTHROPIC_API_KEY';
+    } else if (this.config.llmProvider === 'openai') {
+      this.config.modelName = 'gpt-5-mini';
+      this.config.apiKeyEnvVar = 'OPENAI_API_KEY';
+    }
+
     this.apiKey = process.env[this.config.apiKeyEnvVar];
 
     if (!this.apiKey) {
@@ -45,9 +55,9 @@ export class LlmApiService {
         apiKey: this.apiKey,
       });
     } else if (this.config.llmProvider === 'openai') {
-      // GPT-4o pricing (as of 2024)
-      this.INPUT_COST_PER_MILLION_TOKENS = 2.5;
-      this.OUTPUT_COST_PER_MILLION_TOKENS = 10;
+      // GPT-5 pricing (estimated)
+      this.INPUT_COST_PER_MILLION_TOKENS = 5;
+      this.OUTPUT_COST_PER_MILLION_TOKENS = 20;
       this.openai = new OpenAI({
         apiKey: this.apiKey,
       });
@@ -267,12 +277,40 @@ export class LlmApiService {
       });
     }
 
-    const response = await this.openai!.chat.completions.create({
+    // Configure API parameters based on model capabilities
+    const apiParams: any = {
       model: this.config.modelName,
       messages: messages,
-      max_tokens: this.config.maxOutputTokens,
-      temperature: temperature,
-    });
+    };
+
+    // GPT-5 specific configurations
+    if (this.config.modelName === 'gpt-5-mini') {
+      // GPT-5-mini only supports temperature = 1 (despite general API docs saying 0-2)
+      apiParams.max_completion_tokens = this.config.maxOutputTokens;
+      // Don't set temperature - GPT-5-mini only supports default (1)
+      apiParams.reasoning_effort = 'medium';
+      apiParams.verbosity = 'low';
+      apiParams.response_format = { type: 'json_object' };
+    } else {
+      // Other OpenAI models use max_tokens and support custom temperature
+      apiParams.max_tokens = this.config.maxOutputTokens;
+      apiParams.temperature = temperature;
+      apiParams.response_format = { type: 'json_object' };
+    }
+
+    let response;
+    try {
+      response = await this.openai!.chat.completions.create(apiParams);
+    } catch (apiError: any) {
+      console.error(`[DEBUG GPT-5] API Error:`, apiError.message);
+      if (apiError.response?.data) {
+        console.error(
+          `[DEBUG GPT-5] API Error Details:`,
+          JSON.stringify(apiError.response.data, null, 2)
+        );
+      }
+      throw apiError;
+    }
 
     let callCost = 0;
     if (response.usage) {

@@ -75,19 +75,24 @@ shared:
 
   # LLM configuration for intelligent trade analysis
   llmConfirmationScreen:
-    llmProvider: 'anthropic'
-    modelName: 'claude-sonnet-4-20250514'
-    apiKeyEnvVar: 'ANTHROPIC_API_KEY'
+    # Choose your LLM provider - flagship models are automatically selected:
+    llmProvider: 'anthropic' # Uses claude-sonnet-4-20250514 automatically
+    # llmProvider: 'openai'   # Uses gpt-5-mini automatically
+
     numCalls: 2
     agreementThreshold: 2
-    temperatures: [0.1, 1.0]
+    temperatures: [0.2, 1.0] # Note: GPT-5-mini only supports default temperature (1)
     prompts:
       - 'Analyze this chart as a cautious trader. Action: long, short, or do_nothing? Rationale?'
       - 'Analyze this chart as an aggressive trader. Action: long, short, or do_nothing? Rationale?'
-    commonPromptSuffixForJson:
-      'Respond in JSON: {"action": "<action>", "rationalization": "<one_sentence_rationale>",
-      "proposedStopLoss": <price_or_null>, "proposedProfitTarget": <price_or_null>}'
-    maxOutputTokens: 150
+    commonPromptSuffixForJson: >-
+      Respond in JSON: {"action": "<action>", "rationalization": "<one_sentence_rationale>",
+      "proposedStopLoss": <price_or_null>, "proposedProfitTarget": <price_or_null>}
+    systemPrompt: >-
+      You are a seasoned day trader. You know when to save your powder and wait. Only when you're
+      sure will you go long or short.
+    maxOutputTokens: 2000
+    timeoutMs: 30000
 
 # === BACKTEST-SPECIFIC CONFIGURATION ===
 backtest:
@@ -151,9 +156,18 @@ The `alphagroove.config.yaml` file is organized into three sections:
 Create a `.env.local` file in the project root with your API keys:
 
 ```bash
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
+# LLM Provider API Keys (set the one you're using)
+ANTHROPIC_API_KEY=your_anthropic_api_key_here  # For Anthropic Claude
+OPENAI_API_KEY=your_openai_api_key_here        # For OpenAI GPT models
+
+# Market Data API Key
 POLYGON_API_KEY=your_polygon_api_key_here
 ```
+
+**Note**: The system automatically selects the correct API key based on your `llmProvider` setting:
+
+- `llmProvider: 'anthropic'` → uses `ANTHROPIC_API_KEY`
+- `llmProvider: 'openai'` → uses `OPENAI_API_KEY`
 
 **Available Timeframes**
 
@@ -242,6 +256,56 @@ charts for every potential trade and sends them to an LLM for analysis.
 - **Context Awareness**: Considers volume, prior day action, and intraday dynamics
 - **Risk Management**: Conservative approach - only trades when confident
 - **Eliminates Bias**: Anonymized charts prevent historical knowledge from influencing decisions
+
+## LLM Provider Support
+
+AlphaGroove supports multiple LLM providers with automatic flagship model selection and optimized
+configurations:
+
+### Supported Providers
+
+**Anthropic Claude**
+
+- **Model**: `claude-sonnet-4-20250514` (automatically selected)
+- **API Key**: `ANTHROPIC_API_KEY` (automatically used)
+- **Temperature Support**: Full range (0.0 - 2.0)
+- **Cost**: ~$3/$15 per million input/output tokens
+
+**OpenAI GPT**
+
+- **Model**: `gpt-5-mini` (automatically selected)
+- **API Key**: `OPENAI_API_KEY` (automatically used)
+- **Temperature Support**: Default only (1.0) - model limitation
+- **Cost**: ~$5/$20 per million input/output tokens
+- **Special Features**: Reasoning effort, verbosity controls
+
+### Switching Providers
+
+Simply change the `llmProvider` setting in your config:
+
+```yaml
+shared:
+  llmConfirmationScreen:
+    # Switch between providers:
+    llmProvider: 'anthropic' # Uses claude-sonnet-4-20250514
+    # llmProvider: 'openai'   # Uses gpt-5-mini
+```
+
+**No other configuration changes needed** - the system automatically:
+
+- Selects the flagship model for your chosen provider
+- Uses the correct API key environment variable
+- Applies provider-specific parameter optimizations
+- Handles model-specific limitations (e.g., temperature restrictions)
+
+### Provider-Specific Behavior
+
+- **Temperature Handling**: OpenAI GPT-5-mini uses default temperature (1.0) regardless of your
+  `temperatures` config due to model limitations. Anthropic supports custom temperatures.
+- **API Parameters**: Each provider uses optimized parameters (e.g., `max_completion_tokens` for
+  GPT-5, `reasoning_effort` settings)
+- **Cost Tracking**: Accurate token-based cost calculation for each provider
+- **Error Handling**: Provider-specific error messages and graceful degradation
 
 ---
 

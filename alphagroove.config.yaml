@@ -7,12 +7,8 @@ shared:
   suppressVwap: false # Set to true to disable VWAP computation and display for both backtest and scout
   suppressMetricsInPrompts: true # Set to true to exclude all text metrics from LLM prompts (metrics still appear in charts)
   llmConfirmationScreen:
-    # llmProvider: 'anthropic'
-    # modelName: 'claude-sonnet-4-20250514'
-    # apiKeyEnvVar: 'ANTHROPIC_API_KEY'
-    llmProvider: 'openai'
-    modelName: 'gpt-4o'
-    apiKeyEnvVar: 'OPENAI_API_KEY'
+    llmProvider: 'anthropic' # Uses claude-sonnet-4-20250514 automatically
+    # llmProvider: 'openai' # Uses gpt-5-mini automatically
     numCalls: 2
     agreementThreshold: 2
     temperatures: [0.2, 1.0]
@@ -66,7 +62,7 @@ shared:
       or  
 
       `{"action": "do_nothing", "rationalization": "<here>"}`
-    maxOutputTokens: 250
+    maxOutputTokens: 2000
     timeoutMs: 30000 # 30 second timeout to prevent hanging
 
 # === BACKTEST-SPECIFIC CONFIGURATION ===

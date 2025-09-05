@@ -2,6 +2,7 @@
 import fs from 'node:fs/promises';
 
 import ActualSDKAnthropic from '@anthropic-ai/sdk';
+import ActualSDKOpenAI from 'openai';
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 
 import { type LLMScreenConfig } from '../screens/types';
@@ -11,6 +12,7 @@ import { LlmApiService as ActualLlmApiService } from './llm-api.service';
 // Mock dependencies
 vi.mock('node:fs/promises');
 vi.mock('@anthropic-ai/sdk');
+vi.mock('openai');
 vi.mock('dotenv', () => ({
   default: {
     config: vi.fn(),
@@ -24,8 +26,8 @@ const MOCK_API_KEY = 'test-api-key';
 
 const getBaseConfig = (): LLMScreenConfig => ({
   llmProvider: 'anthropic',
-  modelName: 'claude-test-model',
-  apiKeyEnvVar: 'TEST_ANTHROPIC_API_KEY',
+  modelName: 'claude-test-model', // Will be overridden by hardcoded value in constructor
+  apiKeyEnvVar: 'TEST_ANTHROPIC_API_KEY', // Will be overridden by hardcoded value in constructor
   numCalls: 3,
   agreementThreshold: 2,
   temperatures: [0.2, 0.5, 0.8],
@@ -40,10 +42,14 @@ describe('LlmApiService', () => {
 
   beforeEach(() => {
     originalEnv = { ...process.env };
-    process.env.TEST_ANTHROPIC_API_KEY = MOCK_API_KEY;
+    // Set the environment variable that the service actually uses for Anthropic
+    process.env.ANTHROPIC_API_KEY = MOCK_API_KEY;
+    // Set the environment variable that the service actually uses for OpenAI
+    process.env.OPENAI_API_KEY = MOCK_API_KEY;
     vi.clearAllMocks();
-    // Clear the mock constructor itself if it's been called/configured
+    // Clear the mock constructors
     (ActualSDKAnthropic as unknown as Mock).mockClear();
+    (ActualSDKOpenAI as unknown as Mock).mockClear();
   });
 
   afterEach(() => {
@@ -60,20 +66,20 @@ describe('LlmApiService', () => {
     });
 
     it('should not initialize Anthropic client and not be enabled if API key is missing', () => {
-      delete process.env.TEST_ANTHROPIC_API_KEY;
+      delete process.env.ANTHROPIC_API_KEY;
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const config = getBaseConfig();
       const service = new ActualLlmApiService(config);
       expect(ActualSDKAnthropic).not.toHaveBeenCalled();
       expect(service.isEnabled()).toBe(false);
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        `LLM API Key not found in environment variable TEST_ANTHROPIC_API_KEY. The LLM API service will not be able to make calls.`
+        `LLM API Key not found in environment variable ANTHROPIC_API_KEY. The LLM API service will not be able to make calls.`
       );
       consoleWarnSpy.mockRestore();
     });
 
     it('should be enabled when API key exists (enabled field removed)', () => {
-      process.env.TEST_ANTHROPIC_API_KEY = MOCK_API_KEY;
+      process.env.ANTHROPIC_API_KEY = MOCK_API_KEY;
       const config = { ...getBaseConfig() };
       const service = new ActualLlmApiService(config);
       expect(service.isEnabled()).toBe(true);
@@ -131,7 +137,7 @@ describe('LlmApiService', () => {
     });
 
     it('should return do_nothing responses if no API key is provided', async () => {
-      delete process.env.TEST_ANTHROPIC_API_KEY;
+      delete process.env.ANTHROPIC_API_KEY;
       const config = { ...getBaseConfig() };
       const service = new ActualLlmApiService(config);
       const responses = await service.getTradeDecisions(mockChartPath);

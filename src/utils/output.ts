@@ -154,7 +154,13 @@ export const printHeader = (
   // Display LLM configuration if available
   if (llmConfig) {
     const provider = llmConfig.llmProvider || 'unknown';
-    const model = llmConfig.modelName || 'unknown';
+    // Get the actual model that will be used (hardcoded based on provider)
+    const model =
+      provider === 'anthropic'
+        ? 'claude-sonnet-4-20250514'
+        : provider === 'openai'
+          ? 'gpt-5-mini'
+          : 'unknown';
     const numCalls = llmConfig.numCalls || 'N/A';
     const temperatures = llmConfig.temperatures ? `[${llmConfig.temperatures.join(', ')}]` : 'N/A';
     const threshold = llmConfig.agreementThreshold || 'N/A';
