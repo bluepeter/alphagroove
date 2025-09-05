@@ -418,7 +418,9 @@ backtest:
     maxConcurrentDays: 5
 ```
 
-**LLM Analysis Output**: When LLM screening is enabled, the backtest generates chart overlays with color-coded decisions (LONG/SHORT/DO_NOTHING) and detailed analysis files for each trade, saved in the entry pattern directory.
+**LLM Analysis Output**: When LLM screening is enabled, the backtest generates chart overlays with
+color-coded decisions (LONG/SHORT/DO_NOTHING) and detailed analysis files for each trade, saved in
+the entry pattern directory.
 
 ## Command Line Options
 
