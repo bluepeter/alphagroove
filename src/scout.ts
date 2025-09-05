@@ -714,8 +714,15 @@ const saveOutputToFiles = (
     const latestPath = `${patternDir}/${latestFilename}`;
     fs.writeFileSync(latestPath, output, 'utf-8');
 
+    // Create simple decision-only file for monitoring
+    const simpleDecision = decision.toUpperCase().replace('_', ' ');
+    const simpleFilename = `latest_action_simple.txt`;
+    const simplePath = `${patternDir}/${simpleFilename}`;
+    fs.writeFileSync(simplePath, simpleDecision, 'utf-8');
+
     console.log(chalk.dim(`Output saved: ${timestampedPath}`));
     console.log(chalk.dim(`Latest output: ${latestPath}`));
+    console.log(chalk.dim(`Simple decision: ${simplePath}`));
   } catch (error) {
     console.log(chalk.yellow(`⚠️  Could not save output files: ${error}`));
   }
