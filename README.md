@@ -578,11 +578,64 @@ The scout uses identical methods as the backtesting engine:
 - Same chart format and anonymization
 - ATR-based calculations using real-time data
 
+## Automated Live Trading Monitoring
+
+For continuous monitoring during trading hours, use the two-terminal approach:
+
+### Terminal 1: Continuous Scout Execution
+
+```bash
+# Run scout every 60 seconds continuously
+watch -n 60 'pnpm scout'
+
+# Alternative: Run every 30 seconds for faster updates
+watch -n 30 'pnpm scout'
+```
+
+### Terminal 2: Decision Change Monitoring
+
+```bash
+# Monitor for trade signal changes with prominent alerts
+./monitor_scout.sh
+```
+
+### How It Works
+
+1. **Terminal 1** runs `pnpm scout` continuously at your chosen interval (30-60 seconds recommended)
+2. Each scout run updates `charts/scout/latest_action_simple.txt` with the current decision: `LONG`,
+   `SHORT`, or `DO NOTHING`
+3. **Terminal 2** monitors this file and provides **prominent alerts** when decisions change:
+   - **🚨 TRADE SIGNALS (LONG/SHORT)**: Multiple notifications with different sounds, visual
+     terminal alerts, and audio bells
+   - **💤 DO NOTHING**: Single quiet notification
+
+### Setup
+
+```bash
+# Make the monitoring script executable (one-time setup)
+chmod +x monitor_scout.sh
+
+# Start monitoring in one terminal
+./monitor_scout.sh
+
+# Start continuous scout execution in another terminal
+watch -n 60 'pnpm scout'
+```
+
+### Files Generated
+
+- **`latest_action_simple.txt`** - Single word decision file for monitoring (`LONG`, `SHORT`,
+  `DO NOTHING`)
+- **`latest_action.txt`** - Full detailed analysis results
+- **`latest_masked_result.png`** - Chart with decision overlay
+- All timestamped versions are also created for historical reference
+
 ## Typical Workflow
 
 1. **Backtest**: Validate strategy parameters and LLM configuration using historical data
 2. **Scout**: Use real-time analysis for current market conditions
-3. **Execute**: Apply LLM recommendations and calculated levels in your brokerage platform
+3. **Monitor**: Use automated monitoring for continuous trade signal detection
+4. **Execute**: Apply LLM recommendations and calculated levels in your brokerage platform
 
 ## Directory Structure
 
