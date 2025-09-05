@@ -46,8 +46,8 @@ export const addLlmResultOverlay = async (
       throw new Error('Could not determine image dimensions');
     }
 
-    // Create text overlay SVG with massive font size
-    const fontSize = Math.min(width, height) * 0.15; // 15% of the smaller dimension
+    // Create text overlay SVG with smaller font size positioned below chart
+    const fontSize = Math.min(width, height) * 0.1; // 10% of the smaller dimension (reduced from 15%)
     const textSvg = `
       <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
         <defs>
@@ -57,7 +57,7 @@ export const addLlmResultOverlay = async (
         </defs>
         <text 
           x="${width / 2}" 
-          y="${height - fontSize * 0.8}" 
+          y="${height - fontSize * 0.3}" 
           text-anchor="middle" 
           font-family="Arial Black, Arial, sans-serif" 
           font-size="${fontSize}" 
@@ -65,7 +65,7 @@ export const addLlmResultOverlay = async (
           fill="${config.color}"
           filter="url(#shadow)"
           stroke="white"
-          stroke-width="3"
+          stroke-width="2"
         >${overlayText}</text>
       </svg>
     `;
