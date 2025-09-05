@@ -25,6 +25,7 @@ intelligent analysis over curve-fitting.
   vs price, SMA vs price
 - Generates actionable trade signals with specific entry/exit levels for manual execution
 - On-demand analysis for any date/time, not just current market conditions
+- **Automated Monitoring**: Continuous execution with prominent alerts for trade signal changes
 
 ## Installation & Setup
 
