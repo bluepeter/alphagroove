@@ -18,12 +18,20 @@ import {
 } from './utils/polygon-data-converter';
 import { calculateEntryAtr } from './utils/trade-processing';
 import { calculateExitPrices } from './utils/exit-price-calculator';
-import { generateScoutChart, type ScoutChartOptions } from './utils/scout-chart-generator';
+import {
+  generateScoutChart,
+  addLlmResultOverlay,
+  type ScoutChartOptions,
+  type LlmDecision,
+} from './utils/scout-chart-generator';
+import fs from 'fs';
 import {
   convertPolygonToDailyBars,
   calculateTradingDaysAgo,
   type DailyBar,
 } from './utils/sma-calculator';
+
+// Note: OutputCapture class removed as we're using generateOutputSummary instead
 
 // Initialize command line interface
 const program = new Command();
@@ -297,6 +305,39 @@ const performLLMAnalysis = async (
       );
     }
 
+    // Create result chart with LLM decision overlay
+    try {
+      const decision: LlmDecision =
+        llmDecision.proceed && llmDecision.direction
+          ? (llmDecision.direction as LlmDecision)
+          : 'do_nothing';
+
+      const resultChartPath = await addLlmResultOverlay(chartPath, decision);
+      console.log(chalk.dim(`Result chart (with decision): ${resultChartPath}`));
+
+      // Also create latest_masked_result.png
+      const chartDir = chartPath.substring(0, chartPath.lastIndexOf('/'));
+      const latestResultPath = `${chartDir}/latest_masked_result.png`;
+      const fs = await import('fs');
+      fs.copyFileSync(resultChartPath, latestResultPath);
+      console.log(chalk.dim(`Latest result chart: ${latestResultPath}`));
+
+      // Save terminal output to files
+      // We'll capture this by reconstructing the key output information
+      const outputContent = await generateOutputSummary(
+        ticker,
+        tradeDate,
+        entrySignal,
+        llmDecision,
+        rawConfig,
+        allBars,
+        dailyBars
+      );
+      saveOutputToFiles(outputContent, decision, ticker, tradeDate, chartDir);
+    } catch (error) {
+      console.log(chalk.yellow(`⚠️  Could not create result chart: ${error}`));
+    }
+
     if (llmDecision.proceed && llmDecision.direction) {
       await displayTradingInstructions(
         entrySignal,
@@ -517,6 +558,169 @@ const displayIndividualLLMResponses = (responses: any[]): void => {
 
     console.log(''); // Empty line between responses
   });
+};
+
+/**
+ * Generate a summary of the terminal output for saving to file
+ */
+const generateOutputSummary = async (
+  ticker: string,
+  tradeDate: string,
+  entrySignal: Signal,
+  llmDecision: any,
+  rawConfig: any,
+  _allBars: Bar[],
+  _dailyBars?: DailyBar[]
+): Promise<string> => {
+  const lines: string[] = [];
+
+  // Header
+  lines.push('🔍 AlphaGroove Entry Scout');
+  lines.push(`Ticker: ${ticker}`);
+  lines.push(`Trade Date: ${tradeDate}`);
+  lines.push(`Entry Signal: ${entrySignal.timestamp} @ $${entrySignal.price.toFixed(2)}`);
+  lines.push('');
+
+  // LLM Analysis Results
+  lines.push('🤖 LLM Analysis Results:');
+  lines.push(`Decision: ${llmDecision.proceed ? '✅ ENTER TRADE' : '❌ DO NOT ENTER'}`);
+
+  if (llmDecision.direction) {
+    const directionEmoji = llmDecision.direction === 'long' ? '🔼' : '🔽';
+    lines.push(`Direction: ${llmDecision.direction.toUpperCase()} ${directionEmoji}`);
+  }
+  lines.push('');
+
+  // Trading Instructions (if applicable)
+  if (llmDecision.proceed && llmDecision.direction) {
+    lines.push('📋 Manual Trading Instructions:');
+    lines.push(`Entry Price: $${entrySignal.price.toFixed(2)}`);
+
+    // Calculate exit prices
+    const atrValue = await calculateEntryAtr(
+      ticker,
+      rawConfig.shared?.timeframe || '1min',
+      tradeDate
+    );
+    const isLong = llmDecision.direction === 'long';
+    const stopLossConfig = rawConfig?.backtest?.exit?.strategyOptions?.stopLoss;
+    const profitTargetConfig = rawConfig?.backtest?.exit?.strategyOptions?.profitTarget;
+
+    const exitPrices = calculateExitPrices(
+      entrySignal.price,
+      atrValue,
+      isLong,
+      stopLossConfig,
+      profitTargetConfig,
+      llmDecision.averagedProposedStopLoss,
+      llmDecision.averagedProposedProfitTarget
+    );
+
+    if (exitPrices.stopLoss.price) {
+      const stopLossPrice = exitPrices.stopLoss.price;
+      const stopLossDollarChange = (stopLossPrice - entrySignal.price).toFixed(2);
+      const stopLossPercent = (
+        (Math.abs(stopLossPrice - entrySignal.price) / entrySignal.price) *
+        100
+      ).toFixed(2);
+      const changeSign = parseFloat(stopLossDollarChange) >= 0 ? '+' : '';
+      lines.push(
+        `Stop Loss: $${stopLossPrice.toFixed(2)} (${changeSign}$${stopLossDollarChange}, ${stopLossPercent}% risk)`
+      );
+    }
+
+    if (exitPrices.profitTarget.price) {
+      const profitTargetPrice = exitPrices.profitTarget.price;
+      const profitDollarChange = (profitTargetPrice - entrySignal.price).toFixed(2);
+      const profitPercent = (
+        (Math.abs(profitTargetPrice - entrySignal.price) / entrySignal.price) *
+        100
+      ).toFixed(2);
+      const changeSign = parseFloat(profitDollarChange) >= 0 ? '+' : '';
+      lines.push(
+        `Profit Target: $${profitTargetPrice.toFixed(2)} (${changeSign}$${profitDollarChange}, ${profitPercent}% gain)`
+      );
+    }
+
+    if (exitPrices.stopLoss.price && exitPrices.profitTarget.price) {
+      const riskAmount = Math.abs(entrySignal.price - exitPrices.stopLoss.price);
+      const rewardAmount = Math.abs(exitPrices.profitTarget.price - entrySignal.price);
+      const riskRewardRatio = rewardAmount / riskAmount;
+      lines.push(`Risk/Reward Ratio: 1:${riskRewardRatio.toFixed(2)}`);
+    }
+    lines.push('');
+  }
+
+  // LLM Rationale
+  if (llmDecision.rationale) {
+    lines.push('🧠 LLM Rationale:');
+    lines.push(llmDecision.rationale);
+    lines.push('');
+  }
+
+  // Individual LLM Responses
+  if (llmDecision._debug?.responses) {
+    lines.push('📝 Individual LLM Responses:');
+    llmDecision._debug.responses.forEach((response: any, index: number) => {
+      const actionEmoji =
+        response.action === 'long' ? '🔼' : response.action === 'short' ? '🔽' : '⏸️';
+      lines.push(
+        `LLM ${index + 1}: ${actionEmoji} ${response.action?.toUpperCase() || 'NO ACTION'}`
+      );
+      if (response.rationalization) {
+        lines.push(`   Reasoning: ${response.rationalization}`);
+      }
+      if (response.proposedStopLoss) {
+        lines.push(`   Proposed Stop: $${response.proposedStopLoss}`);
+      }
+      if (response.proposedProfitTarget) {
+        lines.push(`   Proposed Target: $${response.proposedProfitTarget}`);
+      }
+      if (response.cost) {
+        lines.push(`   Cost: $${response.cost.toFixed(6)}`);
+      }
+      lines.push('');
+    });
+  }
+
+  // Total cost
+  if (llmDecision.cost) {
+    lines.push(`Total LLM Cost: $${llmDecision.cost.toFixed(6)}`);
+  }
+
+  return lines.join('\n');
+};
+
+/**
+ * Save terminal output to files with action in filename
+ */
+const saveOutputToFiles = (
+  output: string,
+  decision: LlmDecision,
+  ticker: string,
+  tradeDate: string,
+  patternDir: string
+): void => {
+  try {
+    // Create timestamp-based filename
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const actionText = decision.toUpperCase().replace('_', '_');
+
+    // Create timestamped output file
+    const timestampedFilename = `${timestamp}_${ticker}_${tradeDate.replace(/-/g, '')}_action_${actionText}.txt`;
+    const timestampedPath = `${patternDir}/${timestampedFilename}`;
+    fs.writeFileSync(timestampedPath, output, 'utf-8');
+
+    // Create latest action file (single file, gets overwritten each time)
+    const latestFilename = `latest_action.txt`;
+    const latestPath = `${patternDir}/${latestFilename}`;
+    fs.writeFileSync(latestPath, output, 'utf-8');
+
+    console.log(chalk.dim(`Output saved: ${timestampedPath}`));
+    console.log(chalk.dim(`Latest output: ${latestPath}`));
+  } catch (error) {
+    console.log(chalk.yellow(`⚠️  Could not save output files: ${error}`));
+  }
 };
 
 /**

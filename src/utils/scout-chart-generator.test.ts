@@ -2,7 +2,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
 import sharp from 'sharp';
-import { generateScoutChart, type ScoutChartOptions } from './scout-chart-generator';
+import {
+  generateScoutChart,
+  addLlmResultOverlay,
+  type ScoutChartOptions,
+  type LlmDecision,
+} from './scout-chart-generator';
 import { generateSvgChart } from './chart-generator';
 
 // Mock dependencies
@@ -197,6 +202,141 @@ describe('Scout Chart Generator', () => {
 
       expect(result).toContain('SPY');
       expect(result).toContain('20240103');
+    });
+  });
+
+  describe('addLlmResultOverlay', () => {
+    let mockSharpInstance: any;
+    let mockCompositeInstance: any;
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+
+      // Mock sharp chain for overlay
+      mockCompositeInstance = {
+        png: vi.fn().mockReturnThis(),
+        toFile: vi.fn().mockResolvedValue(undefined),
+      };
+
+      mockSharpInstance = {
+        metadata: vi.fn().mockResolvedValue({ width: 1200, height: 800 }),
+        composite: vi.fn().mockReturnValue(mockCompositeInstance),
+      };
+
+      mockedSharp.mockReturnValue(mockSharpInstance);
+    });
+
+    it('should create result chart with LONG overlay', async () => {
+      const originalPath = 'charts/scout/test_masked.png';
+      const decision: LlmDecision = 'long';
+
+      const result = await addLlmResultOverlay(originalPath, decision);
+
+      expect(result).toBe('charts/scout/test_masked_result.png');
+      expect(mockSharpInstance.metadata).toHaveBeenCalledWith();
+      expect(mockSharpInstance.composite).toHaveBeenCalledWith([
+        expect.objectContaining({
+          input: expect.any(Buffer),
+          blend: 'over',
+        }),
+      ]);
+      expect(mockCompositeInstance.png).toHaveBeenCalled();
+      expect(mockCompositeInstance.toFile).toHaveBeenCalledWith(
+        'charts/scout/test_masked_result.png'
+      );
+    });
+
+    it('should create result chart with SHORT overlay', async () => {
+      const originalPath = 'charts/scout/test_masked.png';
+      const decision: LlmDecision = 'short';
+
+      const result = await addLlmResultOverlay(originalPath, decision);
+
+      expect(result).toBe('charts/scout/test_masked_result.png');
+      expect(mockSharpInstance.composite).toHaveBeenCalledWith([
+        expect.objectContaining({
+          input: expect.any(Buffer),
+          blend: 'over',
+        }),
+      ]);
+    });
+
+    it('should create result chart with DO_NOTHING overlay', async () => {
+      const originalPath = 'charts/scout/test_masked.png';
+      const decision: LlmDecision = 'do_nothing';
+
+      const result = await addLlmResultOverlay(originalPath, decision);
+
+      expect(result).toBe('charts/scout/test_masked_result.png');
+      expect(mockSharpInstance.composite).toHaveBeenCalledWith([
+        expect.objectContaining({
+          input: expect.any(Buffer),
+          blend: 'over',
+        }),
+      ]);
+    });
+
+    it('should handle metadata errors gracefully', async () => {
+      mockSharpInstance.metadata.mockRejectedValue(new Error('Metadata failed'));
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const originalPath = 'charts/scout/test_masked.png';
+      const decision: LlmDecision = 'long';
+
+      await expect(addLlmResultOverlay(originalPath, decision)).rejects.toThrow('Metadata failed');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error adding LLM result overlay:',
+        expect.any(Error)
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should handle composite errors gracefully', async () => {
+      mockCompositeInstance.toFile.mockRejectedValue(new Error('Composite failed'));
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const originalPath = 'charts/scout/test_masked.png';
+      const decision: LlmDecision = 'long';
+
+      await expect(addLlmResultOverlay(originalPath, decision)).rejects.toThrow('Composite failed');
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        'Error adding LLM result overlay:',
+        expect.any(Error)
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should use correct colors for each decision', async () => {
+      mockSharpInstance.metadata.mockResolvedValue({ width: 1200, height: 800 });
+
+      // Test LONG (green)
+      await addLlmResultOverlay('test_masked.png', 'long');
+      let svgCall = mockSharpInstance.composite.mock.calls[0][0][0];
+      let svgContent = svgCall.input.toString();
+      expect(svgContent).toContain('#22C55E'); // Green color
+      expect(svgContent).toContain('LONG');
+
+      vi.clearAllMocks();
+      mockSharpInstance.composite.mockReturnValue(mockCompositeInstance);
+
+      // Test SHORT (red)
+      await addLlmResultOverlay('test_masked.png', 'short');
+      svgCall = mockSharpInstance.composite.mock.calls[0][0][0];
+      svgContent = svgCall.input.toString();
+      expect(svgContent).toContain('#EF4444'); // Red color
+      expect(svgContent).toContain('SHORT');
+
+      vi.clearAllMocks();
+      mockSharpInstance.composite.mockReturnValue(mockCompositeInstance);
+
+      // Test DO_NOTHING (orange)
+      await addLlmResultOverlay('test_masked.png', 'do_nothing');
+      svgCall = mockSharpInstance.composite.mock.calls[0][0][0];
+      svgContent = svgCall.input.toString();
+      expect(svgContent).toContain('#F59E0B'); // Orange color
+      expect(svgContent).toContain('DO NOTHING');
     });
   });
 });

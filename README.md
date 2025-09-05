@@ -483,6 +483,8 @@ pnpm scout --ticker SPY --date 2025-05-28 --time 14:30 --verbose
 - **Trade Recommendations**: Provides entry/exit levels, stop loss, and profit targets
 - **Risk/Reward Analysis**: Calculates risk-reward ratios and percentage moves
 - **Flexible Timing**: Analyze any date/time, not just current market conditions
+- **Result Charts**: Automatically generates charts with LLM decision overlays
+- **Output Files**: Saves complete analysis results to timestamped and latest files
 
 ## Market Context for LLM Analysis
 
@@ -521,6 +523,33 @@ This context helps the LLM understand:
 
 **Note**: When `suppressSma: true` is set in configuration, SMA-related metrics are excluded from
 both charts and LLM prompts, focusing analysis on price action and VWAP only.
+
+## Generated Files
+
+Scout automatically generates multiple files for each analysis:
+
+### Chart Files
+
+- **`YYYY-MM-DDTHH-mm-ss_TICKER_YYYYMMDD_masked.png`** - Anonymized chart sent to LLM
+- **`YYYY-MM-DDTHH-mm-ss_TICKER_YYYYMMDD_complete.png`** - Full chart with all details
+- **`YYYY-MM-DDTHH-mm-ss_TICKER_YYYYMMDD_masked_result.png`** - Masked chart with LLM decision
+  overlay
+- **`latest_masked.png`** - Most recent anonymized chart
+- **`latest_complete.png`** - Most recent complete chart
+- **`latest_masked_result.png`** - Most recent chart with decision overlay
+
+### Output Files
+
+- **`YYYY-MM-DDTHH-mm-ss_TICKER_YYYYMMDD_action_[DECISION].txt`** - Timestamped analysis results
+- **`latest_action.txt`** - Most recent analysis results (overwritten each run)
+
+### Decision Overlays
+
+Charts with `_result.png` suffix include color-coded decision overlays:
+
+- **LONG** - Green text overlay
+- **SHORT** - Red text overlay
+- **DO NOTHING** - Orange text overlay
 
 ## Command Line Options
 
