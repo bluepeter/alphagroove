@@ -49,7 +49,7 @@ describe('LlmApiService Market Metrics Integration', () => {
   describe('Market Metrics in Prompts', () => {
     it('should include market metrics in LLM prompts when provided', async () => {
       const chartPath = '/path/to/chart.png';
-      const marketMetrics = `Prev Close: $100.50 | Today Open: $101.00 | GAP UP: +$0.50 (+0.50%)
+      const marketMetrics = `Prev Close: $100.50 | Today Open: $101.00 with a GAP UP of $0.50 (+0.50%)
 Today H/L: $102.00/$100.75 | Current: $101.50 @ 10:30 AM
 Current price of $101.50 is $0.25 ABOVE VWAP of $101.25.
 Current price of $101.50 is $0.75 ABOVE SMA of $100.75.
@@ -65,7 +65,7 @@ VWAP of $101.25 is $0.50 ABOVE SMA of $100.75.`;
       const firstPromptText = firstCall.messages[0].content[0].text;
       expect(firstPromptText).toContain('Market Context:');
       expect(firstPromptText).toContain('Prev Close: $100.50');
-      expect(firstPromptText).toContain('GAP UP: +$0.50');
+      expect(firstPromptText).toContain('with a GAP UP of $0.50');
       expect(firstPromptText).toContain('Current price of $101.50 is $0.25 ABOVE VWAP');
       expect(firstPromptText).toContain('Current price of $101.50 is $0.75 ABOVE SMA');
       expect(firstPromptText).toContain('VWAP of $101.25 is $0.50 ABOVE SMA');

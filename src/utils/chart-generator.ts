@@ -628,14 +628,6 @@ export const generateSvgChart = (
         `<line x1="${line.x}" y1="${marginTop}" x2="${line.x}" y2="${marginTop + chartHeight}" stroke="#666" stroke-width="2" />`
     )
     .join('\n')}
-    
-  {/* Date Labels in Price Chart Area */}
-  ${dateLabelsForChartArea
-    .map(
-      label =>
-        `<text x="${label.x}" y="${marginTop + 15}" font-size="14" fill="#333" font-weight="bold">${label.text}</text>`
-    )
-    .join('\n  ')}
   
   <line x1="${marginLeft}" y1="${marginTop}" x2="${marginLeft}" y2="${marginTop + chartHeight}" stroke="#333" stroke-width="1" />
   ${(() => {
@@ -958,6 +950,14 @@ export const generateSvgChart = (
       })
       .join('\\n  ');
   })()}
+
+  {/* Date Labels in Price Chart Area - Rendered last to be on top */}
+  ${dateLabelsForChartArea
+    .map(
+      label =>
+        `<text x="${label.x}" y="${marginTop + 15}" font-size="14" fill="#333" font-weight="bold">${label.text}</text>`
+    )
+    .join('\n  ')}
 </svg>
   `.trim();
 };

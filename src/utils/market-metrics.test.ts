@@ -118,9 +118,9 @@ describe('Market Metrics', () => {
       const result = generateMarketMetrics(mockBars, mockEntrySignal, mockDailyBars);
 
       expect(result.marketDataLine1).toContain('Prior Day Close: $100.50');
-      expect(result.marketDataLine1).toContain('GAP UP: +$0.50');
+      expect(result.marketDataLine1).toContain('with a GAP UP of $0.50');
       expect(result.marketDataLine2).toContain('Signal Day H/L: $102.00/$100.75');
-      expect(result.marketDataLine2).toContain('Signal Day Current: $101.50');
+      expect(result.marketDataLine2).toContain('Signal Day current price is: $101.50');
       expect(result.vwapInfo).toBe('Signal Day price of $101.50 is $0.25 ABOVE VWAP of $101.25.');
       expect(result.smaInfo).toBe('Signal Day price of $101.50 is $0.75 ABOVE SMA of $100.75.');
       expect(result.vwapVsSmaInfo).toBe('VWAP of $101.25 is $0.50 ABOVE SMA of $100.75.');
@@ -201,7 +201,7 @@ describe('Market Metrics', () => {
 
       const result = generateMarketMetrics(noGapBars, mockEntrySignal, mockDailyBars);
 
-      expect(result.marketDataLine1).toContain('NO GAP: $0.00 (0.00%)');
+      expect(result.marketDataLine1).toContain('with NO GAP');
     });
 
     it('should use provided daily bars when available', async () => {

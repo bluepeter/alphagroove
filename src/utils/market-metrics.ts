@@ -177,33 +177,6 @@ export const generateMarketMetrics = (
     minute: '2-digit',
   });
 
-  // Calculate remaining time in trading day
-  const calculateRemainingTime = (signalTimestamp: string): string => {
-    const signalDate = new Date(signalTimestamp);
-
-    // Market close is 4:00 PM ET (16:00)
-    const marketCloseDate = new Date(signalDate);
-    marketCloseDate.setHours(16, 0, 0, 0);
-
-    const remainingMs = marketCloseDate.getTime() - signalDate.getTime();
-
-    if (remainingMs <= 0) {
-      return 'Market Closed';
-    }
-
-    const remainingMinutes = Math.floor(remainingMs / (1000 * 60));
-    const hours = Math.floor(remainingMinutes / 60);
-    const minutes = remainingMinutes % 60;
-
-    if (hours > 0) {
-      return `${hours}h ${minutes}m remaining`;
-    } else {
-      return `${minutes}m remaining`;
-    }
-  };
-
-  const remainingTime = calculateRemainingTime(entrySignal.timestamp);
-
   // Calculate market data context
   const marketData = calculateMarketDataContext(allDataInput, entryDate);
   marketData.currentPrice = entrySignal.price;
@@ -240,25 +213,25 @@ export const generateMarketMetrics = (
     }
   }
 
-  // Enhanced gap information with clear directional language
+  // Enhanced gap information with natural language
   let gapInfo = '';
   if (marketData.previousClose && marketData.currentOpen) {
     const gapAmount = marketData.currentOpen - marketData.previousClose;
     const gapPercent = ((Math.abs(gapAmount) / marketData.previousClose) * 100).toFixed(2);
 
     if (gapAmount > 0) {
-      gapInfo = `GAP UP: +$${gapAmount.toFixed(2)} (+${gapPercent}%)`;
+      gapInfo = `with a GAP UP of $${gapAmount.toFixed(2)} (+${gapPercent}%)`;
     } else if (gapAmount < 0) {
-      gapInfo = `GAP DOWN: $${gapAmount.toFixed(2)} (-${gapPercent}%)`;
+      gapInfo = `with a GAP DOWN of $${Math.abs(gapAmount).toFixed(2)} (-${gapPercent}%)`;
     } else {
-      gapInfo = `NO GAP: $0.00 (0.00%)`;
+      gapInfo = `with NO GAP`;
     }
   }
 
   // Format market data lines with explicit day references
-  const marketDataLine1 = `Prior Day Close: ${marketData.previousClose ? '$' + marketData.previousClose.toFixed(2) : 'N/A'} | Signal Day Open: ${marketData.currentOpen ? '$' + marketData.currentOpen.toFixed(2) : 'N/A'} | ${gapInfo || 'Gap: N/A'}`;
+  const marketDataLine1 = `Prior Day Close: ${marketData.previousClose ? '$' + marketData.previousClose.toFixed(2) : 'N/A'} | Signal Day Open: ${marketData.currentOpen ? '$' + marketData.currentOpen.toFixed(2) : 'N/A'}${gapInfo ? ' ' + gapInfo : ' | Gap: N/A'}`;
 
-  const marketDataLine2 = `Signal Day H/L: ${marketData.currentHigh ? '$' + marketData.currentHigh.toFixed(2) : 'N/A'}/${marketData.currentLow ? '$' + marketData.currentLow.toFixed(2) : 'N/A'} | Signal Day Current: $${marketData.currentPrice.toFixed(2)} @ ${entryTime} | ${remainingTime}`;
+  const marketDataLine2 = `Signal Day H/L: ${marketData.currentHigh ? '$' + marketData.currentHigh.toFixed(2) : 'N/A'}/${marketData.currentLow ? '$' + marketData.currentLow.toFixed(2) : 'N/A'} | Signal Day current price is: $${marketData.currentPrice.toFixed(2)} @ ${entryTime}`;
 
   // Add day summary lines with actual data ranges
   // Get prior day data - only the immediate prior trading day (same logic as calculateMarketDataContext)
@@ -289,7 +262,8 @@ export const generateMarketMetrics = (
       })
     : [];
 
-  let priorDaySummary = 'PRIOR DAY SUMMARY: N/A';
+  let priorDaySummary =
+    'Prior Day Open: N/A | Prior Day High: N/A | Prior Day Low: N/A | Prior Day Close: N/A';
   if (priorDayData.length > 0) {
     // Sort by timestamp to ensure we get the correct close (last bar of prior day)
     const sortedPriorDayBars = priorDayData.sort(
@@ -300,10 +274,10 @@ export const generateMarketMetrics = (
     const priorHigh = Math.max(...priorDayData.map(b => b.high));
     const priorClose = sortedPriorDayBars[sortedPriorDayBars.length - 1].close; // Last bar close
 
-    priorDaySummary = `PRIOR DAY SUMMARY: Open $${priorDayData[0].open.toFixed(2)} | High $${priorHigh.toFixed(2)} | Low $${priorLow.toFixed(2)} | Close $${priorClose.toFixed(2)}`;
+    priorDaySummary = `Prior Day Open: $${priorDayData[0].open.toFixed(2)} | Prior Day High: $${priorHigh.toFixed(2)} | Prior Day Low: $${priorLow.toFixed(2)} | Prior Day Close: $${priorClose.toFixed(2)}`;
   }
 
-  const signalDayPerformance = `SIGNAL DAY PERFORMANCE: Open $${marketData.currentOpen ? marketData.currentOpen.toFixed(2) : 'N/A'} | High $${marketData.currentHigh ? marketData.currentHigh.toFixed(2) : 'N/A'} | Low $${marketData.currentLow ? marketData.currentLow.toFixed(2) : 'N/A'} | Current $${marketData.currentPrice.toFixed(2)} @ ${entryTime} | ${remainingTime}${marketData.currentOpen ? ' | Change +$' + (marketData.currentPrice - marketData.currentOpen).toFixed(2) + ' from open' : ''} | ${gapInfo || 'Gap: N/A'}`;
+  const signalDayPerformance = `Signal Day Open: $${marketData.currentOpen ? marketData.currentOpen.toFixed(2) : 'N/A'} ${gapInfo || ''} | Signal Day High: $${marketData.currentHigh ? marketData.currentHigh.toFixed(2) : 'N/A'} | Signal Day Low: $${marketData.currentLow ? marketData.currentLow.toFixed(2) : 'N/A'} | Signal Day current price is $${marketData.currentPrice.toFixed(2)} @ ${entryTime}${marketData.currentOpen ? ' which is ' + (marketData.currentPrice - marketData.currentOpen >= 0 ? 'UP $' : 'DOWN $') + Math.abs(marketData.currentPrice - marketData.currentOpen).toFixed(2) + ' from Open' : ''}`;
 
   // Format VWAP information (only if not suppressed)
   let vwapInfo = '';
