@@ -237,6 +237,13 @@ const performLLMAnalysis = async (
   const completeChartPath = chartPath.replace('_masked.png', '_complete.png');
   console.log(chalk.dim(`Complete chart (for review): ${completeChartPath}`));
 
+  // Show latest chart locations
+  const chartDir = chartPath.substring(0, chartPath.lastIndexOf('/'));
+  const latestMaskedPath = `${chartDir}/latest_masked.png`;
+  const latestCompletePath = `${chartDir}/latest_complete.png`;
+  console.log(chalk.dim(`Latest masked chart: ${latestMaskedPath}`));
+  console.log(chalk.dim(`Latest complete chart: ${latestCompletePath}`));
+
   // LLM Analysis - using same logic as backtest
   console.log(chalk.dim('\nAnalyzing chart with LLM...'));
 

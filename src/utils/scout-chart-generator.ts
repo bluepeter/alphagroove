@@ -92,6 +92,13 @@ export const generateScoutChart = async (options: ScoutChartOptions): Promise<st
       .png()
       .toFile(completePngOutputPath);
 
+    // Duplicate charts as latest versions for easy access
+    const latestMaskedPath = path.join(patternDir, 'latest_masked.png');
+    const latestCompletePath = path.join(patternDir, 'latest_complete.png');
+
+    fs.copyFileSync(pngOutputPath, latestMaskedPath);
+    fs.copyFileSync(completePngOutputPath, latestCompletePath);
+
     fs.unlinkSync(svgOutputPathLlm);
     fs.unlinkSync(svgOutputPathComplete);
     return pngOutputPath; // Return the masked chart path (for LLM)
