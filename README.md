@@ -654,3 +654,8 @@ alphagroove/
 ├── alphagroove.config.yaml # Configuration file (you create this)
 └── README.md           # This documentation
 ```
+
+## Licensing
+
+- Community: AGPL‑3.0‑only. See [LICENSE](LICENSE).
+- Commercial: Need to use PROJECT without AGPL obligations or for closed‑source use? [COMMERCIAL.md](COMMERCIAL.md) has details.
